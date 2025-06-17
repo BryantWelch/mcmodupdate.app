@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MC Updater | Update Your Minecraft Mods</title>
+    <style>
+      /* Scrollbar for File List */
+      .file-list::-webkit-scrollbar {
+        height: 12px; /* Made scrollbar thicker */
+      }
+      .file-list::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 4px;
+      }
+      .file-list::-webkit-scrollbar-thumb {
+        background-color: var(--border-color);
+        border-radius: 4px;
+      }
+      .file-list::-webkit-scrollbar-thumb:hover {
+        background-color: var(--gradient-start);
+      }
+      /* Firefox scrollbar */
+      .file-list {
+        scrollbar-width: auto; /* Changed from thin for potentially thicker scrollbar */
+        scrollbar-color: var(--border-color) rgba(255, 255, 255, 0.03);
+      }
+      /* --- Basic Setup & Fonts --- */
+      :root {
+        --bg-color: #11101d;
+        --primary-text: #e0e0e0;
+        --secondary-text: #a0a0a0;
+        --border-color: #4a4a5e;
+        --dropzone-bg: rgba(255, 255, 255, 0.05);
+        --dropzone-hover-bg: rgba(255, 255, 255, 0.1);
+        --pill-bg: #2a2a3a;
+        --gradient-start: #a855f7;
+        --gradient-end: #6366f1;
+      }
+      body {
+        background-color: var(--bg-color);
+        color: var(--primary-text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Helvetica, Arial, sans-serif;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start; /* Changed */
+        min-height: 100vh;
+        padding: 2rem 0 0 0; /* Changed: top 2rem, sides 0, bottom 0 */
+        box-sizing: border-box;
+      }
+
+      /* --- Main Layout & Content --- */
+      .main-container {
+        width: 100%;
+        max-width: 800px;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center; /* Added to center flex children horizontally */
+        gap: 1.5rem;
+        flex-grow: 1; 
+      }
+      h1 {
+        font-size: 3rem;
+        margin-bottom: 0.5rem;
+        font-weight: bold;
+        background: linear-gradient(
+          to right,
+          var(--gradient-start),
+          var(--gradient-end)
+        );
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin: 0;
+      }
+      .subtitle {
+        color: var(--secondary-text);
+        margin-top: 0;
+      }
+      .controls {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 1.5rem;
+      }
+      .control-group {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      select {
+        background-color: var(--bg-color);
+        color: var(--primary-text);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        padding: 0.5rem 1rem;
+        font-size: 1rem;
+        transition: background-color 0.2s ease, border-color 0.2s ease; /* Add transition for smooth hover */
+      }
+
+      select:hover {
+        border-color: var(--gradient-start);
+      }
+
+      /* --- File Dropzone --- */
+      .dropzone {
+        border: 2px dashed var(--border-color);
+        border-radius: 8px;
+        padding: 1rem;
+        /* Initial smaller size */
+        max-width: 400px;
+        height: 150px; 
+        margin-left: auto; /* Center the smaller dropzone */
+        margin-right: auto; /* Center the smaller dropzone */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        transition: background-color 0.2s ease, border-color 0.2s ease, max-width 0.3s ease, height 0.3s ease;
+        background-color: var(--dropzone-bg);
+        cursor: pointer; 
+      }
+      .dropzone.dropzone-expanded {
+        max-width: 100%; /* Expand to full width of parent */
+        min-height: 120px; /* Ensure enough height for pills */
+        height: auto; /* Adjust height based on content */
+      }
+      .dropzone:hover {
+        background-color: var(--dropzone-hover-bg);
+        border-color: var(--gradient-start);
+      }
+      .dropzone.dragover {
+        background-color: var(--dropzone-hover-bg);
+        border-color: var(--gradient-start);
+      }
+      .dropzone-prompt {
+        color: var(--secondary-text);
+      }
+      .file-list {
+        display: flex;
+        gap: 0.75rem;
+        width: 100%;
+        overflow-x: auto;
+        padding-bottom: 1.5rem; /* Increased padding to push scrollbar lower */
+      }
+      .file-pill {
+        background-color: var(--pill-bg);
+        padding: 0.5rem 1rem;
+        padding-right: 28px;
+        border-radius: 1rem;
+        white-space: nowrap;
+        font-size: 0.9rem;
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+      }
+      .file-pill span {
+        max-width: 200px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        display: inline-block;
+      }
+      .file-pill-remove {
+        position: absolute;
+        top: 50%;
+        right: 10px;
+        transform: translateY(-50%);
+        cursor: pointer;
+        font-size: 1.4rem;
+        line-height: 1;
+        color: var(--secondary-text);
+      }
+      .file-pill-remove:hover {
+        color: var(--primary-text);
+      }
+
+      /* --- Buttons --- */
+      .update-button {
+        background: linear-gradient(
+          to right,
+          var(--gradient-start),
+          var(--gradient-end)
+        );
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 0.6rem 0.5rem; /* Further reduced horizontal padding */
+        font-size: 1rem;    
+        font-weight: bold;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        transition: transform 0.2s ease;
+        max-width: 160px; /* Constrain button size */
+        /* margin-left: auto; /* Centering now handled by parent's align-items */
+        /* margin-right: auto; /* Centering now handled by parent's align-items */
+      }
+      .update-button:hover {
+        transform: scale(1.05);
+      }
+      .info-button {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 60px;
+        height: 60px;
+        background: var(--gradient-end);
+        border: none;
+        padding: 0;
+        cursor: pointer;
+        clip-path: polygon(0% 0%, 100% 0%, 100% 100%);
+        border-radius: 0;
+      }
+      .info-button svg {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        stroke: white;
+      }
+
+      /* --- Info Modal --- */
+      .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.7);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+      }
+      .modal-content {
+        background-color: #1e1e2f;
+        padding: 2rem;
+        border-radius: 12px;
+        max-width: 600px;
+        width: 90%;
+        position: relative;
+        color: var(--secondary-text);
+      }
+      .modal-content h2 {
+        color: var(--primary-text);
+        margin-top: 0;
+      }
+      .modal-content ul {
+        padding-left: 20px;
+      }
+      .modal-content li {
+        margin-bottom: 0.5rem;
+      }
+      .modal-close-button {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        background: none;
+        border: none;
+        color: var(--primary-text);
+        font-size: 1.5rem;
+        cursor: pointer;
+      }
+
+      /* --- Footer --- */
+      footer {
+        width: 100%;
+        background-color: #0c0c17; /* Restored dark background */
+        color: var(--secondary-text);
+        padding: 1rem 0 0.5rem 0; /* Reduced top padding */
+        font-size: 0.9rem;
+        margin-top: auto;
+        /* border-top: 1px solid var(--border-color); /* Removed, background defines area */
+      }
+      .footer-content {
+        display: flex;
+        justify-content: space-around;
+        flex-wrap: wrap;
+        gap: 1rem; 
+        max-width: 900px;
+        margin: 0 auto 1rem auto; 
+        padding: 0 1rem;
+        text-align: left; /* Columns left-aligned */
+      }
+      .footer-column {
+        flex: 1;
+        min-width: 180px;
+      }
+      .footer-column h4 {
+        color: var(--primary-text);
+        font-size: 1.1rem;
+        margin-bottom: 1rem;
+        font-weight: 600;
+      }
+      .footer-column ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+      .footer-column ul li {
+        margin-bottom: 0.6rem;
+      }
+      .footer-column ul li a {
+        color: var(--secondary-text);
+        text-decoration: none;
+        transition: color 0.2s ease;
+      }
+      .footer-column ul li a:hover {
+        color: var(--primary-text);
+        text-decoration: underline;
+      }
+      .footer-bottom {
+        text-align: center;
+        padding: 0.6rem 1rem; /* Reduced vertical padding */
+        border-top: 1px solid var(--border-color);
+        font-size: 0.85rem;
+        display: flex;
+        justify-content: space-between; /* Align items to ends */
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.5rem; /* Gap if items wrap */
+        /* max-width: 900px; /* Removed for full-width border */
+        /* margin: 0 auto; /* Removed for full-width border */
+        /* position: relative; /* No longer needed for kofi button */
+      }
+      .footer-bottom p {
+        margin: 0;
+        flex-grow: 1; /* Allow paragraph to take space for centering */
+        text-align: center; /* Copyright text centered */
+      }
+      .kofi-button {
+        margin-top: 3px; /* Nudge button down slightly */
+      }
+      /* .kofi-button positioning is now handled by flexbox in .footer-bottom */
+      .kofi-button img {
+        height: 36px;
+        width: auto;
+        border-radius: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Info Button in the corner -->
+    <button id="info-button" class="info-button" aria-label="Show info">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="16" x2="12" y2="12"></line>
+        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+      </svg>
+    </button>
+
+    <div class="main-container">
+      <header>
+        <h1>Minecraft Mod Updater</h1>
+        <p class="subtitle">
+          Easily find updates for your Minecraft Mods using the Modrinth API
+        </p>
+      </header>
+
+      <div class="controls">
+        <div class="control-group">
+          <label for="mod-loader">Loader:</label>
+          <select id="mod-loader">
+            <option value="fabric">Fabric</option>
+            <option value="forge">Forge</option>
+            <option value="quilt">Quilt</option>
+            <option value="neoforge">NeoForge</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label for="mc-version">Version:</label>
+          <select id="mc-version">
+            <!-- Options will be populated by JavaScript -->
+          </select>
+        </div>
+      </div>
+
+      <!-- The file dropzone -->
+      <div id="dropzone" class="dropzone">
+        <div id="file-list-container" class="file-list"></div>
+        <p id="dropzone-prompt" class="dropzone-prompt">
+          Upload your mod(s)
+        </p>
+      </div>
+
+      <button id="update-button" class="update-button">
+        Update
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="17 8 12 3 7 8"></polyline>
+          <line x1="12" y1="3" x2="12" y2="15"></line>
+        </svg>
+      </button>
+    </div>
+    <input type="file" id="file-input" multiple style="display: none;" accept=".jar" />
+
+    <!-- The Info Modal (hidden by default) -->
+    <div id="info-modal" class="modal-overlay">
+      <div class="modal-content">
+        <button id="modal-close-button" class="modal-close-button">
+          &times;
+        </button>
+        <h2>MC Updater and Loader Migrator</h2>
+        <p>
+          This tool helps you find updates for and lets you migrate Minecraft
+          Java Mods using the Modrinth API by simply uploading them as .jar
+          files.
+        </p>
+        <h3>How to use:</h3>
+        <ul>
+          <li>Select the desired mod loader (Fabric / Forge / etc).</li>
+          <li>Select the Minecraft version you want to target.</li>
+          <li>Upload your mod(s) by dragging and dropping them onto the page.</li>
+          <li>Let the tool find the targeted versions of your mods.</li>
+        </ul>
+        <h3>Attributions:</h3>
+        <p>
+          This tool relies on the Modrinth API for fetching mod updates. Please
+          be aware of their rate limits to prevent abuse.
+        </p>
+      </div>
+    </div>
+
+    <footer>
+      <div class="footer-content">
+        <div class="footer-column">
+          <h4>About</h4>
+          <ul>
+            <li><a href="https://github.com/BryantWelch/mc-updater.app" target="_blank" rel="noopener noreferrer">GitHub Repository</a></li>
+            <li><a href="https://github.com/BryantWelch/mc-updater.app/issues" target="_blank" rel="noopener noreferrer">Report an Issue</a></li>
+            <li><a href="https://github.com/BryantWelch/mc-updater.app/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener noreferrer">Contribute</a></li>
+            <li><a href="https://github.com/BryantWelch/mc-updater.app/releases" target="_blank" rel="noopener noreferrer">Releases</a></li>
+          </ul>
+        </div>
+        <div class="footer-column">
+          <h4>Resources</h4>
+          <ul>
+            <li><a href="https://modrinth.com" target="_blank" rel="noopener noreferrer">Modrinth Official</a></li>
+            <li><a href="https://www.curseforge.com/minecraft/mc-mods" target="_blank" rel="noopener noreferrer">CurseForge Mods</a></li>
+            <li><a href="https://fabricmc.net/" target="_blank" rel="noopener noreferrer">FabricMC</a></li>
+            <li><a href="https://neoforged.net/" target="_blank" rel="noopener noreferrer">NeoForged</a></li>
+          </ul>
+        </div>
+        <div class="footer-column">
+          <h4>Community</h4>
+          <ul>
+            <li><a href="https://www.reddit.com/r/ModdedMinecraft/" target="_blank" rel="noopener noreferrer">r/ModdedMinecraft</a></li>
+            <li><a href="https://www.reddit.com/r/feedthebeast/" target="_blank" rel="noopener noreferrer">r/feedthebeast</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; <span id="current-year">2024</span> Bryant Welch. Open source under MIT License.</p>
+        <a href="https://ko-fi.com/YOUR_KOFI_ID_HERE" target="_blank" rel="noopener noreferrer" class="kofi-button" title="Support the developer!">
+          <img src="https://storage.ko-fi.com/cdn/kofi5.png?v=6" alt="Buy Me a Coffee at ko-fi.com">
+        </a>
+      </div>
+    </footer>
+
+    <script>
+      // --- DOM Element References ---
+      const dropzone = document.getElementById("dropzone");
+      const dropzonePrompt = document.getElementById("dropzone-prompt");
+      const fileListContainer = document.getElementById("file-list-container");
+      const fileInput = document.getElementById("file-input"); // Added for clickable dropzone
+      const infoButton = document.getElementById("info-button");
+      const infoModal = document.getElementById("info-modal");
+      const modalCloseButton = document.getElementById("modal-close-button");
+
+      // --- Modal Logic ---
+      infoButton.addEventListener("click", () => {
+        infoModal.style.display = "flex";
+      });
+      modalCloseButton.addEventListener("click", () => {
+        infoModal.style.display = "none";
+      });
+      // Close modal if user clicks on the dark overlay
+      infoModal.addEventListener("click", (event) => {
+        if (event.target === infoModal) {
+          infoModal.style.display = "none";
+        }
+      });
+
+      // --- Dropzone Logic ---
+      // Prevent default browser behavior for drag and drop
+      ["dragenter", "dragover", "dragleave", "drop"].forEach((eventName) => {
+        dropzone.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        });
+      });
+
+      // Add visual feedback when item is dragged over
+      ["dragenter", "dragover"].forEach((eventName) => {
+        dropzone.addEventListener(eventName, () => {
+          dropzone.classList.add("dragover");
+        });
+      });
+
+      // Remove visual feedback when item leaves dropzone
+      ["dragleave", "drop"].forEach((eventName) => {
+        dropzone.addEventListener(eventName, () => {
+          dropzone.classList.remove("dragover");
+        });
+      });
+
+      // Handle the actual file drop
+      dropzone.addEventListener("drop", (event) => {
+        const files = event.dataTransfer.files;
+        handleFiles(files);
+      });
+
+      // Make dropzone clickable to open file dialog
+      dropzone.addEventListener("click", () => {
+        // Avoid triggering if a pill's remove button was clicked
+        if (event.target.classList.contains('file-pill-remove') || event.target.closest('.file-pill-remove')) {
+            return;
+        }
+        fileInput.click();
+      });
+
+      fileInput.addEventListener("change", (event) => {
+        const files = event.target.files;
+        if (files.length > 0) { // Check if files were actually selected
+            handleFiles(files);
+        }
+        // Reset the input's value to allow selecting the same file again if it was removed
+        event.target.value = null;
+      });
+
+      // --- File Handling Function ---
+      function handleFiles(files) {
+        if (files.length === 0) {
+          return;
+        }
+        // Hide the "Upload your mod(s)" prompt
+        dropzonePrompt.style.display = "none";
+        dropzone.classList.add("dropzone-expanded");
+        // Clear any previous files
+        fileListContainer.innerHTML = "";
+
+        // Loop through the FileList and create a "pill" for each file
+        for (const file of files) {
+          // We only care about .jar files for now
+          if (file.name.endsWith(".jar")) {
+            const filePill = document.createElement("div");
+            filePill.classList.add("file-pill");
+
+            const fileNameSpan = document.createElement("span");
+            fileNameSpan.textContent = file.name;
+            filePill.appendChild(fileNameSpan);
+
+            const removeButton = document.createElement("span");
+            removeButton.classList.add("file-pill-remove");
+            removeButton.innerHTML = "&times;";
+            removeButton.setAttribute("role", "button");
+            removeButton.setAttribute("tabindex", "0");
+            removeButton.setAttribute("aria-label", "Remove " + file.name);
+            removeButton.onclick = function(event) {
+              event.stopPropagation();
+              filePill.remove();
+              // If all pills are removed, show the prompt again
+              if (fileListContainer.children.length === 0) {
+                dropzonePrompt.style.display = "block";
+                dropzone.classList.remove("dropzone-expanded");
+              }
+              // TODO: Also remove from an internal list of files to be processed
+            };
+            // Allow removal with Enter key for accessibility
+            removeButton.onkeydown = function(event) {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                removeButton.onclick(event);
+              }
+            };
+            filePill.appendChild(removeButton);
+            fileListContainer.appendChild(filePill);
+          }
+        }
+
+        // If no valid files were dropped, show the prompt again
+        if (fileListContainer.children.length === 0) {
+          dropzonePrompt.style.display = "block";
+          dropzone.classList.remove("dropzone-expanded");
+        }
+      }
+
+      // --- TODO: API Logic ---
+      // Update footer year
+      document.getElementById("current-year").textContent = new Date().getFullYear();
+
+      // Populate Minecraft Versions Dropdown
+      const mcVersionSelect = document.getElementById('mc-version');
+      const mcVersionsData = [
+        // 1.21 (1-6)
+        { display: "1.21", value: "1.21", isSubVersion: false },
+        { display: "&nbsp;&nbsp;1.21.6", value: "1.21.6", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.21.5", value: "1.21.5", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.21.4", value: "1.21.4", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.21.3", value: "1.21.3", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.21.2", value: "1.21.2", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.21.1", value: "1.21.1", isSubVersion: true },
+        // 1.20 (1-6)
+        { display: "1.20", value: "1.20", isSubVersion: false },
+        { display: "&nbsp;&nbsp;1.20.6", value: "1.20.6", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.20.5", value: "1.20.5", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.20.4", value: "1.20.4", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.20.3", value: "1.20.3", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.20.2", value: "1.20.2", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.20.1", value: "1.20.1", isSubVersion: true },
+        // 1.19 (1-4)
+        { display: "1.19", value: "1.19", isSubVersion: false },
+        { display: "&nbsp;&nbsp;1.19.4", value: "1.19.4", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.19.3", value: "1.19.3", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.19.2", value: "1.19.2", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.19.1", value: "1.19.1", isSubVersion: true },
+        // 1.18 (1-2)
+        { display: "1.18", value: "1.18", isSubVersion: false },
+        { display: "&nbsp;&nbsp;1.18.2", value: "1.18.2", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.18.1", value: "1.18.1", isSubVersion: true },
+        // 1.17 (1)
+        { display: "1.17", value: "1.17", isSubVersion: false },
+        { display: "&nbsp;&nbsp;1.17.1", value: "1.17.1", isSubVersion: true },
+        // 1.16 (1-5)
+        { display: "1.16", value: "1.16", isSubVersion: false },
+        { display: "&nbsp;&nbsp;1.16.5", value: "1.16.5", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.16.4", value: "1.16.4", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.16.3", value: "1.16.3", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.16.2", value: "1.16.2", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.16.1", value: "1.16.1", isSubVersion: true },
+        // 1.15 (1-2)
+        { display: "1.15", value: "1.15", isSubVersion: false },
+        { display: "&nbsp;&nbsp;1.15.2", value: "1.15.2", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.15.1", value: "1.15.1", isSubVersion: true },
+        // 1.14 (1-4)
+        { display: "1.14", value: "1.14", isSubVersion: false },
+        { display: "&nbsp;&nbsp;1.14.4", value: "1.14.4", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.14.3", value: "1.14.3", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.14.2", value: "1.14.2", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.14.1", value: "1.14.1", isSubVersion: true },
+        // 1.13 (1-2)
+        { display: "1.13", value: "1.13", isSubVersion: false },
+        { display: "&nbsp;&nbsp;1.13.2", value: "1.13.2", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.13.1", value: "1.13.1", isSubVersion: true },
+        // 1.12 (1-2)
+        { display: "1.12", value: "1.12", isSubVersion: false },
+        { display: "&nbsp;&nbsp;1.12.2", value: "1.12.2", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.12.1", value: "1.12.1", isSubVersion: true },
+        // 1.11 (1-2)
+        { display: "1.11", value: "1.11", isSubVersion: false },
+        { display: "&nbsp;&nbsp;1.11.2", value: "1.11.2", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.11.1", value: "1.11.1", isSubVersion: true },
+        // 1.10 (1-2)
+        { display: "1.10", value: "1.10", isSubVersion: false },
+        { display: "&nbsp;&nbsp;1.10.2", value: "1.10.2", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.10.1", value: "1.10.1", isSubVersion: true },
+        // 1.9 (1-4)
+        { display: "1.9", value: "1.9", isSubVersion: false },
+        { display: "&nbsp;&nbsp;1.9.4", value: "1.9.4", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.9.3", value: "1.9.3", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.9.2", value: "1.9.2", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.9.1", value: "1.9.1", isSubVersion: true },
+        // 1.8 (1-9)
+        { display: "1.8", value: "1.8", isSubVersion: false },
+        { display: "&nbsp;&nbsp;1.8.9", value: "1.8.9", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.8.8", value: "1.8.8", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.8.7", value: "1.8.7", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.8.6", value: "1.8.6", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.8.5", value: "1.8.5", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.8.4", value: "1.8.4", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.8.3", value: "1.8.3", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.8.2", value: "1.8.2", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.8.1", value: "1.8.1", isSubVersion: true },
+        // 1.7 (1-10)
+        { display: "1.7", value: "1.7", isSubVersion: false },
+        { display: "&nbsp;&nbsp;1.7.10", value: "1.7.10", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.7.9", value: "1.7.9", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.7.8", value: "1.7.8", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.7.7", value: "1.7.7", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.7.6", value: "1.7.6", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.7.5", value: "1.7.5", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.7.4", value: "1.7.4", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.7.3", value: "1.7.3", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.7.2", value: "1.7.2", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.7.1", value: "1.7.1", isSubVersion: true },
+        // 1.6 (1-4)
+        { display: "1.6", value: "1.6", isSubVersion: false },
+        { display: "&nbsp;&nbsp;1.6.4", value: "1.6.4", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.6.3", value: "1.6.3", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.6.2", value: "1.6.2", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.6.1", value: "1.6.1", isSubVersion: true },
+        // 1.5 (1-2)
+        { display: "1.5", value: "1.5", isSubVersion: false },
+        { display: "&nbsp;&nbsp;1.5.2", value: "1.5.2", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.5.1", value: "1.5.1", isSubVersion: true },
+        // 1.4 (1-7)
+        { display: "1.4", value: "1.4", isSubVersion: false },
+        { display: "&nbsp;&nbsp;1.4.7", value: "1.4.7", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.4.6", value: "1.4.6", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.4.5", value: "1.4.5", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.4.4", value: "1.4.4", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.4.3", value: "1.4.3", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.4.2", value: "1.4.2", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.4.1", value: "1.4.1", isSubVersion: true },
+        // 1.3 (1-2)
+        { display: "1.3", value: "1.3", isSubVersion: false },
+        { display: "&nbsp;&nbsp;1.3.2", value: "1.3.2", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.3.1", value: "1.3.1", isSubVersion: true },
+        // 1.2 (1-5)
+        { display: "1.2", value: "1.2", isSubVersion: false },
+        { display: "&nbsp;&nbsp;1.2.5", value: "1.2.5", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.2.4", value: "1.2.4", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.2.3", value: "1.2.3", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.2.2", value: "1.2.2", isSubVersion: true },
+        { display: "&nbsp;&nbsp;1.2.1", value: "1.2.1", isSubVersion: true },
+        // 1.1
+        { display: "1.1", value: "1.1", isSubVersion: false },
+        // 1.0
+        { display: "1.0", value: "1.0", isSubVersion: false }
+      ];
+      
+      mcVersionSelect.innerHTML = ''; // Clear existing options
+
+      mcVersionsData.forEach(version => {
+        const option = document.createElement('option');
+        option.value = version.value;
+        option.dataset.cleanDisplay = version.value; // Store clean display text (same as value)
+        option.dataset.indentedDisplay = version.display; // Store display text with &nbsp;
+        option.innerHTML = option.dataset.indentedDisplay; // Initially populate with indented text
+        mcVersionSelect.appendChild(option);
+      });
+      
+      // Set the highest non-sub-version as the default
+      const defaultVersionEntry = mcVersionsData.find(version => !version.isSubVersion);
+      if (defaultVersionEntry) {
+        const defaultOption = mcVersionSelect.querySelector(`option[value="${defaultVersionEntry.value}"]`);
+        if (defaultOption) {
+          defaultOption.selected = true;
+        }
+      } else if (mcVersionSelect.options.length > 0) {
+        // Fallback to the very first option in the list if no non-sub-version is found (should not happen with current data)
+        mcVersionSelect.options[0].selected = true;
+      }
+
+      // Helper function to set the displayed text of the selected option to its 'clean' version
+      function _updateSelectedOptionDisplay(selectElement) {
+        if (selectElement.selectedIndex !== -1) {
+          const opt = selectElement.options[selectElement.selectedIndex];
+          // Ensure opt and its dataset properties exist before trying to access them
+          if (opt && opt.dataset && opt.dataset.cleanDisplay) {
+            opt.innerHTML = opt.dataset.cleanDisplay;
+          }
+        }
+      }
+
+      // Set the display for the initially selected default option
+      _updateSelectedOptionDisplay(mcVersionSelect);
+
+      // When the select box gains focus (e.g., user clicks or tabs to it)
+      // reset all options to their indented display for the dropdown list
+      mcVersionSelect.addEventListener('focus', () => {
+        for (let i = 0; i < mcVersionSelect.options.length; i++) {
+          const opt = mcVersionSelect.options[i];
+          if (opt && opt.dataset && opt.dataset.indentedDisplay) {
+            opt.innerHTML = opt.dataset.indentedDisplay;
+          }
+        }
+      });
+
+      // When the selection changes, update the newly selected option's display to clean
+      mcVersionSelect.addEventListener('change', () => {
+        _updateSelectedOptionDisplay(mcVersionSelect);
+      });
+
+      // When the select box loses focus, ensure the selected option shows clean text
+      mcVersionSelect.addEventListener('blur', () => {
+        _updateSelectedOptionDisplay(mcVersionSelect);
+      });
+
+      // --- TODO: API Logic ---
+      // This is where you'll add the logic to process the files
+      // and call the Modrinth API when the "Update" button is clicked.
+      const updateButton = document.getElementById("update-button");
+      updateButton.addEventListener("click", () => {
+        console.log("Update button clicked!");
+        // 1. Get the list of files (you'll need to store them from the drop event)
+        // 2. For each file, parse the name or use JSZip to read the mod ID
+        // 3. Call the Modrinth API for each mod ID
+        // 4. Display the results
+        alert("Update functionality is not yet implemented.");
+      });
+    </script>
+  </body>
+</html>
