@@ -15,11 +15,8 @@ A powerful web-based tool to update your Minecraft mods, discover new ones, and 
 
 ---
 
-<!--
-TODO: Take a screenshot of your app with results and replace this placeholder.
-A great screenshot is the best way to show off your work!
--->
-![Application Screenshot](https://mcmodupdate.app/social-preview.png)
+![Recording 2025-06-22 at 02 06 36](https://github.com/user-attachments/assets/aeb3e94e-068e-4fa4-a960-1b221ab5bc9a)
+
 
 ## About The Project
 
