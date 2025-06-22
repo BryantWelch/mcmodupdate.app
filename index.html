@@ -3,31 +3,36 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MC Updater | Update Your Minecraft Mods</title>
+    <title>MC Mod Updater | Update Your Minecraft Mods</title>
+    <meta name="description" content="Easily update your Minecraft mods or build a new modpack from scratch. Upload your .jar files or search for mods on Modrinth to find the latest compatible versions and dependencies.">
+    <meta name="keywords" content="Minecraft, Mod, Updater, Modpack, Builder, Modrinth, Fabric, Forge, NeoForge, Quilt, Update, Minecraft Mods">
+    <meta name="author" content="Bryant Welch">
+    <link rel="canonical" href="https://mcmodupdate.app/">
+    
+    <!-- Favicon and Theme Configuration -->
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+    <link rel="manifest" href="site.webmanifest">
+    <meta name="msapplication-TileColor" content="#6366f1">
+    <meta name="theme-color" content="#11101d">
+
+    <!-- Open Graph / Social Media Tags -->
+    <meta property="og:title" content="MC Updater | Update & Build Minecraft Modpacks">
+    <meta property="og:description" content="A powerful web tool to update existing mods and discover new ones via the Modrinth API.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://mcmodupdate.app/">
+    <meta property="og:image" content="https://mcmodupdate.app/social-preview.png">
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/toml@3.0.0/toml.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
     <style>
-      /* Scrollbar for File List */
-      .file-list::-webkit-scrollbar {
-        height: 12px; /* Made scrollbar thicker */
-      }
-      .file-list::-webkit-scrollbar-track {
-        background: rgba(255, 255, 255, 0.03);
-        border-radius: 4px;
-      }
-      .file-list::-webkit-scrollbar-thumb {
-        background-color: var(--border-color);
-        border-radius: 4px;
-      }
-      .file-list::-webkit-scrollbar-thumb:hover {
-        background-color: var(--gradient-start);
-      }
-      /* Firefox scrollbar */
-      .file-list {
-        scrollbar-width: auto; /* Changed from thin for potentially thicker scrollbar */
-        scrollbar-color: var(--border-color) rgba(255, 255, 255, 0.03);
-      }
-      /* --- Basic Setup & Fonts --- */
+      
+      /* CSS */
       :root {
         --bg-color: #11101d;
+        --card-bg: #1e1e2f;
         --primary-text: #e0e0e0;
         --secondary-text: #a0a0a0;
         --border-color: #4a4a5e;
@@ -36,6 +41,11 @@
         --pill-bg: #2a2a3a;
         --gradient-start: #a855f7;
         --gradient-end: #6366f1;
+        --success-color: #4caf50;
+        --error-color: #f44336;
+        --warning-color: #ffc107;
+        --alpha-color: #ef5350;
+        --beta-color: #ff9800;
       }
       body {
         background-color: var(--bg-color);
@@ -46,22 +56,21 @@
         display: flex;
         flex-direction: column;
         align-items: center;
-        justify-content: flex-start; /* Changed */
+        justify-content: flex-start;
         min-height: 100vh;
-        padding: 2rem 0 0 0; /* Changed: top 2rem, sides 0, bottom 0 */
+        padding: 2rem 0 0 0;
         box-sizing: border-box;
       }
-
-      /* --- Main Layout & Content --- */
       .main-container {
         width: 100%;
         max-width: 800px;
         text-align: center;
         display: flex;
         flex-direction: column;
-        align-items: center; /* Added to center flex children horizontally */
+        align-items: center;
         gap: 1.5rem;
-        flex-grow: 1; 
+        flex-grow: 1;
+        padding: 0 1rem;
       }
       h1 {
         font-size: 3rem;
@@ -86,11 +95,6 @@
         align-items: center;
         gap: 1.5rem;
       }
-      .control-group {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-      }
       select {
         background-color: var(--bg-color);
         color: var(--primary-text);
@@ -98,40 +102,33 @@
         border-radius: 6px;
         padding: 0.5rem 1rem;
         font-size: 1rem;
-        transition: background-color 0.2s ease, border-color 0.2s ease; /* Add transition for smooth hover */
+        transition: background-color 0.2s ease, border-color 0.2s ease;
       }
-
       select:hover {
         border-color: var(--gradient-start);
       }
-
-      /* --- File Dropzone --- */
       .dropzone {
         border: 2px dashed var(--border-color);
         border-radius: 8px;
         padding: 1rem;
-        /* Initial smaller size */
         max-width: 400px;
-        height: 150px; 
-        margin-left: auto; /* Center the smaller dropzone */
-        margin-right: auto; /* Center the smaller dropzone */
+        height: 150px;
+        margin-left: auto;
+        margin-right: auto;
         display: flex;
         align-items: center;
         justify-content: center;
         flex-direction: column;
-        transition: background-color 0.2s ease, border-color 0.2s ease, max-width 0.3s ease, height 0.3s ease;
+        transition: all 0.3s ease;
         background-color: var(--dropzone-bg);
-        cursor: pointer; 
+        cursor: pointer;
       }
       .dropzone.dropzone-expanded {
-        max-width: 100%; /* Expand to full width of parent */
-        min-height: 120px; /* Ensure enough height for pills */
-        height: auto; /* Adjust height based on content */
+        max-width: 100%;
+        min-height: 120px;
+        height: auto;
       }
-      .dropzone:hover {
-        background-color: var(--dropzone-hover-bg);
-        border-color: var(--gradient-start);
-      }
+      .dropzone:hover,
       .dropzone.dragover {
         background-color: var(--dropzone-hover-bg);
         border-color: var(--gradient-start);
@@ -144,7 +141,23 @@
         gap: 0.75rem;
         width: 100%;
         overflow-x: auto;
-        padding-bottom: 1.5rem; /* Increased padding to push scrollbar lower */
+        padding-bottom: 1.5rem;
+        scrollbar-width: auto;
+        scrollbar-color: var(--border-color) rgba(255, 255, 255, 0.03);
+      }
+      .file-list::-webkit-scrollbar {
+        height: 12px;
+      }
+      .file-list::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 4px;
+      }
+      .file-list::-webkit-scrollbar-thumb {
+        background-color: var(--border-color);
+        border-radius: 4px;
+      }
+      .file-list::-webkit-scrollbar-thumb:hover {
+        background-color: var(--gradient-start);
       }
       .file-pill {
         background-color: var(--pill-bg);
@@ -177,8 +190,6 @@
       .file-pill-remove:hover {
         color: var(--primary-text);
       }
-
-      /* --- Buttons --- */
       .update-button {
         background: linear-gradient(
           to right,
@@ -188,8 +199,8 @@
         color: white;
         border: none;
         border-radius: 8px;
-        padding: 0.6rem 0.5rem; /* Further reduced horizontal padding */
-        font-size: 1rem;    
+        padding: 0.6rem 0.5rem;
+        font-size: 1rem;
         font-weight: bold;
         cursor: pointer;
         display: inline-flex;
@@ -197,12 +208,73 @@
         justify-content: center;
         gap: 0.5rem;
         transition: transform 0.2s ease;
-        max-width: 160px; /* Constrain button size */
-        /* margin-left: auto; /* Centering now handled by parent's align-items */
-        /* margin-right: auto; /* Centering now handled by parent's align-items */
+        max-width: 160px;
       }
       .update-button:hover {
         transform: scale(1.05);
+      }
+      .update-button:disabled {
+        background: var(--border-color);
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .action-buttons-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 1rem;
+      }
+
+      .clear-all-button {
+        background-color: transparent;
+        color: var(--secondary-text);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 0.6rem 1.2rem;
+        font-size: 1rem;
+        font-weight: bold;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: none; /* Hidden by default */
+      }
+
+      .clear-all-button:hover {
+        background-color: var(--pill-bg);
+        color: var(--primary-text);
+        border-color: var(--primary-text);
+      }
+
+      #scroll-buttons-container {
+        position: fixed;
+        bottom: 4.5rem;
+        right: 2rem;
+        z-index: 100;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+
+      .scroll-btn {
+        width: 48px;
+        height: 48px;
+        background-color: var(--card-bg);
+        color: var(--primary-text);
+        border: 1px solid var(--border-color);
+        border-radius: 50%;
+        cursor: pointer;
+        display: none; /* Hidden by default */
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+        opacity: 0.7;
+      }
+
+      .scroll-btn:hover {
+        opacity: 1;
+        transform: scale(1.1);
+        background-color: var(--gradient-start);
+        border-color: var(--gradient-start);
       }
       .info-button {
         position: absolute;
@@ -223,8 +295,6 @@
         right: 8px;
         stroke: white;
       }
-
-      /* --- Info Modal --- */
       .modal-overlay {
         position: fixed;
         top: 0;
@@ -232,10 +302,21 @@
         width: 100%;
         height: 100%;
         background-color: rgba(0, 0, 0, 0.7);
-        display: none;
+        display: flex; /* Changed from none to flex */
         align-items: center;
         justify-content: center;
         z-index: 1000;
+        transition: opacity 0.3s ease-in-out;
+        opacity: 0; /* Start transparent */
+        pointer-events: none; /* Prevent interaction when hidden */
+      }
+      #search-modal {
+        align-items: flex-start; /* Aligns content to the top */
+        padding-top: 15vh; /* Adds space from the top */
+      }
+      .modal-overlay.visible {
+        opacity: 1; /* Fade in to full opacity */
+        pointer-events: auto; /* Allow interaction when visible */
       }
       .modal-content {
         background-color: #1e1e2f;
@@ -245,16 +326,15 @@
         width: 90%;
         position: relative;
         color: var(--secondary-text);
+        transform: scale(0.95);
+        transition: transform 0.3s ease-in-out;
       }
-      .modal-content h2 {
-        color: var(--primary-text);
-        margin-top: 0;
+      .modal-overlay.visible .modal-content {
+        transform: scale(1);
       }
-      .modal-content ul {
-        padding-left: 20px;
-      }
-      .modal-content li {
-        margin-bottom: 0.5rem;
+      .modal-actions {
+        text-align: center;
+        margin-top: 1rem;
       }
       .modal-close-button {
         position: absolute;
@@ -262,38 +342,40 @@
         right: 1rem;
         background: none;
         border: none;
-        color: var(--primary-text);
-        font-size: 1.5rem;
+        font-size: 2rem;
+        color: var(--secondary-text);
         cursor: pointer;
+        line-height: 1;
       }
-
-      /* --- Footer --- */
+      .modal-close-button:hover {
+        color: var(--primary-text);
+      }
+      #alert-icon {
+        display: inline-block;
+        margin-right: 0.75rem;
+        vertical-align: middle;
+      }
       footer {
         width: 100%;
-        background-color: #0c0c17; /* Restored dark background */
+        background-color: #0c0c17;
         color: var(--secondary-text);
-        padding: 1rem 0 0.5rem 0; /* Reduced top padding */
+        padding: 0rem 0 0.5rem 0;
         font-size: 0.9rem;
-        margin-top: auto;
-        /* border-top: 1px solid var(--border-color); /* Removed, background defines area */
+        margin-top: 3rem;
       }
       .footer-content {
         display: flex;
         justify-content: space-around;
         flex-wrap: wrap;
-        gap: 1rem; 
+        gap: 1rem;
         max-width: 900px;
-        margin: 0 auto 1rem auto; 
+        margin: 0 auto 1rem auto;
         padding: 0 1rem;
-        text-align: left; /* Columns left-aligned */
-      }
-      .footer-column {
-        flex: 1;
-        min-width: 180px;
+        text-align: left;
       }
       .footer-column h4 {
         color: var(--primary-text);
-        font-size: 1.1rem;
+        font-size: 1.5rem;
         margin-bottom: 1rem;
         font-weight: 600;
       }
@@ -316,36 +398,299 @@
       }
       .footer-bottom {
         text-align: center;
-        padding: 0.6rem 1rem; /* Reduced vertical padding */
+        padding: 1.2rem 1rem 0.6rem;
         border-top: 1px solid var(--border-color);
         font-size: 0.85rem;
-        display: flex;
-        justify-content: space-between; /* Align items to ends */
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 0.5rem; /* Gap if items wrap */
-        /* max-width: 900px; /* Removed for full-width border */
-        /* margin: 0 auto; /* Removed for full-width border */
-        /* position: relative; /* No longer needed for kofi button */
+        position: relative;
       }
       .footer-bottom p {
         margin: 0;
-        flex-grow: 1; /* Allow paragraph to take space for centering */
-        text-align: center; /* Copyright text centered */
+      }
+      .footer-bottom p a {
+        color: var(--secondary-text);
+        text-decoration: underline;
+        transition: color 0.2s ease;
+      }
+      .footer-bottom p a:hover {
+        color: var(--primary-text);
       }
       .kofi-button {
-        margin-top: 3px; /* Nudge button down slightly */
+        position: absolute;
+        right: 1rem;
+        top: 55%;
+        transform: translateY(-50%);
       }
-      /* .kofi-button positioning is now handled by flexbox in .footer-bottom */
       .kofi-button img {
         height: 36px;
         width: auto;
         border-radius: 6px;
       }
+      .progress-bar-container {
+        width: 100%;
+        background-color: var(--card-bg);
+        border-radius: 4px;
+        margin-top: 1rem;
+        display: none; /* Hidden by default */
+      }
+      .progress-bar {
+        width: 0%;
+        height: 10px;
+        background: linear-gradient(
+          to right,
+          var(--gradient-start),
+          var(--gradient-end)
+        );
+        border-radius: 4px;
+        transition: width 0.3s ease-out;
+      }
+      .status-message {
+        color: var(--secondary-text);
+        font-size: 0.9rem;
+        margin: 0; /* Margin will be part of the transition */
+        max-height: 0; /* Start with zero height */
+        opacity: 0; /* Start fully transparent */
+        overflow: hidden; /* Important for the max-height trick */
+        transition: all 0.4s ease-in-out; /* Animate everything */
+      }
+      .status-message.visible {
+        margin-top: 0.5rem; /* Add margin when visible */
+        max-height: 2em; /* Animate to a height large enough for the text */
+        opacity: 1; /* Animate to be fully visible */
+      }
+      #results-area {
+        width: 100%;
+        margin-top: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+      }
+      .results-section {
+        display: none; /* Hidden by default */
+      }
+      .results-section.visible {
+        display: block;
+      }
+      .results-section h2 {
+        text-align: left;
+        color: var(--primary-text);
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 0.5rem;
+        margin-bottom: 1rem;
+      }
+      .results-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+      .result-card {
+        background-color: var(--card-bg);
+        border-radius: 8px;
+        padding: 1rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        text-align: left;
+      }
+      .result-card-main {
+        display: flex;
+        gap: 1rem;
+        width: 100%;
+      }
+      .result-card.failure,
+      .result-card.warning {
+        align-items: center;
+      }
+      .result-card.failure {
+        border-left: 4px solid var(--error-color);
+      }
+      .result-card.warning {
+        border-left: 4px solid var(--warning-color);
+      }
+      .mod-icon-link {
+        flex-shrink: 0;
+      }
+      .mod-icon {
+        width: 64px;
+        height: 64px;
+        border-radius: 8px;
+        object-fit: cover;
+        background-color: var(--bg-color);
+      }
+      .mod-details {
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        min-width: 0;
+      }
+      .mod-title {
+        font-size: 1.2rem;
+        font-weight: bold;
+        color: var(--primary-text);
+      }
+      .mod-title a {
+        color: inherit;
+        text-decoration: none;
+      }
+      .mod-title a:hover {
+        text-decoration: underline;
+      }
+      .mod-title .mod-author {
+        font-size: 0.9rem;
+        font-weight: normal;
+        color: var(--secondary-text);
+        margin-left: 0.5rem;
+      }
+      .mod-author a {
+        color: var(--secondary-text);
+        text-decoration: none;
+      }
+      .mod-author a:hover {
+        text-decoration: underline;
+      }
+      .mod-description {
+        font-size: 0.9rem;
+        color: var(--secondary-text);
+        margin-top: 0.25rem;
+      }
+      .mod-meta {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
+        font-size: 0.85rem;
+        color: var(--secondary-text);
+        margin-top: 0.5rem;
+      }
+      .mod-meta-item {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+      }
+      .changelog-toggle {
+        cursor: pointer;
+        text-decoration: underline;
+      }
+      .changelog-toggle:hover {
+        color: var(--primary-text);
+      }
+      .changelog-content {
+        display: none;
+        width: 100%;
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--border-color);
+        color: var(--secondary-text);
+        font-size: 0.9rem;
+      }
+      .changelog-content.visible {
+        display: block;
+      }
+      .changelog-content ul {
+        padding-left: 20px;
+        margin: 0;
+      }
+      .mod-actions {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 0.5rem;
+        flex-shrink: 0;
+      }
+      .version-select {
+        background-color: var(--pill-bg);
+        border: 1px solid var(--border-color);
+        color: var(--primary-text);
+        border-radius: 6px;
+        padding: 0.3rem 0.5rem;
+      }
+      .version-type {
+        font-weight: bold;
+        margin-left: 0.5em;
+      }
+      .version-type-release {
+        color: var(--success-color);
+      }
+      .version-type-beta {
+        color: var(--beta-color);
+      }
+      .version-type-alpha {
+        color: var(--alpha-color);
+      }
+      .download-link {
+        background-color: var(--success-color);
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        text-decoration: none;
+        font-weight: bold;
+        font-size: 0.9rem;
+      }
+      .results-actions {
+        display: flex;
+        justify-content: center;
+        gap: 1rem;
+        margin-top: 1rem;
+      }
+      .action-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.6rem 1.2rem;
+        background: linear-gradient(
+          to right,
+          var(--gradient-start),
+          var(--gradient-end)
+        );
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 1rem;
+      }
+      .search-container input {
+        background-color: var(--bg-color);
+        color: var(--primary-text);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        padding: 0.5rem 1rem;
+        font-size: 1rem;
+        transition: border-color 0.2s ease;
+      }
+      .search-container input:focus {
+        outline: none;
+        border-color: var(--gradient-start);
+      }
+
+      #search-results-container {
+        margin-top: 1.5rem;
+        max-height: 60vh;
+        overflow-y: auto;
+        padding-right: 0.5rem; /* For scrollbar spacing */
+      }
+
+      /* Style for the "Add" button on search result cards */
+      .add-mod-button {
+        background-color: var(--success-color);
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        text-decoration: none;
+        font-weight: bold;
+        font-size: 0.9rem;
+        border: none;
+        cursor: pointer;
+      }
+      .add-mod-button:disabled {
+        background-color: var(--border-color);
+        cursor: not-allowed;
+      }
     </style>
   </head>
   <body>
-    <!-- Info Button in the corner -->
+    <!-- HTML -->
     <button id="info-button" class="info-button" aria-label="Show info">
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -363,7 +708,6 @@
         <line x1="12" y1="8" x2="12.01" y2="8"></line>
       </svg>
     </button>
-
     <div class="main-container">
       <header>
         <h1>Minecraft Mod Updater</h1>
@@ -371,7 +715,6 @@
           Easily find updates for your Minecraft Mods using the Modrinth API
         </p>
       </header>
-
       <div class="controls">
         <div class="control-group">
           <label for="mod-loader">Loader:</label>
@@ -384,65 +727,120 @@
         </div>
         <div class="control-group">
           <label for="mc-version">Version:</label>
-          <select id="mc-version">
-            <!-- Options will be populated by JavaScript -->
-          </select>
+          <select id="mc-version"></select>
+        </div>
+        <div class="control-group search-container">
+          <label for="mod-search">Search:</label>
+          <input type="text" id="mod-search" placeholder="Find mods by name...">
         </div>
       </div>
-
-      <!-- The file dropzone -->
       <div id="dropzone" class="dropzone">
         <div id="file-list-container" class="file-list"></div>
         <p id="dropzone-prompt" class="dropzone-prompt">
           Upload your mod(s)
+          <br>
+          or
+          <br>
+          Use the search
         </p>
       </div>
-
-      <button id="update-button" class="update-button">
-        Update
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-          <polyline points="17 8 12 3 7 8"></polyline>
-          <line x1="12" y1="3" x2="12" y2="15"></line>
-        </svg>
-      </button>
+      <div class="action-buttons-container">
+        <button id="update-button" class="update-button">
+          Update
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+          </svg>
+        </button>
+        <button id="clear-all-button" class="clear-all-button">
+          Clear All
+        </button>
+      </div>
+      <div id="progress-bar-container" class="progress-bar-container">
+        <div id="progress-bar" class="progress-bar"></div>
+      </div>
+      <p id="status-message" class="status-message"></p>
+      <div id="results-area">
+        <div id="welcome-message" class="results-section visible">
+          <h2 style="text-align: center;">Welcome to the Minecraft Mod Updater &amp; Builder!</h2>
+          <p style="text-align: left; line-height: 1.6;">
+            This tool is your one-stop shop for managing your Minecraft mods.
+            You can easily find updates for your entire mod list, discover new mods, and export a ready-to-use modpack for your favorite launcher.
+          </p>
+          <h3 style="text-align: center; margin-top: 2rem;">Ready to Start?</h3>
+          <p style="text-align: left; line-height: 1.6;">
+            Simply drag and drop your <code>.jar</code> files into the upload area above, or use the search bar to find mods directly on Modrinth. Then, click the "Update" button to see the magic happen!
+          </p>
+          <p style="text-align: left; font-style: italic; margin-top: 2rem; font-size: 0.9rem; color: var(--secondary-text);">
+            For more detailed instructions, click the info icon in the top-right corner.
+          </p>
+        </div>
+      </div>
     </div>
-    <input type="file" id="file-input" multiple style="display: none;" accept=".jar" />
-
-    <!-- The Info Modal (hidden by default) -->
+    <input
+      type="file"
+      id="file-input"
+      multiple
+      style="display: none"
+      accept=".jar"
+    />
     <div id="info-modal" class="modal-overlay">
       <div class="modal-content">
-        <button id="modal-close-button" class="modal-close-button">
-          &times;
-        </button>
-        <h2>MC Updater and Loader Migrator</h2>
+        <button id="modal-close-button" class="modal-close-button">&times;</button>
+        
+        <h2>MC Mod Updater &amp; Builder</h2>
         <p>
-          This tool helps you find updates for and lets you migrate Minecraft
-          Java Mods using the Modrinth API by simply uploading them as .jar
-          files.
+          This tool helps you update your existing Minecraft mods or build a brand new mod list from scratch. It uses the Modrinth API to find the latest compatible versions and can export your list as a standard Modrinth modpack.
         </p>
         <h3>How to use:</h3>
         <ul>
-          <li>Select the desired mod loader (Fabric / Forge / etc).</li>
-          <li>Select the Minecraft version you want to target.</li>
-          <li>Upload your mod(s) by dragging and dropping them onto the page.</li>
-          <li>Let the tool find the targeted versions of your mods.</li>
+          <li>Select your desired mod loader (Fabric, Forge, etc.) and Minecraft version.</li>
+          <li><b>Update Existing Mods:</b> Drag and drop your local .jar files into the upload area.</li>
+          <li><b>Discover New Mods:</b> Use the search bar to find and add mods directly from Modrinth.</li>
+          <li><b>Process Your List:</b> Click the "Update" button.</li>
+          <li><b>Get Results:</b> The tool will find the latest compatible versions and automatically add any required dependencies (like APIs and libraries) for you.</li>
         </ul>
         <h3>Attributions:</h3>
         <p>
-          This tool relies on the Modrinth API for fetching mod updates. Please
-          be aware of their rate limits to prevent abuse.
+          This tool relies on the Modrinth API for all mod data. Please be aware of their rate limits. The application will automatically pause and resume to respect these limits.
         </p>
+      </div>
+    </div>
+
+    <!-- ALERT MODAL BLOCK -->
+    <div id="alert-modal" class="modal-overlay">
+      <div class="modal-content">
+        <h2 id="alert-title"><span id="alert-icon"></span>Notice</h2>
+        <p id="alert-message" style="margin: 1.5rem 0;"></p>
+        <div class="modal-actions">
+          <button id="alert-ok-button" class="action-button">OK</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SEARCH MODAL BLOCK -->
+    <div id="search-modal" class="modal-overlay">
+      <div class="modal-content">
+        <button id="search-x-close-button" class="modal-close-button">&times;</button>
+        
+        <h2 id="search-title">Search for Mods</h2>
+        <div id="search-results-container">
+          <p>Start typing in the search bar to find mods.</p>
+        </div>
+        <div class="modal-actions">
+          <button id="search-close-button" class="clear-all-button">Close</button>
+        </div>
       </div>
     </div>
 
@@ -451,369 +849,1359 @@
         <div class="footer-column">
           <h4>About</h4>
           <ul>
-            <li><a href="https://github.com/BryantWelch/mc-updater.app" target="_blank" rel="noopener noreferrer">GitHub Repository</a></li>
-            <li><a href="https://github.com/BryantWelch/mc-updater.app/issues" target="_blank" rel="noopener noreferrer">Report an Issue</a></li>
-            <li><a href="https://github.com/BryantWelch/mc-updater.app/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener noreferrer">Contribute</a></li>
-            <li><a href="https://github.com/BryantWelch/mc-updater.app/releases" target="_blank" rel="noopener noreferrer">Releases</a></li>
+            <li>
+              <a
+                href="https://github.com/BryantWelch/mcmodupdate.app"
+                target="_blank"
+                rel="noopener noreferrer"
+                >GitHub Repository</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://github.com/BryantWelch/mcmodupdate.app/issues"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Report an Issue</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://github.com/BryantWelch/mcmodupdate.app/blob/main/CONTRIBUTING.md"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Contribute</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://github.com/BryantWelch/mcmodupdate.app/releases"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Releases</a
+              >
+            </li>
           </ul>
         </div>
         <div class="footer-column">
           <h4>Resources</h4>
           <ul>
-            <li><a href="https://modrinth.com" target="_blank" rel="noopener noreferrer">Modrinth Official</a></li>
-            <li><a href="https://www.curseforge.com/minecraft/mc-mods" target="_blank" rel="noopener noreferrer">CurseForge Mods</a></li>
-            <li><a href="https://fabricmc.net/" target="_blank" rel="noopener noreferrer">FabricMC</a></li>
-            <li><a href="https://neoforged.net/" target="_blank" rel="noopener noreferrer">NeoForged</a></li>
+            <li>
+              <a
+                href="https://modrinth.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Modrinth Official</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://www.curseforge.com/minecraft/mc-mods"
+                target="_blank"
+                rel="noopener noreferrer"
+                >CurseForge Mods</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://fabricmc.net/"
+                target="_blank"
+                rel="noopener noreferrer"
+                >FabricMC</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://neoforged.net/"
+                target="_blank"
+                rel="noopener noreferrer"
+                >NeoForged</a
+              >
+            </li>
           </ul>
         </div>
         <div class="footer-column">
           <h4>Community</h4>
           <ul>
-            <li><a href="https://www.reddit.com/r/ModdedMinecraft/" target="_blank" rel="noopener noreferrer">r/ModdedMinecraft</a></li>
-            <li><a href="https://www.reddit.com/r/feedthebeast/" target="_blank" rel="noopener noreferrer">r/feedthebeast</a></li>
+            <li>
+              <a
+                href="https://www.reddit.com/r/ModdedMinecraft/"
+                target="_blank"
+                rel="noopener noreferrer"
+                >r/ModdedMinecraft</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://www.reddit.com/r/feedthebeast/"
+                target="_blank"
+                rel="noopener noreferrer"
+                >r/feedthebeast</a
+              >
+            </li>
+            <li>
+                <a
+                href="https://discord.gg/moddedmc"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Modded Minecraft Discord</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://discord.fabricmc.net/"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Fabric Project Discord</a
+              >
+            </li>
           </ul>
         </div>
       </div>
       <div class="footer-bottom">
-        <p>&copy; <span id="current-year">2024</span> Bryant Welch. Open source under MIT License.</p>
-        <a href="https://ko-fi.com/YOUR_KOFI_ID_HERE" target="_blank" rel="noopener noreferrer" class="kofi-button" title="Support the developer!">
-          <img src="https://storage.ko-fi.com/cdn/kofi5.png?v=6" alt="Buy Me a Coffee at ko-fi.com">
+        <p>
+          &copy; <span id="current-year">2024</span> Bryant Welch. Open source under 
+          <a href="https://github.com/BryantWelch/mcmodupdate.app/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a>.
+        </p>
+        <a
+          href="https://ko-fi.com/bryantwelch"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="kofi-button"
+          title="Support the developer!"
+        >
+          <img
+            src="https://storage.ko-fi.com/cdn/kofi5.png?v=6"
+            alt="Buy Me a Coffee at ko-fi.com"
+          />
         </a>
       </div>
     </footer>
 
+    <div id="scroll-buttons-container">
+      <!-- "Scroll to Top" button is first -->
+      <button id="scroll-to-top-btn" class="scroll-btn" title="Scroll to top">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="17 11 12 6 7 11"></polyline>
+          <polyline points="17 18 12 13 7 18"></polyline>
+        </svg>
+      </button>
+      <!-- "Scroll to Bottom" button is second -->
+      <button id="scroll-to-bottom-btn" class="scroll-btn" title="Scroll to bottom">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="7 13 12 18 17 13"></polyline>
+          <polyline points="7 6 12 11 17 6"></polyline>
+        </svg>
+      </button>
+    </div>
+
     <script>
+      // --- Global State ---
+      let uploadedFiles = new Map();
+      let successfulDownloads = [];
+      let sectionCounts = {};
+      let renderedModIds = new Set();
+      let searchedMods = new Map();
+
       // --- DOM Element References ---
       const dropzone = document.getElementById("dropzone");
       const dropzonePrompt = document.getElementById("dropzone-prompt");
       const fileListContainer = document.getElementById("file-list-container");
-      const fileInput = document.getElementById("file-input"); // Added for clickable dropzone
+      const fileInput = document.getElementById("file-input");
       const infoButton = document.getElementById("info-button");
       const infoModal = document.getElementById("info-modal");
       const modalCloseButton = document.getElementById("modal-close-button");
+      const mcVersionSelect = document.getElementById("mc-version");
+      const updateButton = document.getElementById("update-button");
+      const updateButtonIcon = updateButton.querySelector("svg");
+      const modLoaderSelect = document.getElementById("mod-loader");
+      const resultsArea = document.getElementById("results-area");
+      const progressBarContainer = document.getElementById(
+        "progress-bar-container"
+      );
+      const progressBar = document.getElementById("progress-bar");
+      const statusMessage = document.getElementById("status-message");
+      const clearAllButton = document.getElementById("clear-all-button");
+      const alertModal = document.getElementById("alert-modal");
+      const alertMessage = document.getElementById("alert-message");
+      const alertOkButton = document.getElementById("alert-ok-button");
+      const alertIcon = document.getElementById("alert-icon");
+      const alertTitle = document.getElementById("alert-title");
+      const scrollToTopBtn = document.getElementById("scroll-to-top-btn");
+      const scrollToBottomBtn = document.getElementById("scroll-to-bottom-btn");
+      const searchInput = document.getElementById("mod-search");
+      const searchModal = document.getElementById("search-modal");
+      const searchResultsContainer = document.getElementById("search-results-container");
+      const searchCloseButton = document.getElementById("search-close-button");
+      const searchXCloseButton = document.getElementById("search-x-close-button");
 
-      // --- Modal Logic ---
+      // --- UI LOGIC ---
       infoButton.addEventListener("click", () => {
-        infoModal.style.display = "flex";
+        infoModal.classList.add("visible");
       });
       modalCloseButton.addEventListener("click", () => {
-        infoModal.style.display = "none";
+        infoModal.classList.remove("visible");
       });
-      // Close modal if user clicks on the dark overlay
       infoModal.addEventListener("click", (event) => {
         if (event.target === infoModal) {
-          infoModal.style.display = "none";
+          infoModal.classList.remove("visible");
         }
       });
 
-      // --- Dropzone Logic ---
-      // Prevent default browser behavior for drag and drop
+      // --- UPGRADED: Custom Alert Modal Logic ---
+      function showCustomAlert(message, type = "notice") {
+        const icons = {
+          notice: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--warning-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`,
+          error: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--error-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`,
+        };
+        const titles = {
+          notice: "Notice",
+          error: "Error",
+        };
+
+        // Set the text content of the title, excluding the icon
+        alertTitle.childNodes[1].nodeValue = titles[type] || "Notice";
+        alertIcon.innerHTML = icons[type] || icons.notice;
+        
+        alertMessage.textContent = message;
+        alertModal.classList.add("visible");
+      }
+
+      function hideCustomAlert() {
+        alertModal.classList.remove("visible");
+      }
+
+      alertOkButton.addEventListener("click", hideCustomAlert);
+      alertModal.addEventListener("click", (event) => {
+        if (event.target === alertModal) {
+          hideCustomAlert();
+        }
+      });
+
+      // --- ADDED: Scroll to Top/Bottom Button Logic ---
+      function handleScrollButtons() {
+        const scrollY = window.scrollY;
+        const pageHeight = document.documentElement.scrollHeight;
+        const viewportHeight = document.documentElement.clientHeight;
+
+        // First, check if the page is scrollable at all. If not, hide both and exit.
+        if (pageHeight <= viewportHeight) {
+          scrollToTopBtn.style.display = "none";
+          scrollToBottomBtn.style.display = "none";
+          return;
+        }
+
+        // --- "Scroll to Top" Button Logic ---
+        // Show if we are NOT at the top.
+        if (scrollY > 0) {
+          scrollToTopBtn.style.display = "flex";
+        } else {
+          scrollToTopBtn.style.display = "none";
+        }
+
+        // --- "Scroll to Bottom" Button Logic ---
+        // Show if we are NOT at the bottom.
+        // The '- 1' is a small buffer for rounding issues.
+        if (scrollY + viewportHeight < pageHeight - 1) {
+          scrollToBottomBtn.style.display = "flex";
+        } else {
+          scrollToBottomBtn.style.display = "none";
+        }
+      }
+
+      // Add click listeners for smooth scrolling
+      scrollToTopBtn.addEventListener("click", () => {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+
+      scrollToBottomBtn.addEventListener("click", () => {
+        window.scrollTo({
+          top: document.documentElement.scrollHeight,
+          behavior: "smooth",
+        });
+      });
+
+      // Listen for scroll events to show/hide the buttons
+      window.addEventListener("scroll", handleScrollButtons);
+
+      // --- Clear All Button Logic ---
+      function clearDropzone() {
+        // Clear the underlying file data
+        uploadedFiles.clear();
+
+        searchedMods.clear();
+
+        // Clear the visual file pills from the UI
+        fileListContainer.innerHTML = "";
+
+        // Reset the dropzone to its initial, non-expanded state
+        dropzonePrompt.style.display = "block";
+        dropzone.classList.remove("dropzone-expanded");
+
+        // Hide the "Clear All" button since there's nothing to clear
+        clearAllButton.style.display = "none";
+      }
+
+      // --- Mod Search Functionality ---
+      function debounce(func, delay) {
+        let timeout;
+        return function(...args) {
+          const context = this;
+          clearTimeout(timeout);
+          timeout = setTimeout(() => func.apply(context, args), delay);
+        };
+      }
+
+      async function performSearch(query) {
+        if (!query) {
+          searchResultsContainer.innerHTML = "<p>Start typing to find mods.</p>";
+          return;
+        }
+        searchResultsContainer.innerHTML = "<p>Searching...</p>";
+
+        const searchUrl = `https://api.modrinth.com/v2/search?query=${encodeURIComponent(query)}&limit=10`;
+        try {
+          const response = await fetchWithRetry(searchUrl);
+          const data = await response.json();
+          renderSearchResults(data.hits);
+        } catch (error) {
+          searchResultsContainer.innerHTML = "<p>Error fetching search results.</p>";
+          console.error("Search failed:", error);
+        }
+      }
+
+      const debouncedSearch = debounce(performSearch, 300);
+
+      searchInput.addEventListener("input", (e) => {
+        if (e.target.value.trim().length > 1) {
+          searchModal.classList.add("visible");
+          debouncedSearch(e.target.value.trim());
+        } else {
+          searchResultsContainer.innerHTML = "<p>Start typing to find mods.</p>";
+        }
+      });
+      
+      searchInput.addEventListener("focus", () => {
+        if(searchInput.value.trim().length > 1) {
+            searchModal.classList.add("visible");
+        }
+      });
+
+      // --- Search Modal Close Logic ---
+      searchCloseButton.addEventListener("click", () => {
+        searchModal.classList.remove("visible");
+      });
+
+      searchXCloseButton.addEventListener("click", () => {
+        searchModal.classList.remove("visible");
+      });
+
+      searchModal.addEventListener("click", (event) => {
+        // If the user clicks on the dark overlay itself, not the content
+        if (event.target === searchModal) {
+          searchModal.classList.remove("visible");
+        }
+      });
+
+      function renderSearchResults(hits) {
+        searchResultsContainer.innerHTML = "";
+        if (hits.length === 0) {
+          searchResultsContainer.innerHTML = "<p>No mods found.</p>";
+          return;
+        }
+        hits.forEach(hit => {
+          const card = createSearchResultCard(hit);
+          searchResultsContainer.appendChild(card);
+        });
+      }
+
+      function createSearchResultCard(mod) {
+        const card = document.createElement("div");
+        card.className = "result-card";
+        
+        // The project URL is consistent for all links
+        const projectUrl = `https://modrinth.com/project/${mod.slug}`;
+        const authorUrl = `https://modrinth.com/user/${mod.author}`;
+
+        card.innerHTML = `
+          <div class="result-card-main">
+            <a href="${projectUrl}" target="_blank" rel="noopener noreferrer" class="mod-icon-link">
+              <img src="${mod.icon_url}" alt="${mod.title} icon" class="mod-icon" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGcgaWQ9Ik1pbmVjcmFmdCI+PHBhdGggZD0ibTIxIDFoLTE4YTIgMiAwIDAgMCAtMiAydjE4YTIgMiAwIDAgMCAyIDJoMThhMiAyIDAgMCAwIDItMnYtMThhMiAyIDAgMCAwIC0yLTJ6bS0xNSA4LjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYzYS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV6bTExIDhhLjUuNSAwIDAgMSAtLjUuNWgtMmEuNS41IDAgMCAxIC0uNS0uNXYtMS41aC00djEuNWEuNS41IDAgMCAxIC0uNS41aC0yYS41LjUgMCAwIDEgLS41LS41di01YS41LjUgMCAwIDEgLjUtLjVoMi41di0xLjVhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYxLjVoMi41YS41LjUgMCAwIDEgLjUuNXptMS04YS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXoiIGZpbGw9IiMzMDNjNDIiLz48L2c+PC9zdmc+'">
+            </a>
+            <div class="mod-details">
+              <div class="mod-title">
+                <a href="${projectUrl}" target="_blank" rel="noopener noreferrer">${mod.title}</a>
+                <span class="mod-author">by <a href="${authorUrl}" target="_blank" rel="noopener noreferrer">${mod.author}</a></span>
+              </div>
+              <div class="mod-description">${mod.description}</div>
+            </div>
+            <div class="mod-actions">
+              <button class="add-mod-button" data-slug="${mod.slug}" data-title="${mod.title}">Add</button>
+            </div>
+          </div>`;
+
+        const addButton = card.querySelector(".add-mod-button");
+        // Disable button if already added
+        if (searchedMods.has(mod.slug) || renderedModIds.has(mod.slug)) {
+            addButton.disabled = true;
+            addButton.textContent = "Added";
+        }
+
+        addButton.addEventListener("click", (e) => {
+          const slug = e.target.dataset.slug;
+          const title = e.target.dataset.title;
+
+          if (!searchedMods.has(slug)) {
+            searchedMods.set(slug, { title: title });
+            createFilePill({ name: `${title} (Searched)` });
+            dropzonePrompt.style.display = "none";
+            dropzone.classList.add("dropzone-expanded");
+            clearAllButton.style.display = "inline-flex";
+          }
+          
+          e.target.disabled = true;
+          e.target.textContent = "Added";
+          searchModal.classList.remove("visible");
+        });
+
+        return card;
+      }
+
+      clearAllButton.addEventListener("click", clearDropzone);
+
       ["dragenter", "dragover", "dragleave", "drop"].forEach((eventName) => {
         dropzone.addEventListener(eventName, (e) => {
           e.preventDefault();
           e.stopPropagation();
         });
       });
-
-      // Add visual feedback when item is dragged over
       ["dragenter", "dragover"].forEach((eventName) => {
         dropzone.addEventListener(eventName, () => {
           dropzone.classList.add("dragover");
         });
       });
-
-      // Remove visual feedback when item leaves dropzone
       ["dragleave", "drop"].forEach((eventName) => {
         dropzone.addEventListener(eventName, () => {
           dropzone.classList.remove("dragover");
         });
       });
-
-      // Handle the actual file drop
       dropzone.addEventListener("drop", (event) => {
-        const files = event.dataTransfer.files;
-        handleFiles(files);
+        handleFiles(event.dataTransfer.files);
       });
-
-      // Make dropzone clickable to open file dialog
-      dropzone.addEventListener("click", () => {
-        // Avoid triggering if a pill's remove button was clicked
-        if (event.target.classList.contains('file-pill-remove') || event.target.closest('.file-pill-remove')) {
-            return;
+      dropzone.addEventListener("click", (event) => {
+        if (
+          !event.target.classList.contains("file-pill-remove") &&
+          !event.target.closest(".file-pill-remove")
+        ) {
+          fileInput.click();
         }
-        fileInput.click();
       });
-
       fileInput.addEventListener("change", (event) => {
-        const files = event.target.files;
-        if (files.length > 0) { // Check if files were actually selected
-            handleFiles(files);
+        if (event.target.files.length > 0) {
+          handleFiles(event.target.files);
         }
-        // Reset the input's value to allow selecting the same file again if it was removed
         event.target.value = null;
       });
 
-      // --- File Handling Function ---
       function handleFiles(files) {
-        if (files.length === 0) {
-          return;
-        }
-        // Hide the "Upload your mod(s)" prompt
+        if (files.length === 0) return;
         dropzonePrompt.style.display = "none";
         dropzone.classList.add("dropzone-expanded");
-        // Clear any previous files
-        fileListContainer.innerHTML = "";
-
-        // Loop through the FileList and create a "pill" for each file
+        clearAllButton.style.display = "inline-flex"; // SHOW THE BUTTON
         for (const file of files) {
-          // We only care about .jar files for now
-          if (file.name.endsWith(".jar")) {
-            const filePill = document.createElement("div");
-            filePill.classList.add("file-pill");
+          if (file.name.endsWith(".jar") && !uploadedFiles.has(file.name)) {
+            uploadedFiles.set(file.name, file);
+            createFilePill(file);
+          }
+        }
+      }
 
-            const fileNameSpan = document.createElement("span");
-            fileNameSpan.textContent = file.name;
-            filePill.appendChild(fileNameSpan);
+      function createFilePill(file) {
+        const filePill = document.createElement("div");
+        filePill.classList.add("file-pill");
+        const fileNameSpan = document.createElement("span");
+        fileNameSpan.textContent = file.name;
+        filePill.appendChild(fileNameSpan);
+        const removeButton = document.createElement("span");
+        removeButton.classList.add("file-pill-remove");
+        removeButton.innerHTML = "&times;";
+        removeButton.setAttribute("role", "button");
+        removeButton.setAttribute("tabindex", "0");
+        removeButton.setAttribute("aria-label", "Remove " + file.name);
+        removeButton.onclick = function (event) {
+          event.stopPropagation();
+          uploadedFiles.delete(file.name);
+          filePill.remove();
+          if (uploadedFiles.size === 0) {
+            dropzonePrompt.style.display = "block";
+            dropzone.classList.remove("dropzone-expanded");
+            clearAllButton.style.display = "none"; // HIDE THE BUTTON
+          }
+        };
+        removeButton.onkeydown = function (event) {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            removeButton.onclick(event);
+          }
+        };
+        filePill.appendChild(removeButton);
+        fileListContainer.appendChild(filePill);
+      }
 
-            const removeButton = document.createElement("span");
-            removeButton.classList.add("file-pill-remove");
-            removeButton.innerHTML = "&times;";
-            removeButton.setAttribute("role", "button");
-            removeButton.setAttribute("tabindex", "0");
-            removeButton.setAttribute("aria-label", "Remove " + file.name);
-            removeButton.onclick = function(event) {
-              event.stopPropagation();
-              filePill.remove();
-              // If all pills are removed, show the prompt again
-              if (fileListContainer.children.length === 0) {
-                dropzonePrompt.style.display = "block";
-                dropzone.classList.remove("dropzone-expanded");
+      document.getElementById("current-year").textContent =
+        new Date().getFullYear();
+
+// --- Dynamic Minecraft Version Loading with Hierarchical Layout ---
+async function populateMcVersions() {
+  try {
+    const response = await fetch(
+      "https://api.modrinth.com/v2/tag/game_version"
+    );
+    if (!response.ok) throw new Error("Failed to fetch MC versions");
+    const versions = await response.json();
+
+    // Filter for release versions and sort them numerically descending
+    const releaseVersions = versions
+      .filter(
+        (v) =>
+          v.version_type === "release" &&
+          /^\d+\.\d+(\.\d+)?$/.test(v.version)
+      )
+      .sort((a, b) => {
+        const aParts = a.version.split(".").map(Number);
+        const bParts = b.version.split(".").map(Number);
+        for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
+          const aVal = aParts[i] || 0;
+          const bVal = bParts[i] || 0;
+          if (aVal !== bVal) return bVal - aVal; // Sort descending
+        }
+        return 0;
+      });
+
+    const groupedVersions = {};
+
+    // Group versions by their major release (e.g., "1.21.6" -> "1.21")
+    releaseVersions.forEach((versionObj) => {
+      // Access the .version property of the object
+      const versionStr = versionObj.version;
+      const parts = versionStr.split(".");
+
+      if (parts.length >= 2) {
+        const majorVersion = `${parts[0]}.${parts[1]}`;
+        if (!groupedVersions[majorVersion]) {
+          groupedVersions[majorVersion] = [];
+        }
+        // Only add patch versions (like 1.21.6) to the sub-list
+        if (parts.length > 2) {
+          // Push the version string, not the whole object
+          groupedVersions[majorVersion].push(versionStr);
+        }
+      }
+    });
+
+    // Get the major versions and sort them again to ensure order
+    const sortedMajorVersions = Object.keys(groupedVersions).sort((a, b) => {
+      const aParts = a.split(".").map(Number);
+      const bParts = b.split(".").map(Number);
+      for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
+        const aVal = aParts[i] || 0;
+        const bVal = bParts[i] || 0;
+        if (aVal !== bVal) return bVal - aVal;
+      }
+      return 0;
+    });
+
+    mcVersionSelect.innerHTML = ""; // Clear existing options
+
+    // Populate the dropdown with the hierarchical structure
+    sortedMajorVersions.forEach((majorVersion) => {
+      // Add the main version entry (e.g., 1.21)
+      const mainOption = document.createElement("option");
+      mainOption.value = majorVersion;
+      mainOption.textContent = majorVersion;
+      mcVersionSelect.appendChild(mainOption);
+
+      // Add the indented sub-version entries (e.g., 1.21.6, 1.21.5)
+      const subVersions = groupedVersions[majorVersion];
+      subVersions.forEach((subVersion) => {
+        const subOption = document.createElement("option");
+        subOption.value = subVersion;
+        // Use non-breaking spaces for indentation
+        subOption.innerHTML = `&nbsp;&nbsp;${subVersion}`;
+        mcVersionSelect.appendChild(subOption);
+      });
+    });
+
+    // Select the latest version by default
+    if (mcVersionSelect.options.length > 0) {
+      mcVersionSelect.options[0].selected = true;
+    }
+  } catch (error) {
+    console.error("A real error occurred:", error); // Changed for better debugging
+    // Fallback or show an error
+    mcVersionSelect.innerHTML =
+      '<option value="1.21">Error loading versions</option>';
+    showCustomAlert(
+      "Could not load Minecraft versions from Modrinth. Please check your connection and refresh.",
+      "error"
+    );
+  }
+}
+
+// Call these functions when the page loads
+document.addEventListener("DOMContentLoaded", () => {
+  populateMcVersions();
+  handleScrollButtons(); // This runs our check once on load
+});
+
+// --- UI State Reset Function ---
+function resetResults() {
+  // Clear the results area from the screen
+  resultsArea.innerHTML = "";
+
+  // Hide the progress bar and status message
+  progressBarContainer.style.display = "none";
+  progressBar.style.width = "0%";
+  statusMessage.classList.remove("visible");
+
+  // Reset the data arrays
+  successfulDownloads = [];
+  sectionCounts = { found: 0, warning: 0, failure: 0 };
+
+  // Re-enable the update button
+  updateButton.disabled = false;
+  updateButton.innerHTML = `Update
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+      <polyline points="17 8 12 3 7 8"></polyline>
+      <line x1="12" y1="3" x2="12" y2="15"></line>
+    </svg>`;
+}
+
+// --- Main Update Logic with Live Rendering and Dependency Resolution ---
+updateButton.addEventListener("click", handleUpdate);
+
+async function handleUpdate() {
+  // 1. Combine jobs from both sources first.
+  const fileJobs = Array.from(uploadedFiles.values()).map((file) => ({
+    type: "file",
+    data: file,
+  }));
+  const searchJobs = Array.from(searchedMods.keys()).map((slug) => ({
+    type: "id",
+    data: slug,
+  }));
+  const jobs = [...fileJobs, ...searchJobs];
+
+  // 2. Check if there's anything to do.
+  if (jobs.length === 0) {
+    showCustomAlert("Please upload or search for mods first.", "notice");
+    return;
+  }
+
+  // 3. NOW, reset the UI and state for a new run.
+  resetResults();
+  renderedModIds.clear();
+  updateButton.disabled = true;
+  updateButton.innerHTML = "Searching...";
+  statusMessage.textContent = "Searching for updates and dependencies...";
+  statusMessage.classList.add("visible");
+  setupResultSections();
+  progressBarContainer.style.display = "block";
+
+  // 4. The rest of the processing loop...
+  const processedIds = new Set();
+  let completedJobs = 0;
+  let totalJobs = jobs.length;
+
+  for (let i = 0; i < jobs.length; i++) {
+    const job = jobs[i];
+    const key = job.type === "file" ? job.data.name : job.data;
+
+    if (processedIds.has(key)) {
+      completedJobs++;
+      continue;
+    }
+    processedIds.add(key);
+
+    const result = await getModUpdateInfo(job);
+
+    if (result.status === "success" && renderedModIds.has(result.modId)) {
+      console.log(`Skipping duplicate render for: ${result.title}`);
+    } else {
+      renderSingleResult(result);
+      if (result.status === "success") {
+        renderedModIds.add(result.modId);
+      }
+    }
+
+    if (result.status === "success" && result.dependencies) {
+      for (const dep of result.dependencies) {
+        if (dep.dependency_type === "required") {
+          const depId = dep.project_id;
+          if (!processedIds.has(depId)) {
+            jobs.push({ type: "id", data: depId });
+            totalJobs++;
+          }
+        }
+      }
+    }
+    completedJobs++;
+    progressBar.style.width = `${(completedJobs / totalJobs) * 100}%`;
+  }
+
+  finalizeResultsUI();
+  updateButton.disabled = false;
+  updateButton.textContent = "Update";
+  updateButton.appendChild(updateButtonIcon);
+  statusMessage.classList.remove("visible");
+
+  setTimeout(() => {
+    progressBarContainer.style.display = "none";
+  }, 1000);
+}
+
+// --- API Fetcher with Transparent Rate Limit and Custom User-Agent ---
+async function fetchWithRetry(url, options, retries = 3) {
+  const requestOptions = {
+    ...options, // Spread any existing options
+    headers: {
+      // Add our custom User-Agent to be a good API citizen
+      "User-Agent": "BryantWelch/mcmodupdate.app/",
+    },
+  };
+
+  for (let i = 0; i < retries; i++) {
+    // Use the new requestOptions object
+    const response = await fetch(url, requestOptions);
+
+    if (response.status === 429) {
+      const resetTimestamp = Number(
+        response.headers.get("X-Ratelimit-Reset")
+      );
+      const currentTime = Math.floor(Date.now() / 1000);
+      const waitTime = resetTimestamp
+        ? Math.max(0, resetTimestamp - currentTime) + 1
+        : 5;
+
+      const originalMessage = statusMessage.textContent;
+      console.warn(
+        `Rate limited. Waiting for ${waitTime} seconds until the limit resets.`
+      );
+      statusMessage.textContent = `Rate limited. Pausing for ${waitTime} seconds...`;
+
+      await new Promise((resolve) =>
+        setTimeout(resolve, waitTime * 1000)
+      );
+
+      statusMessage.textContent = originalMessage;
+      continue;
+    }
+    return response;
+  }
+  throw new Error(
+    "Failed to fetch after multiple retries due to rate limiting."
+  );
+}
+
+// --- Multi-Stage API Check with HASH-FIRST and UNIFIED AUTHOR LOOKUP ---
+async function getModUpdateInfo(job) {
+        const loader = modLoaderSelect.value;
+        const gameVersion = mcVersionSelect.value;
+        let modId;
+        let originalFileName = job.type === "file" ? job.data.name : job.data;
+
+        try {
+          let projectDetails;
+
+          if (job.type === "id") {
+            const projectUrl = `https://api.modrinth.com/v2/project/${job.data}`;
+            const projectResponse = await fetchWithRetry(projectUrl);
+            if (!projectResponse.ok) throw new Error("Dependency not found.");
+            projectDetails = await projectResponse.json();
+            modId = projectDetails.slug;
+          } else {
+            const hash = await calculateFileHash(job.data);
+            const hashUrl = `https://api.modrinth.com/v2/version_file/${hash}?algorithm=sha1`;
+            const hashResponse = await fetchWithRetry(hashUrl);
+
+            if (hashResponse.ok) {
+              const versionData = await hashResponse.json();
+              const projectUrl = `https://api.modrinth.com/v2/project/${versionData.project_id}`;
+              const projectResponse = await fetchWithRetry(projectUrl);
+              if (projectResponse.ok) {
+                projectDetails = await projectResponse.json();
               }
-              // TODO: Also remove from an internal list of files to be processed
-            };
-            // Allow removal with Enter key for accessibility
-            removeButton.onkeydown = function(event) {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                removeButton.onclick(event);
+            } else {
+              const modInfo = await getModIdFromJar(job.data);
+              let projectUrl = `https://api.modrinth.com/v2/project/${modInfo.id}`;
+              let projectResponse = await fetchWithRetry(projectUrl);
+
+              if (projectResponse.ok) {
+                projectDetails = await projectResponse.json();
+              } else if (modInfo.name) {
+                const searchUrl = `https://api.modrinth.com/v2/search?query=${encodeURIComponent(modInfo.name)}&limit=1`;
+                const searchResponse = await fetchWithRetry(searchUrl);
+                if (searchResponse.ok) {
+                  const searchResults = await searchResponse.json();
+                  if (searchResults.hits.length > 0) {
+                    const foundSlug = searchResults.hits[0].slug;
+                    const foundProjectUrl = `https://api.modrinth.com/v2/project/${foundSlug}`;
+                    const foundProjectResponse = await fetchWithRetry(foundProjectUrl);
+                    if (foundProjectResponse.ok) {
+                      projectDetails = await foundProjectResponse.json();
+                    }
+                  }
+                }
               }
+            }
+
+            if (!projectDetails) {
+              throw new Error("Mod not found on Modrinth by hash, ID, or name.");
+            }
+            modId = projectDetails.slug;
+          }
+
+          const author = await getAuthorDetails(projectDetails.team);
+
+          const versionUrl = `https://api.modrinth.com/v2/project/${modId}/version?loaders=["${loader}"]&game_versions=["${gameVersion}"]`;
+          const versionResponse = await fetchWithRetry(versionUrl);
+          const versions = await versionResponse.json();
+
+          const release = versions.find((v) => v.version_type === "release");
+          const beta = versions.find((v) => v.version_type === "beta");
+          const alpha = versions.find((v) => v.version_type === "alpha");
+          const latestVersion = release || beta || alpha;
+
+          if (!latestVersion) {
+            return {
+              status: "warning",
+              title: projectDetails.title,
+              author_name: author.name,
+              author_url: author.url,
+              description: projectDetails.description,
+              icon_url: projectDetails.icon_url,
+              project_url: `https://modrinth.com/project/${modId}`,
+              client_side: projectDetails.client_side,
+              server_side: projectDetails.server_side,
+              downloads: projectDetails.downloads,
+              reason: "No compatible version found for selected loader/version.",
             };
-            filePill.appendChild(removeButton);
-            fileListContainer.appendChild(filePill);
           }
-        }
 
-        // If no valid files were dropped, show the prompt again
-        if (fileListContainer.children.length === 0) {
-          dropzonePrompt.style.display = "block";
-          dropzone.classList.remove("dropzone-expanded");
+          const primaryFile = latestVersion.files.find((f) => f.primary);
+          if (!primaryFile) {
+            return {
+              status: "warning",
+              title: projectDetails.title,
+              author_name: author.name,
+              author_url: author.url,
+              description: projectDetails.description,
+              icon_url: projectDetails.icon_url,
+              project_url: `https://modrinth.com/project/${modId}`,
+              client_side: projectDetails.client_side,
+              server_side: projectDetails.server_side,
+              downloads: projectDetails.downloads,
+              reason: "Compatible version found, but no primary file to download.",
+            };
+          }
+
+          // --- GATHER ALL DATA FOR THE .MRPACK FILE ---
+          const downloadInfo = {
+            url: primaryFile.url,
+            filename: primaryFile.filename,
+            hashes: primaryFile.hashes,
+            path: `mods/${primaryFile.filename}`,
+            fileSize: primaryFile.size, // For the fileSize field
+            client_side: projectDetails.client_side, // For the env object
+            server_side: projectDetails.server_side, // For the env object
+          };
+          if (!renderedModIds.has(modId)) {
+            successfulDownloads.push(downloadInfo);
+          }
+
+          return {
+            status: "success",
+            modId: modId,
+            title: projectDetails.title,
+            author_name: author.name,
+            author_url: author.url,
+            description: projectDetails.description,
+            icon_url: projectDetails.icon_url,
+            project_url: `https://modrinth.com/project/${modId}`,
+            client_side: projectDetails.client_side,
+            server_side: projectDetails.server_side,
+            downloads: projectDetails.downloads,
+            all_versions: versions,
+            dependencies: latestVersion.dependencies,
+            isDependency: job.type === "id",
+          };
+        } catch (error) {
+          return {
+            status: "failure",
+            title: originalFileName,
+            reason: error.message,
+          };
         }
       }
 
-      // --- TODO: API Logic ---
-      // Update footer year
-      document.getElementById("current-year").textContent = new Date().getFullYear();
 
-      // Populate Minecraft Versions Dropdown
-      const mcVersionSelect = document.getElementById('mc-version');
-      const mcVersionsData = [
-        // 1.21 (1-6)
-        { display: "1.21", value: "1.21", isSubVersion: false },
-        { display: "&nbsp;&nbsp;1.21.6", value: "1.21.6", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.21.5", value: "1.21.5", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.21.4", value: "1.21.4", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.21.3", value: "1.21.3", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.21.2", value: "1.21.2", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.21.1", value: "1.21.1", isSubVersion: true },
-        // 1.20 (1-6)
-        { display: "1.20", value: "1.20", isSubVersion: false },
-        { display: "&nbsp;&nbsp;1.20.6", value: "1.20.6", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.20.5", value: "1.20.5", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.20.4", value: "1.20.4", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.20.3", value: "1.20.3", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.20.2", value: "1.20.2", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.20.1", value: "1.20.1", isSubVersion: true },
-        // 1.19 (1-4)
-        { display: "1.19", value: "1.19", isSubVersion: false },
-        { display: "&nbsp;&nbsp;1.19.4", value: "1.19.4", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.19.3", value: "1.19.3", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.19.2", value: "1.19.2", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.19.1", value: "1.19.1", isSubVersion: true },
-        // 1.18 (1-2)
-        { display: "1.18", value: "1.18", isSubVersion: false },
-        { display: "&nbsp;&nbsp;1.18.2", value: "1.18.2", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.18.1", value: "1.18.1", isSubVersion: true },
-        // 1.17 (1)
-        { display: "1.17", value: "1.17", isSubVersion: false },
-        { display: "&nbsp;&nbsp;1.17.1", value: "1.17.1", isSubVersion: true },
-        // 1.16 (1-5)
-        { display: "1.16", value: "1.16", isSubVersion: false },
-        { display: "&nbsp;&nbsp;1.16.5", value: "1.16.5", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.16.4", value: "1.16.4", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.16.3", value: "1.16.3", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.16.2", value: "1.16.2", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.16.1", value: "1.16.1", isSubVersion: true },
-        // 1.15 (1-2)
-        { display: "1.15", value: "1.15", isSubVersion: false },
-        { display: "&nbsp;&nbsp;1.15.2", value: "1.15.2", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.15.1", value: "1.15.1", isSubVersion: true },
-        // 1.14 (1-4)
-        { display: "1.14", value: "1.14", isSubVersion: false },
-        { display: "&nbsp;&nbsp;1.14.4", value: "1.14.4", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.14.3", value: "1.14.3", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.14.2", value: "1.14.2", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.14.1", value: "1.14.1", isSubVersion: true },
-        // 1.13 (1-2)
-        { display: "1.13", value: "1.13", isSubVersion: false },
-        { display: "&nbsp;&nbsp;1.13.2", value: "1.13.2", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.13.1", value: "1.13.1", isSubVersion: true },
-        // 1.12 (1-2)
-        { display: "1.12", value: "1.12", isSubVersion: false },
-        { display: "&nbsp;&nbsp;1.12.2", value: "1.12.2", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.12.1", value: "1.12.1", isSubVersion: true },
-        // 1.11 (1-2)
-        { display: "1.11", value: "1.11", isSubVersion: false },
-        { display: "&nbsp;&nbsp;1.11.2", value: "1.11.2", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.11.1", value: "1.11.1", isSubVersion: true },
-        // 1.10 (1-2)
-        { display: "1.10", value: "1.10", isSubVersion: false },
-        { display: "&nbsp;&nbsp;1.10.2", value: "1.10.2", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.10.1", value: "1.10.1", isSubVersion: true },
-        // 1.9 (1-4)
-        { display: "1.9", value: "1.9", isSubVersion: false },
-        { display: "&nbsp;&nbsp;1.9.4", value: "1.9.4", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.9.3", value: "1.9.3", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.9.2", value: "1.9.2", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.9.1", value: "1.9.1", isSubVersion: true },
-        // 1.8 (1-9)
-        { display: "1.8", value: "1.8", isSubVersion: false },
-        { display: "&nbsp;&nbsp;1.8.9", value: "1.8.9", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.8.8", value: "1.8.8", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.8.7", value: "1.8.7", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.8.6", value: "1.8.6", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.8.5", value: "1.8.5", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.8.4", value: "1.8.4", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.8.3", value: "1.8.3", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.8.2", value: "1.8.2", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.8.1", value: "1.8.1", isSubVersion: true },
-        // 1.7 (1-10)
-        { display: "1.7", value: "1.7", isSubVersion: false },
-        { display: "&nbsp;&nbsp;1.7.10", value: "1.7.10", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.7.9", value: "1.7.9", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.7.8", value: "1.7.8", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.7.7", value: "1.7.7", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.7.6", value: "1.7.6", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.7.5", value: "1.7.5", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.7.4", value: "1.7.4", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.7.3", value: "1.7.3", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.7.2", value: "1.7.2", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.7.1", value: "1.7.1", isSubVersion: true },
-        // 1.6 (1-4)
-        { display: "1.6", value: "1.6", isSubVersion: false },
-        { display: "&nbsp;&nbsp;1.6.4", value: "1.6.4", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.6.3", value: "1.6.3", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.6.2", value: "1.6.2", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.6.1", value: "1.6.1", isSubVersion: true },
-        // 1.5 (1-2)
-        { display: "1.5", value: "1.5", isSubVersion: false },
-        { display: "&nbsp;&nbsp;1.5.2", value: "1.5.2", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.5.1", value: "1.5.1", isSubVersion: true },
-        // 1.4 (1-7)
-        { display: "1.4", value: "1.4", isSubVersion: false },
-        { display: "&nbsp;&nbsp;1.4.7", value: "1.4.7", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.4.6", value: "1.4.6", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.4.5", value: "1.4.5", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.4.4", value: "1.4.4", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.4.3", value: "1.4.3", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.4.2", value: "1.4.2", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.4.1", value: "1.4.1", isSubVersion: true },
-        // 1.3 (1-2)
-        { display: "1.3", value: "1.3", isSubVersion: false },
-        { display: "&nbsp;&nbsp;1.3.2", value: "1.3.2", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.3.1", value: "1.3.1", isSubVersion: true },
-        // 1.2 (1-5)
-        { display: "1.2", value: "1.2", isSubVersion: false },
-        { display: "&nbsp;&nbsp;1.2.5", value: "1.2.5", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.2.4", value: "1.2.4", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.2.3", value: "1.2.3", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.2.2", value: "1.2.2", isSubVersion: true },
-        { display: "&nbsp;&nbsp;1.2.1", value: "1.2.1", isSubVersion: true },
-        // 1.1
-        { display: "1.1", value: "1.1", isSubVersion: false },
-        // 1.0
-        { display: "1.0", value: "1.0", isSubVersion: false }
-      ];
-      
-      mcVersionSelect.innerHTML = ''; // Clear existing options
+      async function getModIdFromJar(jarFile) {
+        try {
+          const zip = await JSZip.loadAsync(jarFile);
+          const fabricFile = zip.file("fabric.mod.json");
+          if (fabricFile) {
+            const content = await fabricFile.async("string");
+            const manifest = JSON.parse(content);
+            return { id: manifest.id, name: manifest.name };
+          }
 
-      mcVersionsData.forEach(version => {
-        const option = document.createElement('option');
-        option.value = version.value;
-        option.dataset.cleanDisplay = version.value; // Store clean display text (same as value)
-        option.dataset.indentedDisplay = version.display; // Store display text with &nbsp;
-        option.innerHTML = option.dataset.indentedDisplay; // Initially populate with indented text
-        mcVersionSelect.appendChild(option);
-      });
-      
-      // Set the highest non-sub-version as the default
-      const defaultVersionEntry = mcVersionsData.find(version => !version.isSubVersion);
-      if (defaultVersionEntry) {
-        const defaultOption = mcVersionSelect.querySelector(`option[value="${defaultVersionEntry.value}"]`);
-        if (defaultOption) {
-          defaultOption.selected = true;
+          const forgeFile = zip.file("META-INF/mods.toml");
+          if (forgeFile) {
+            const content = await forgeFile.async("string");
+            const manifest = toml.parse(content);
+            const modInfo = manifest.mods && manifest.mods[0];
+            if (modInfo) {
+              return { id: modInfo.modId, name: modInfo.displayName };
+            }
+          }
+          throw new Error("Could not find a valid manifest file.");
+        } catch (e) {
+          throw new Error("Invalid or corrupt JAR file.");
         }
-      } else if (mcVersionSelect.options.length > 0) {
-        // Fallback to the very first option in the list if no non-sub-version is found (should not happen with current data)
-        mcVersionSelect.options[0].selected = true;
       }
 
-      // Helper function to set the displayed text of the selected option to its 'clean' version
-      function _updateSelectedOptionDisplay(selectElement) {
-        if (selectElement.selectedIndex !== -1) {
-          const opt = selectElement.options[selectElement.selectedIndex];
-          // Ensure opt and its dataset properties exist before trying to access them
-          if (opt && opt.dataset && opt.dataset.cleanDisplay) {
-            opt.innerHTML = opt.dataset.cleanDisplay;
+      // --- Results Rendering ---
+      function setupResultSections() {
+        resultsArea.innerHTML = `
+          <div id="results-found" class="results-section">
+            <h2 id="header-found">Updates Found</h2>
+            <div class="results-list"></div>
+          </div>
+          <div id="results-warning" class="results-section">
+            <h2 id="header-warning">No Compatible Version Found</h2>
+            <div class="results-list"></div>
+          </div>
+          <div id="results-failure" class="results-section">
+            <h2 id="header-failure">Could Not Find Mod</h2>
+            <div class="results-list"></div>
+          </div>
+        `;
+      }
+
+      // --- Helper to update section headers with counts ---
+      function updateSectionHeader(type, count) {
+        const headerId = `header-${type}`; // e.g., 'header-found'
+        const headerElement = document.getElementById(headerId);
+        if (!headerElement) return; // Safety check
+
+        let baseText = "";
+        switch (type) {
+          case "found":
+            baseText = "Updates Found";
+            break;
+          case "warning":
+            baseText = "No Compatible Version Found";
+            break;
+          case "failure":
+            baseText = "Could Not Find Mod";
+            break;
+        }
+
+        // Only show the count if it's greater than zero
+        if (count > 0) {
+          headerElement.textContent = `${baseText} (${count})`;
+        }
+      }
+
+      function renderSingleResult(result) {
+        let sectionId, card, countType;
+
+        switch (result.status) {
+          case "success":
+            sectionId = "results-found";
+            card = createSuccessCard(result);
+            countType = "found";
+            break;
+          case "warning":
+            sectionId = "results-warning";
+            card = createWarningCard(result);
+            countType = "warning";
+            break;
+          case "failure":
+            sectionId = "results-failure";
+            card = createFailureCard(result);
+            countType = "failure";
+            break;
+        }
+
+        // Increment the appropriate counter
+        if (countType) {
+          sectionCounts[countType]++;
+          updateSectionHeader(countType, sectionCounts[countType]);
+        }
+
+        // First, check for duplicates.
+        if (result.status === "success" && renderedModIds.has(result.modId)) {
+          console.log(`Skipping duplicate render for: ${result.title}`);
+          // If it's a duplicate, we do nothing else.
+        } else {
+          // If it's NOT a duplicate (or it's a warning/failure), then we render it.
+          const section = document.getElementById(sectionId);
+          if (section) {
+            section.querySelector(".results-list").appendChild(card);
+            section.classList.add("visible");
+          }
+          // And if it was a new success, we add it to our tracking set.
+          if (result.status === "success") {
+            renderedModIds.add(result.modId);
           }
         }
       }
 
-      // Set the display for the initially selected default option
-      _updateSelectedOptionDisplay(mcVersionSelect);
+      function finalizeResultsUI() {
+        const foundSection = document.getElementById("results-found");
+        if (foundSection && successfulDownloads.length > 0) {
+          const actionsContainer = document.createElement("div");
+          actionsContainer.className = "results-actions";
 
-      // When the select box gains focus (e.g., user clicks or tabs to it)
-      // reset all options to their indented display for the dropdown list
-      mcVersionSelect.addEventListener('focus', () => {
-        for (let i = 0; i < mcVersionSelect.options.length; i++) {
-          const opt = mcVersionSelect.options[i];
-          if (opt && opt.dataset && opt.dataset.indentedDisplay) {
-            opt.innerHTML = opt.dataset.indentedDisplay;
-          }
+          const downloadAllBtn = document.createElement("button");
+          downloadAllBtn.className = "action-button";
+          downloadAllBtn.innerHTML = `Download All (${successfulDownloads.length}) &darr;`;
+          downloadAllBtn.onclick = () => {
+            let i = 0;
+            function downloadNext() {
+              if (i < successfulDownloads.length) {
+                const dl = successfulDownloads[i];
+                const link = document.createElement("a");
+                link.href = dl.url;
+                link.setAttribute("download", dl.filename);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                i++;
+                setTimeout(downloadNext, 300);
+              }
+            }
+            downloadNext();
+          };
+
+          const downloadPackBtn = document.createElement("button");
+          downloadPackBtn.className = "action-button";
+          downloadPackBtn.innerHTML = `Download as .mrpack`;
+          downloadPackBtn.onclick = createModpack;
+
+          actionsContainer.appendChild(downloadAllBtn);
+          actionsContainer.appendChild(downloadPackBtn);
+          foundSection.appendChild(actionsContainer);
         }
-      });
 
-      // When the selection changes, update the newly selected option's display to clean
-      mcVersionSelect.addEventListener('change', () => {
-        _updateSelectedOptionDisplay(mcVersionSelect);
-      });
+        // Hide sections that have no results for a cleaner UI
+        if (sectionCounts.warning === 0) {
+          const warningSection = document.getElementById("results-warning");
+          if (warningSection) warningSection.style.display = "none";
+        }
+        if (sectionCounts.failure === 0) {
+          const failureSection = document.getElementById("results-failure");
+          if (failureSection) failureSection.style.display = "none";
+        }
+        // Check if all categories are empty after processing
+        if (
+          sectionCounts.found === 0 &&
+          sectionCounts.warning === 0 &&
+          sectionCounts.failure === 0
+        ) {
+          resultsArea.innerHTML = `
+            <div class="results-section visible">
+              <h2>Search Complete</h2>
+              <p>We couldn't find any information for the mods in your list on Modrinth. They may be from another source like CurseForge, or the files may be corrupt.</p>
+            </div>
+          `;
+        }
+      }
 
-      // When the select box loses focus, ensure the selected option shows clean text
-      mcVersionSelect.addEventListener('blur', () => {
-        _updateSelectedOptionDisplay(mcVersionSelect);
-      });
+      // --- Success Card ---
+      function createSuccessCard(mod) {
+        const card = document.createElement("div");
+        card.className = "result-card";
+        const clientServerInfo = getClientServerSupport(
+          mod.client_side,
+          mod.server_side
+        );
+        const versionOptions = mod.all_versions
+          .map((v) => {
+            const type = v.version_type.charAt(0).toUpperCase();
+            const typeClass = `version-type-${v.version_type}`;
+            return `<option value="${v.id}">${v.version_number} <span class="${typeClass}">[${type}]</span></option>`;
+          })
+          .join("");
 
-      // --- TODO: API Logic ---
-      // This is where you'll add the logic to process the files
-      // and call the Modrinth API when the "Update" button is clicked.
-      const updateButton = document.getElementById("update-button");
-      updateButton.addEventListener("click", () => {
-        console.log("Update button clicked!");
-        // 1. Get the list of files (you'll need to store them from the drop event)
-        // 2. For each file, parse the name or use JSZip to read the mod ID
-        // 3. Call the Modrinth API for each mod ID
-        // 4. Display the results
-        alert("Update functionality is not yet implemented.");
-      });
+        card.innerHTML = `
+          <div class="result-card-main">
+            <a href="${mod.project_url}" target="_blank" rel="noopener noreferrer" class="mod-icon-link">
+              <img src="${mod.icon_url}" alt="${mod.title} icon" class="mod-icon" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGcgaWQ9Ik1pbmVjcmFmdCI+PHBhdGggZD0ibTIxIDFoLTE4YTIgMiAwIDAgMCAtMiAydjE4YTIgMiAwIDAgMCAyIDJoMThhMiAyIDAgMCAwIDItMnYtMThhMiAyIDAgMCAwIC0yLTJ6bS0xNSA4LjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYzYS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV6bTExIDhhLjUuNSAwIDAgMSAtLjUuNWgtMmEuNS41IDAgMCAxIC0uNS0uNXYtMS41aC00djEuNWEuNS41IDAgMCAxIC0uNS41aC0yYS41LjUgMCAwIDEgLS41LS41di01YS41LjUgMCAwIDEgLjUtLjVoMi41di0xLjVhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYxLjVoMi41YS41LjUgMCAwIDEgLjUuNXptMS04YS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXoiIGZpbGw9IiMzMDNjNDIiLz48L2c+PC9zdmc+'">
+            </a>
+            <div class="mod-details">
+              <div class="mod-title">
+                <a href="${mod.project_url}" target="_blank" rel="noopener noreferrer">${mod.title}</a>
+                <span class="mod-author">by <a href="${mod.author_url}" target="_blank" rel="noopener noreferrer">${mod.author_name}</a></span>
+                ${mod.isDependency ? '<span class="mod-author">(dependency)</span>' : ""}
+              </div>
+              <div class="mod-description">${mod.description}</div>
+              <div class="mod-meta">
+                <div class="mod-meta-item">${clientServerInfo.svg}<span>${clientServerInfo.text}</span></div>
+                <div class="mod-meta-item">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                  <span class="mod-meta-date"></span>
+                </div>
+                <div class="mod-meta-item">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                  <span>${formatDownloads(mod.downloads)}</span>
+                </div>
+                <div class="mod-meta-item changelog-toggle">Changelog</div>
+              </div>
+            </div>
+            <div class="mod-actions">
+              <select class="version-select">${versionOptions}</select>
+              <a href="#" class="download-link">Download</a>
+            </div>
+          </div>
+          <div class="changelog-content"></div>`;
+
+        const versionSelect = card.querySelector(".version-select");
+        const downloadLink = card.querySelector(".download-link");
+        const dateSpan = card.querySelector(".mod-meta-date");
+        const changelogToggle = card.querySelector(".changelog-toggle");
+        const changelogContent = card.querySelector(".changelog-content");
+
+        function updateDynamicContent() {
+          const selectedVersionId = versionSelect.value;
+          const selectedVersion = mod.all_versions.find(
+            (v) => v.id === selectedVersionId
+          );
+          const primaryFile = selectedVersion.files.find((f) => f.primary);
+          if (primaryFile) {
+            downloadLink.href = primaryFile.url;
+            downloadLink.setAttribute("download", primaryFile.filename);
+          }
+          dateSpan.textContent = formatTimeAgo(selectedVersion.date_published);
+          changelogContent.innerHTML = marked.parse(
+            selectedVersion.changelog || "No changelog provided for this version."
+          );
+        }
+
+        versionSelect.addEventListener("change", updateDynamicContent);
+        changelogToggle.addEventListener("click", () => {
+          changelogContent.classList.toggle("visible");
+        });
+
+        updateDynamicContent();
+        return card;
+      }
+
+      function createWarningCard(mod) {
+  const card = document.createElement("div");
+  // We keep the 'warning' class for the yellow border
+  card.className = "result-card warning";
+  const clientServerInfo = getClientServerSupport(
+    mod.client_side,
+    mod.server_side
+  );
+
+  card.innerHTML = `
+    <div class="result-card-main">
+      <a href="${mod.project_url}" target="_blank" rel="noopener noreferrer" class="mod-icon-link">
+        <img src="${mod.icon_url}" alt="${mod.title} icon" class="mod-icon" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGcgaWQ9Ik1pbmVjcmFmdCI+PHBhdGggZD0ibTIxIDFoLTE4YTIgMiAwIDAgMCAtMiAydjE4YTIgMiAwIDAgMCAyIDJoMThhMiAyIDAgMCAwIDItMnYtMThhMiAyIDAgMCAwIC0yLTJ6bS0xNSA4LjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYzYS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV6bTExIDhhLjUuNSAwIDAgMSAtLjUuNWgtMmEuNS41IDAgMCAxIC0uNS0uNXYtMS41aC00djEuNWEuNS41IDAgMCAxIC0uNS41aC0yYS41LjUgMCAwIDEgLS41LS41di01YS41LjUgMCAwIDEgLjUtLjVoMi41di0xLjVhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYxLjVoMi41YS41LjUgMCAwIDEgLjUuNXptMS04YS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXoiIGZpbGw9IiMzMDNjNDIiLz48L2c+PC9zdmc+'">
+      </a>
+      <div class="mod-details">
+        <div class="mod-title">
+          <a href="${mod.project_url}" target="_blank" rel="noopener noreferrer">${mod.title}</a>
+          <span class="mod-author">by <a href="${mod.author_url}" target="_blank" rel="noopener noreferrer">${mod.author_name}</a></span>
+        </div>
+        <div class="mod-description">${mod.description}</div>
+        <div class="mod-meta">
+          <div class="mod-meta-item">${clientServerInfo.svg}<span>${clientServerInfo.text}</span></div>
+          <div class="mod-meta-item">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            <span>${formatDownloads(mod.downloads)}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="changelog-content" style="width: 100%; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color); display: block;">
+       <p style="color: var(--warning-color); font-weight: bold; margin: 0;">${mod.reason}</p>
+    </div>`;
+  return card;
+}
+
+      function createFailureCard(mod) {
+        const card = document.createElement("div");
+        card.className = "result-card failure";
+        card.innerHTML = `
+          <div class="mod-details">
+            <div class="mod-title">${mod.title}</div>
+            <div class="mod-description">${mod.reason}</div>
+          </div>`;
+        return card;
+      }
+
+// --- Helper Functions ---
+
+// --- Reusable function to get author details from a team ID ---
+      async function getAuthorDetails(teamId) {
+        try {
+          const teamUrl = `https://api.modrinth.com/v2/team/${teamId}/members`;
+          const teamResponse = await fetchWithRetry(teamUrl);
+          if (!teamResponse.ok) return { name: "unknown", url: "#" };
+
+          const teamMembers = await teamResponse.json();
+          // Find the first member who is an "Owner", then "Developer", or fall back to the first member
+          const owner = teamMembers.find(m => m.role.toLowerCase() === 'owner');
+          const developer = teamMembers.find(m => m.role.toLowerCase() === 'developer');
+          const primaryAuthor = owner || developer || teamMembers[0];
+
+          if (primaryAuthor && primaryAuthor.user) {
+            return {
+              name: primaryAuthor.user.username,
+              url: `https://modrinth.com/user/${primaryAuthor.user.username}`,
+            };
+          }
+        } catch (error) {
+          console.error("Failed to fetch author details:", error);
+        }
+        return { name: "unknown", url: "#" }; // Default fallback
+      }
+
+      // --- File Hash Calculation ---
+      async function calculateFileHash(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            try {
+              const binary = event.target.result;
+              const wordArray = CryptoJS.lib.WordArray.create(binary);
+              const hash = CryptoJS.SHA1(wordArray).toString(CryptoJS.enc.Hex);
+              resolve(hash);
+            } catch (error) {
+              reject(error);
+            }
+          };
+          reader.onerror = (error) => reject(error);
+          reader.readAsArrayBuffer(file);
+        });
+      }
+
+      function getClientServerSupport(client, server) {
+        const both =
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><path d="M9 2v20"></path></svg>';
+        const clientIcon =
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"></rect><path d="M8 21h8"></path><path d="M12 17v4"></path></svg>';
+        const serverIcon =
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"></rect><rect x="2" y="14" width="20" height="8" rx="2"></rect><path d="M6 6h.01"></path><path d="M6 18h.01"></path></svg>';
+
+        if (client !== "unsupported" && server !== "unsupported") {
+          return { text: "Client & Server", svg: both };
+        } else if (client !== "unsupported") {
+          return { text: "Client-side", svg: clientIcon };
+        } else if (server !== "unsupported") {
+          return { text: "Server-side", svg: serverIcon };
+        }
+        return { text: "Unknown", svg: "" };
+      }
+
+      function formatDownloads(num) {
+        if (num >= 1000000) return (num / 1000000).toFixed(1) + "M";
+        if (num >= 1000) return (num / 1000).toFixed(1) + "K";
+        return num;
+      }
+
+      function formatTimeAgo(dateString) {
+        const date = new Date(dateString);
+        const now = new Date();
+        const seconds = Math.round((now - date) / 1000);
+        const minutes = Math.round(seconds / 60);
+        const hours = Math.round(minutes / 60);
+        const days = Math.round(hours / 24);
+        const months = Math.round(days / 30.44);
+        const years = Math.round(days / 365.25);
+        if (seconds < 60) return `${seconds}s ago`;
+        if (minutes < 60) return `${minutes}m ago`;
+        if (hours < 24) return `${hours}h ago`;
+        if (days < 30) return `${days}d ago`;
+        if (months < 12) return `${months}mo ago`;
+        return `${years}y ago`;
+      }
+
+      function createModpack() {
+        const loaderNameMap = {
+          fabric: "fabric-loader",
+          forge: "forge",
+          quilt: "quilt-loader",
+          neoforge: "neoforge",
+        };
+
+        const selectedLoader = modLoaderSelect.value;
+        const officialLoaderName = loaderNameMap[selectedLoader] || selectedLoader;
+
+        const manifest = {
+          formatVersion: 1,
+          game: "minecraft",
+          versionId: "mc-updater-pack",
+          name: "MC Updater Export",
+          dependencies: {
+            minecraft: mcVersionSelect.value,
+            [officialLoaderName]: "*",
+          },
+          // --- BUILD THE FULL FILE ENTRY ---
+          files: successfulDownloads.map((dl) => {
+            const fileEntry = {
+              path: dl.path,
+              hashes: dl.hashes,
+              downloads: [dl.url],
+              fileSize: dl.fileSize, // Add the fileSize
+            };
+
+            // Conditionally build the env object
+            const env = {};
+            if (dl.client_side === "required") {
+              env.client = "required";
+            }
+            if (dl.server_side === "required") {
+              env.server = "required";
+            }
+
+            // Add the env object only if it has keys
+            if (Object.keys(env).length > 0) {
+              fileEntry.env = env;
+            }
+
+            return fileEntry;
+          }),
+        };
+
+        const zip = new JSZip();
+        zip.file("modrinth.index.json", JSON.stringify(manifest, null, 2));
+        zip.folder("overrides");
+
+        zip.generateAsync({ type: "blob" }).then(function (content) {
+          const link = document.createElement("a");
+          link.href = URL.createObjectURL(content);
+          link.download = "mc-updater-pack.mrpack";
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        });
+      }
     </script>
   </body>
 </html>
