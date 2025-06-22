@@ -650,18 +650,42 @@
         font-weight: bold;
         font-size: 1rem;
       }
+      .search-container {
+        position: relative;
+        display: flex;
+        align-items: center;
+      }
       .search-container input {
         background-color: var(--bg-color);
         color: var(--primary-text);
         border: 1px solid var(--border-color);
         border-radius: 6px;
         padding: 0.5rem 1rem;
+        padding-right: 2.5rem;
         font-size: 1rem;
         transition: border-color 0.2s ease;
+        margin-left: 0.3rem;
       }
       .search-container input:focus {
         outline: none;
         border-color: var(--gradient-start);
+      }
+      .search-clear-button {
+        position: absolute;
+        right: 0.5rem;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: var(--secondary-text);
+        font-size: 1.5rem;
+        cursor: pointer;
+        display: none; /* Hidden by default */
+        padding: 0 0.5rem;
+        line-height: 1;
+      }
+      .search-clear-button:hover {
+        color: var(--primary-text);
       }
 
       #search-results-container {
@@ -732,6 +756,7 @@
         <div class="control-group search-container">
           <label for="mod-search">Search:</label>
           <input type="text" id="mod-search" placeholder="Find mods by name...">
+          <button id="search-clear-button" class="search-clear-button">&times;</button>
         </div>
       </div>
       <div id="dropzone" class="dropzone">
@@ -813,7 +838,7 @@
         </ul>
         <h3>Attributions:</h3>
         <p>
-          This tool relies on the Modrinth API for all mod data. Please be aware of their rate limits. The application will automatically pause and resume to respect these limits.
+          This tool relies on the Modrinth API for all mod data. Please be aware of their ratelimits. The ratelimit is currently 300 requests per minute. The application will automatically pause and resume to respect these limits.
         </p>
       </div>
     </div>
@@ -1016,9 +1041,7 @@
       const updateButtonIcon = updateButton.querySelector("svg");
       const modLoaderSelect = document.getElementById("mod-loader");
       const resultsArea = document.getElementById("results-area");
-      const progressBarContainer = document.getElementById(
-        "progress-bar-container"
-      );
+      const progressBarContainer = document.getElementById("progress-bar-container");
       const progressBar = document.getElementById("progress-bar");
       const statusMessage = document.getElementById("status-message");
       const clearAllButton = document.getElementById("clear-all-button");
@@ -1034,6 +1057,7 @@
       const searchResultsContainer = document.getElementById("search-results-container");
       const searchCloseButton = document.getElementById("search-close-button");
       const searchXCloseButton = document.getElementById("search-x-close-button");
+      const searchClearButton = document.getElementById("search-clear-button");
 
       // --- UI LOGIC ---
       infoButton.addEventListener("click", () => {
@@ -1170,15 +1194,36 @@
         }
       }
 
-      const debouncedSearch = debounce(performSearch, 300);
+      const debouncedSearch = debounce(performSearch, 500);
 
       searchInput.addEventListener("input", (e) => {
-        if (e.target.value.trim().length > 1) {
+        const query = e.target.value.trim();
+        
+        // Show or hide the clear button
+        if (query.length > 0) {
+          searchClearButton.style.display = "block";
+        } else {
+          searchClearButton.style.display = "none";
+        }
+
+        // Perform search
+        if (query.length > 1) {
           searchModal.classList.add("visible");
-          debouncedSearch(e.target.value.trim());
+          debouncedSearch(query);
         } else {
           searchResultsContainer.innerHTML = "<p>Start typing to find mods.</p>";
         }
+      });
+      // Add click listener for the new clear button
+      searchClearButton.addEventListener("click", () => {
+        // Clear the input field
+        searchInput.value = "";
+        // Hide the clear button itself
+        searchClearButton.style.display = "none";
+        // Reset the search results in the modal
+        searchResultsContainer.innerHTML = "<p>Start typing to find mods.</p>";
+        // Give focus back to the input field so the user can type a new query
+        searchInput.focus();
       });
       
       searchInput.addEventListener("focus", () => {
@@ -1577,7 +1622,7 @@ async function fetchWithRetry(url, options, retries = 3) {
     ...options, // Spread any existing options
     headers: {
       // Add our custom User-Agent to be a good API citizen
-      "User-Agent": "BryantWelch/mcmodupdate.app/",
+      // "User-Agent": "BryantWelch/mcmodupdate.app/",
     },
   };
 
