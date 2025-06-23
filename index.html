@@ -24,12 +24,12 @@
     <meta property="og:url" content="https://mcmodupdate.app/">
     <meta property="og:image" content="https://mcmodupdate.app/social-preview.png">
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/toml@3.0.0/toml.min.js"></script>
+    <script src="https://unpkg.com/toml-js@0.0.8/lib/amd/toml.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
     <style>
       
-      /* CSS */
+      /* -- CSS -- */
       :root {
         --bg-color: #11101d;
         --card-bg: #1e1e2f;
@@ -302,7 +302,7 @@
         width: 100%;
         height: 100%;
         background-color: rgba(0, 0, 0, 0.7);
-        display: flex; /* Changed from none to flex */
+        display: flex;
         align-items: center;
         justify-content: center;
         z-index: 1000;
@@ -574,6 +574,32 @@
       .changelog-toggle:hover {
         color: var(--primary-text);
       }
+      .mod-channel-links {
+        display: flex;
+        align-items: center;
+      }
+
+      .channel-link {
+        text-decoration: underline;
+        cursor: pointer;
+        transition: color 0.2s ease;
+      }
+
+      /* Match the hover effect of the changelog link */
+      .channel-link:hover {
+        color: var(--primary-text);
+      }
+
+      /* Set the specific text colors for each channel */
+      .channel-link.release {
+        color: var(--success-color);
+      }
+      .channel-link.beta {
+        color: var(--beta-color);
+      }
+      .channel-link.alpha {
+        color: var(--alpha-color);
+      }
       .changelog-content {
         display: none;
         width: 100%;
@@ -594,7 +620,7 @@
         display: flex;
         flex-direction: column;
         align-items: flex-end;
-        gap: 0.5rem;
+        gap: 1rem;
         flex-shrink: 0;
       }
       .version-select {
@@ -711,10 +737,137 @@
         background-color: var(--border-color);
         cursor: not-allowed;
       }
+
+/* -- Styles for the header and the toggle button's container -- */
+.results-header-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.results-header-container h2 {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
+
+/* -- Styles for the layout toggle button itself -- */
+.layout-toggle {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--secondary-text);
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 0.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.layout-toggle:hover {
+  color: var(--primary-text);
+  border-color: var(--primary-text);
+  background-color: var(--pill-bg);
+}
+
+/* -- Default Visibility: Hide grid-only elements -- */
+.grid-view-channels {
+  display: none;
+}
+
+/* -- Grid View Container Style -- */
+.results-list.grid-view {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+/* -- Card Styles in Grid View -- */
+.results-list.grid-view .result-card {
+  flex-direction: column;
+  padding: 0.75rem;
+  align-items: center;
+  text-align: center;
+  gap: 0.5rem;
+}
+
+.results-list.grid-view .result-card-main {
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* -- Child Element Styles in Grid View -- */
+.results-list.grid-view .mod-icon {
+  width: 64px;
+  height: 64px;
+}
+
+.results-list.grid-view .mod-title {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.3;
+  height: 2.6em; /* Reserve space for 2 lines */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Hide elements not needed in compact view */
+.results-list.grid-view .mod-author,
+.results-list.grid-view .mod-description,
+.results-list.grid-view .mod-meta {
+  display: none;
+}
+
+/* -- Action Area in Grid View -- */
+.results-list.grid-view .mod-actions {
+  width: 100%;
+  margin-top: auto;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border-color);
+  align-items: stretch;
+  gap: 0.5rem;
+}
+
+.results-list.grid-view .version-select {
+  text-align: center;
+  padding: 0.2rem 0.5rem;
+}
+
+/* -- New Bottom Line Container -- */
+.results-list.grid-view .grid-bottom-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.results-list.grid-view .grid-view-channels {
+  display: block;
+}
+
+.results-list.grid-view .download-link {
+  background: none;
+  padding: 0;
+  font-weight: normal;
+  color: var(--secondary-text);
+  text-decoration: underline;
+}
+
+.results-list.grid-view .download-link:hover {
+  color: var(--primary-text);
+}
+/* End of CSS */
+
+/* Beginning of HTML */
     </style>
   </head>
   <body>
-    <!-- HTML -->
     <button id="info-button" class="info-button" aria-label="Show info">
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -820,6 +973,8 @@
       style="display: none"
       accept=".jar"
     />
+
+    <!-- Info Modal -->
     <div id="info-modal" class="modal-overlay">
       <div class="modal-content">
         <button id="modal-close-button" class="modal-close-button">&times;</button>
@@ -869,6 +1024,7 @@
       </div>
     </div>
 
+    <!-- FOOTER -->
     <footer>
       <div class="footer-content">
         <div class="footer-column">
@@ -1003,16 +1159,15 @@
       </div>
     </footer>
 
+    <!-- SCROLL BUTTONS -->
     <div id="scroll-buttons-container">
-      <!-- "Scroll to Top" button is first -->
-      <button id="scroll-to-top-btn" class="scroll-btn" title="Scroll to top">
+      <button id="scroll-to-top-btn" class="scroll-btn" title="Scroll to top"> <!-- "Scroll to Top" button is first -->
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="17 11 12 6 7 11"></polyline>
           <polyline points="17 18 12 13 7 18"></polyline>
         </svg>
       </button>
-      <!-- "Scroll to Bottom" button is second -->
-      <button id="scroll-to-bottom-btn" class="scroll-btn" title="Scroll to bottom">
+      <button id="scroll-to-bottom-btn" class="scroll-btn" title="Scroll to bottom"> <!-- "Scroll to Bottom" button is second -->
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="7 13 12 18 17 13"></polyline>
           <polyline points="7 6 12 11 17 6"></polyline>
@@ -1102,7 +1257,7 @@
         }
       });
 
-      // --- ADDED: Scroll to Top/Bottom Button Logic ---
+      // --- Scroll to Top/Bottom Button Logic ---
       function handleScrollButtons() {
         const scrollY = window.scrollY;
         const pageHeight = document.documentElement.scrollHeight;
@@ -1248,6 +1403,7 @@
         }
       });
 
+      // --- Search Modal Results Logic ---
       function renderSearchResults(hits) {
         searchResultsContainer.innerHTML = "";
         if (hits.length === 0) {
@@ -1260,6 +1416,7 @@
         });
       }
 
+      // --- Search Modal Results Card Logic ---
       function createSearchResultCard(mod) {
         const card = document.createElement("div");
         card.className = "result-card";
@@ -1361,6 +1518,7 @@
         }
       }
 
+      // --- File Pill Logic ---
       function createFilePill(file) {
         const filePill = document.createElement("div");
         filePill.classList.add("file-pill");
@@ -1537,7 +1695,7 @@ function resetResults() {
 updateButton.addEventListener("click", handleUpdate);
 
 async function handleUpdate() {
-  // 1. Combine jobs from both sources first.
+  // Combine jobs from both sources first.
   const fileJobs = Array.from(uploadedFiles.values()).map((file) => ({
     type: "file",
     data: file,
@@ -1548,13 +1706,13 @@ async function handleUpdate() {
   }));
   const jobs = [...fileJobs, ...searchJobs];
 
-  // 2. Check if there's anything to do.
+  // Check if there's anything to do.
   if (jobs.length === 0) {
     showCustomAlert("Please upload or search for mods first.", "notice");
     return;
   }
 
-  // 3. NOW, reset the UI and state for a new run.
+  // Reset the UI and state for a new run.
   resetResults();
   renderedModIds.clear();
   updateButton.disabled = true;
@@ -1564,7 +1722,7 @@ async function handleUpdate() {
   setupResultSections();
   progressBarContainer.style.display = "block";
 
-  // 4. The rest of the processing loop...
+  // The rest of the processing loop...
   const processedIds = new Set();
   let completedJobs = 0;
   let totalJobs = jobs.length;
@@ -1637,7 +1795,7 @@ async function fetchWithRetry(url, options, retries = 3) {
       const currentTime = Math.floor(Date.now() / 1000);
       const waitTime = resetTimestamp
         ? Math.max(0, resetTimestamp - currentTime) + 1
-        : 5;
+        : 10; // Default to 10 seconds if reset time is not available
 
       const originalMessage = statusMessage.textContent;
       console.warn(
@@ -1800,7 +1958,7 @@ async function getModUpdateInfo(job) {
         }
       }
 
-
+      // --- Get Mod ID from JAR ---
       async function getModIdFromJar(jarFile) {
         try {
           const zip = await JSZip.loadAsync(jarFile);
@@ -1826,23 +1984,62 @@ async function getModUpdateInfo(job) {
         }
       }
 
-      // --- Results Rendering ---
-      function setupResultSections() {
-        resultsArea.innerHTML = `
-          <div id="results-found" class="results-section">
-            <h2 id="header-found">Updates Found</h2>
-            <div class="results-list"></div>
-          </div>
-          <div id="results-warning" class="results-section">
-            <h2 id="header-warning">No Compatible Version Found</h2>
-            <div class="results-list"></div>
-          </div>
-          <div id="results-failure" class="results-section">
-            <h2 id="header-failure">Could Not Find Mod</h2>
-            <div class="results-list"></div>
-          </div>
-        `;
-      }
+      // --- Setup Result Sections ---
+function setupResultSections() {
+  // --- NEW: SVG icons for the layout toggle button ---
+  const gridIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect></svg>`;
+  const listIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>`;
+
+  resultsArea.innerHTML = `
+    <div id="results-found" class="results-section">
+      <!-- NEW: Header container for title and button -->
+      <div class="results-header-container">
+        <h2 id="header-found">Updates Found</h2>
+        <button id="layout-toggle-btn" class="layout-toggle" title="Toggle Layout">${gridIcon}</button>
+      </div>
+      <div class="results-list"></div>
+    </div>
+    <div id="results-warning" class="results-section">
+      <h2 id="header-warning">No Compatible Version Found</h2>
+      <div class="results-list"></div>
+    </div>
+    <div id="results-failure" class="results-section">
+      <h2 id="header-failure">Could Not Find Mod</h2>
+      <div class="results-list"></div>
+    </div>
+  `;
+
+  // --- Logic for the layout toggle button ---
+  const layoutToggleBtn = document.getElementById("layout-toggle-btn");
+  const foundResultsList = document.querySelector("#results-found .results-list");
+
+  // Function to set the layout based on stored preference or default
+  function setLayout() {
+    const currentLayout = localStorage.getItem("mod-layout") || "list";
+    if (currentLayout === "grid") {
+      foundResultsList.classList.add("grid-view");
+      layoutToggleBtn.innerHTML = listIcon;
+    } else {
+      foundResultsList.classList.remove("grid-view");
+      layoutToggleBtn.innerHTML = gridIcon;
+    }
+  }
+
+  layoutToggleBtn.addEventListener("click", () => {
+    foundResultsList.classList.toggle("grid-view");
+    // Save the new preference to localStorage
+    if (foundResultsList.classList.contains("grid-view")) {
+      localStorage.setItem("mod-layout", "grid");
+      layoutToggleBtn.innerHTML = listIcon; // Show list icon
+    } else {
+      localStorage.setItem("mod-layout", "list");
+      layoutToggleBtn.innerHTML = gridIcon; // Show grid icon
+    }
+  });
+
+  // Set the initial layout when the page loads
+  setLayout();
+}
 
       // --- Helper to update section headers with counts ---
       function updateSectionHeader(type, count) {
@@ -1914,6 +2111,7 @@ async function getModUpdateInfo(job) {
         }
       }
 
+      // --- Finalize Results UI ---
       function finalizeResultsUI() {
         const foundSection = document.getElementById("results-found");
         if (foundSection && successfulDownloads.length > 0) {
@@ -1975,86 +2173,147 @@ async function getModUpdateInfo(job) {
         }
       }
 
-      // --- Success Card ---
-      function createSuccessCard(mod) {
-        const card = document.createElement("div");
-        card.className = "result-card";
-        const clientServerInfo = getClientServerSupport(
-          mod.client_side,
-          mod.server_side
-        );
-        const versionOptions = mod.all_versions
-          .map((v) => {
-            const type = v.version_type.charAt(0).toUpperCase();
-            const typeClass = `version-type-${v.version_type}`;
-            return `<option value="${v.id}">${v.version_number} <span class="${typeClass}">[${type}]</span></option>`;
-          })
-          .join("");
+      // --- Create Success Card ---
+function createSuccessCard(mod) {
+  const card = document.createElement("div");
+  card.className = "result-card";
 
-        card.innerHTML = `
-          <div class="result-card-main">
-            <a href="${mod.project_url}" target="_blank" rel="noopener noreferrer" class="mod-icon-link">
-              <img src="${mod.icon_url}" alt="${mod.title} icon" class="mod-icon" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGcgaWQ9Ik1pbmVjcmFmdCI+PHBhdGggZD0ibTIxIDFoLTE4YTIgMiAwIDAgMCAtMiAydjE4YTIgMiAwIDAgMCAyIDJoMThhMiAyIDAgMCAwIDItMnYtMThhMiAyIDAgMCAwIC0yLTJ6bS0xNSA4LjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYzYS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV6bTExIDhhLjUuNSAwIDAgMSAtLjUuNWgtMmEuNS41IDAgMCAxIC0uNS0uNXYtMS41aC00djEuNWEuNS41IDAgMCAxIC0uNS41aC0yYS41LjUgMCAwIDEgLS41LS41di01YS41LjUgMCAwIDEgLjUtLjVoMi41di0xLjVhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYxLjVoMi41YS41LjUgMCAwIDEgLjUuNXptMS04YS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXoiIGZpbGw9IiMzMDNjNDIiLz48L2c+PC9zdmc+'">
-            </a>
-            <div class="mod-details">
-              <div class="mod-title">
-                <a href="${mod.project_url}" target="_blank" rel="noopener noreferrer">${mod.title}</a>
-                <span class="mod-author">by <a href="${mod.author_url}" target="_blank" rel="noopener noreferrer">${mod.author_name}</a></span>
-                ${mod.isDependency ? '<span class="mod-author">(dependency)</span>' : ""}
-              </div>
-              <div class="mod-description">${mod.description}</div>
-              <div class="mod-meta">
-                <div class="mod-meta-item">${clientServerInfo.svg}<span>${clientServerInfo.text}</span></div>
-                <div class="mod-meta-item">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                  <span class="mod-meta-date"></span>
-                </div>
-                <div class="mod-meta-item">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                  <span>${formatDownloads(mod.downloads)}</span>
-                </div>
-                <div class="mod-meta-item changelog-toggle">Changelog</div>
-              </div>
-            </div>
-            <div class="mod-actions">
-              <select class="version-select">${versionOptions}</select>
-              <a href="#" class="download-link">Download</a>
-            </div>
-          </div>
-          <div class="changelog-content"></div>`;
+  const clientServerInfo = getClientServerSupport(
+    mod.client_side,
+    mod.server_side
+  );
+  const versionOptions = mod.all_versions
+    .map((v) => {
+      const type = v.version_type.charAt(0).toUpperCase();
+      return `<option value="${v.id}">${v.version_number} [${type}]</option>`;
+    })
+    .join("");
 
-        const versionSelect = card.querySelector(".version-select");
-        const downloadLink = card.querySelector(".download-link");
-        const dateSpan = card.querySelector(".mod-meta-date");
-        const changelogToggle = card.querySelector(".changelog-toggle");
-        const changelogContent = card.querySelector(".changelog-content");
-
-        function updateDynamicContent() {
-          const selectedVersionId = versionSelect.value;
-          const selectedVersion = mod.all_versions.find(
-            (v) => v.id === selectedVersionId
-          );
-          const primaryFile = selectedVersion.files.find((f) => f.primary);
-          if (primaryFile) {
-            downloadLink.href = primaryFile.url;
-            downloadLink.setAttribute("download", primaryFile.filename);
+  // This HTML now contains TWO sets of channel links.
+  card.innerHTML = `
+    <div class="result-card-main">
+      <a href="${
+        mod.project_url
+      }" target="_blank" rel="noopener noreferrer" class="mod-icon-link">
+        <img src="${
+          mod.icon_url
+        }" alt="${
+    mod.title
+  } icon" class="mod-icon" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGcgaWQ9Ik1pbmVjcmFmdCI+PHBhdGggZD0ibTIxIDFoLTE4YTIgMiAwIDAgMCAtMiAydjE4YTIgMiAwIDAgMCAyIDJoMThhMiAyIDAgMCAwIDItMnYtMThhMiAyIDAgMCAwIC0yLTJ6bS0xNSA4LjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYzYS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV6bTExIDhhLjUuNSAwIDAgMSAtLjUuNWgtMmEuNS41IDAgMCAxIC0uNS0uNXYtMS41aC00djEuNWEuNS41IDAgMCAxIC0uNS41aC0yYS41LjUgMCAwIDEgLS41LS41di01YS41LjUgMCAwIDEgLjUtLjVoMi41di0xLjVhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYxLjVoMi41YS41LjUgMCAwIDEgLjUuNXptMS04YS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXoiIGZpbGw9IiMzMDNjNDIiLz48L2c+PC9zdmc+'">
+      </a>
+      <div class="mod-details">
+        <div class="mod-title">
+          <a href="${
+            mod.project_url
+          }" target="_blank" rel="noopener noreferrer">${mod.title}</a>
+          <span class="mod-author">by <a href="${
+            mod.author_url
+          }" target="_blank" rel="noopener noreferrer">${mod.author_name}</a></span>
+          ${
+            mod.isDependency
+              ? '<span class="mod-author">(dependency)</span>'
+              : ""
           }
-          dateSpan.textContent = formatTimeAgo(selectedVersion.date_published);
-          changelogContent.innerHTML = marked.parse(
-            selectedVersion.changelog || "No changelog provided for this version."
-          );
-        }
+        </div>
+        <div class="mod-description">${mod.description}</div>
+        <div class="mod-meta">
+          <div class="mod-meta-item">${
+            clientServerInfo.svg
+          }<span>${clientServerInfo.text}</span></div>
+          <div class="mod-meta-item">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            <span class="mod-meta-date"></span>
+          </div>
+          <div class="mod-meta-item">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            <span>${formatDownloads(mod.downloads)}</span>
+          </div>
+          <div class="mod-meta-item changelog-toggle">Changelog</div>
+          <div class="mod-meta-item list-view-channels">
+            <a href="#" target="_blank" rel="noopener noreferrer" class="channel-link release" style="display: none;">Release</a>
+            <a href="#" target="_blank" rel="noopener noreferrer" class="channel-link beta" style="display: none;">Beta</a>
+            <a href="#" target="_blank" rel="noopener noreferrer" class="channel-link alpha" style="display: none;">Alpha</a>
+          </div>
+        </div>
+      </div>
+      <div class="mod-actions">
+        <select class="version-select">${versionOptions}</select>
+        <div class="grid-bottom-line">
+          <div class="grid-view-channels">
+            <a href="#" target="_blank" rel="noopener noreferrer" class="channel-link release" style="display: none;">Release</a>
+            <a href="#" target="_blank" rel="noopener noreferrer" class="channel-link beta" style="display: none;">Beta</a>
+            <a href="#" target="_blank" rel="noopener noreferrer" class="channel-link alpha" style="display: none;">Alpha</a>
+          </div>
+          <a href="#" class="download-link">Download</a>
+        </div>
+      </div>
+    </div>
+    <div class="changelog-content"></div>`;
 
-        versionSelect.addEventListener("change", updateDynamicContent);
-        changelogToggle.addEventListener("click", () => {
-          changelogContent.classList.toggle("visible");
-        });
+  // Get references to ALL the elements we need to update
+  const versionSelect = card.querySelector(".version-select");
+  const downloadLink = card.querySelector(".download-link");
+  const dateSpan = card.querySelector(".mod-meta-date");
+  const changelogToggle = card.querySelector(".changelog-toggle");
+  const changelogContent = card.querySelector(".changelog-content");
 
-        updateDynamicContent();
-        return card;
-      }
+  // Get references to BOTH sets of links
+  const listLinks = {
+    release: card.querySelector(".list-view-channels .release"),
+    beta: card.querySelector(".list-view-channels .beta"),
+    alpha: card.querySelector(".list-view-channels .alpha"),
+  };
+  const gridLinks = {
+    release: card.querySelector(".grid-view-channels .release"),
+    beta: card.querySelector(".grid-view-channels .beta"),
+    alpha: card.querySelector(".grid-view-channels .alpha"),
+  };
 
-      function createWarningCard(mod) {
+  // --- Update Dynamic Content ---
+  function updateDynamicContent() {
+    const selectedVersionId = versionSelect.value;
+    const selectedVersion = mod.all_versions.find(
+      (v) => v.id === selectedVersionId
+    );
+    if (!selectedVersion) return;
+
+    const primaryFile = selectedVersion.files.find((f) => f.primary);
+    if (primaryFile) {
+      downloadLink.href = primaryFile.url;
+      downloadLink.setAttribute("download", primaryFile.filename);
+    }
+    dateSpan.textContent = formatTimeAgo(selectedVersion.date_published);
+    changelogContent.innerHTML = marked.parse(
+      selectedVersion.changelog || "No changelog provided for this version."
+    );
+
+    // Hide all links in both sets first
+    Object.values(listLinks).forEach((link) => (link.style.display = "none"));
+    Object.values(gridLinks).forEach((link) => (link.style.display = "none"));
+
+    const versionUrl = `${mod.project_url}/version/${selectedVersion.version_number}`;
+    const versionType = selectedVersion.version_type; // 'release', 'beta', or 'alpha'
+
+    // Update the correct link in BOTH sets
+    if (listLinks[versionType] && gridLinks[versionType]) {
+      listLinks[versionType].href = versionUrl;
+      listLinks[versionType].style.display = "inline";
+      gridLinks[versionType].href = versionUrl;
+      gridLinks[versionType].style.display = "inline";
+    }
+  }
+
+  versionSelect.addEventListener("change", updateDynamicContent);
+  changelogToggle.addEventListener("click", () => {
+    changelogContent.classList.toggle("visible");
+  });
+
+  updateDynamicContent();
+  return card;
+}
+
+// --- Create Warning Card ---
+function createWarningCard(mod) {
   const card = document.createElement("div");
   // We keep the 'warning' class for the yellow border
   card.className = "result-card warning";
@@ -2089,7 +2348,8 @@ async function getModUpdateInfo(job) {
   return card;
 }
 
-      function createFailureCard(mod) {
+// --- Create Failure Card ---
+function createFailureCard(mod) {
         const card = document.createElement("div");
         card.className = "result-card failure";
         card.innerHTML = `
@@ -2146,6 +2406,7 @@ async function getModUpdateInfo(job) {
         });
       }
 
+      // --- Get Client/Server Support ---
       function getClientServerSupport(client, server) {
         const both =
           '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><path d="M9 2v20"></path></svg>';
@@ -2164,12 +2425,14 @@ async function getModUpdateInfo(job) {
         return { text: "Unknown", svg: "" };
       }
 
+      // --- Format Downloads ---
       function formatDownloads(num) {
         if (num >= 1000000) return (num / 1000000).toFixed(1) + "M";
         if (num >= 1000) return (num / 1000).toFixed(1) + "K";
         return num;
       }
 
+      // --- Format Time Ago ---
       function formatTimeAgo(dateString) {
         const date = new Date(dateString);
         const now = new Date();
@@ -2187,6 +2450,7 @@ async function getModUpdateInfo(job) {
         return `${years}y ago`;
       }
 
+      // --- Create Modpack ---
       function createModpack() {
         const loaderNameMap = {
           fabric: "fabric-loader",
