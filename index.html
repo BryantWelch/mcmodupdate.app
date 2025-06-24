@@ -47,6 +47,11 @@
         --alpha-color: #ef5350;
         --beta-color: #ff9800;
       }
+      html,
+      body {
+        width: 100%;
+        overflow-x: hidden;
+      }
       body {
         background-color: var(--bg-color);
         color: var(--primary-text);
@@ -122,6 +127,7 @@
         transition: all 0.3s ease;
         background-color: var(--dropzone-bg);
         cursor: pointer;
+        overflow: hidden;
       }
       .dropzone.dropzone-expanded {
         max-width: 100%;
@@ -535,11 +541,10 @@
       .mod-title a:hover {
         text-decoration: underline;
       }
-      .mod-title .mod-author {
+      .mod-author {
         font-size: 0.9rem;
         font-weight: normal;
         color: var(--secondary-text);
-        margin-left: 0.5rem;
       }
       .mod-author a {
         color: var(--secondary-text);
@@ -629,6 +634,10 @@
         color: var(--primary-text);
         border-radius: 6px;
         padding: 0.3rem 0.5rem;
+        width: clamp(120px, 25vw, 160px);
+        white-space: nowrap; /* Prevents the text inside from wrapping */
+        overflow: hidden; /* Hides the text that overflows the container */
+        text-overflow: ellipsis; /* Adds the "..." for any hidden text */
       }
       .version-type {
         font-weight: bold;
@@ -862,6 +871,108 @@
 .results-list.grid-view .download-link:hover {
   color: var(--primary-text);
 }
+
+/* This new class will style ALL tags */
+.mod-title-tag {
+  font-size: 0.9rem;
+  font-weight: normal;
+  color: var(--secondary-text); /* Matches the author text color */
+  margin-left: 0.5rem;
+  font-style: italic;
+  white-space: nowrap; /* Prevents the tag itself from breaking onto two lines */
+}
+
+/* --- Mobile Responsive Styles --- */
+@media (max-width: 700px) {
+  /* Make the main container use the full width */
+  .main-container {
+    padding: 0 1rem;
+  }
+
+  /* Reduce header size */
+  h1 {
+    font-size: 2.2rem;
+  }
+
+  /* --- 1. Stack the main controls vertically --- */
+  .controls {
+    flex-direction: column;
+    align-items: stretch; /* Make all control groups full-width */
+    gap: 1rem;
+  }
+
+  .control-group {
+    display: flex;
+    flex-direction: column; /* Stack label above the input/select */
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+
+  /* Make inputs and selects full-width */
+  .search-container input,
+  .control-group select {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Make Update/Clear buttons full width */
+  .action-buttons-container {
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 400px;
+    gap: 1rem; /* Add a gap for nice spacing when both buttons are visible */
+  }
+
+  /* Center the welcome message content */
+  #welcome-message h2,
+  #welcome-message p {
+    text-align: center;
+  }
+
+  /* --- Stack the result card content --- */
+  .result-card-main {
+    flex-direction: column;
+    align-items: center; /* Center the icon */
+    gap: 0.5rem;
+  }
+
+  .mod-details,
+  .mod-actions {
+    width: 100%; /* Allow details and actions to take full width */
+    align-items: center; /* Makes dropdown/button full width */
+  }
+
+  .mod-details {
+    text-align: center; /* Center the text below the icon */
+  }
+
+  .mod-meta {
+    justify-content: center; /* Center the metadata items */
+    margin-top: 1rem;
+  }
+
+  /* --- Fix the Footer Layout --- */
+  .footer-content {
+    flex-direction: column; /* Stack the columns vertically */
+    text-align: center; /* Center the text inside each column */
+    gap: 2rem; /* Add more space between the stacked sections */
+  }
+
+  .footer-bottom {
+    display: flex;
+    flex-direction: column; /* Stack the copyright and Ko-fi button */
+    align-items: center;
+    gap: 1rem;
+    padding-top: 1.5rem;
+  }
+
+  .kofi-button {
+    position: static; /* Remove absolute positioning */
+    transform: none; /* Reset the transform */
+    margin-top: 0.5rem; /* Add some space above it */
+  }
+}
 /* End of CSS */
 
 /* Beginning of HTML */
@@ -915,11 +1026,11 @@
       <div id="dropzone" class="dropzone">
         <div id="file-list-container" class="file-list"></div>
         <p id="dropzone-prompt" class="dropzone-prompt">
-          Upload your mod(s)
-          <br>
-          or
-          <br>
-          Use the search
+          Upload your mod files (.jar),
+          <br />
+          Upload a modpack (.mrpack)
+          <br />
+          or use the search
         </p>
       </div>
       <div class="action-buttons-container">
@@ -951,17 +1062,32 @@
       <p id="status-message" class="status-message"></p>
       <div id="results-area">
         <div id="welcome-message" class="results-section visible">
-          <h2 style="text-align: center;">Welcome to the Minecraft Mod Updater &amp; Builder!</h2>
-          <p style="text-align: left; line-height: 1.6;">
-            This tool is your one-stop shop for managing your Minecraft mods.
-            You can easily find updates for your entire mod list, discover new mods, and export a ready-to-use modpack for your favorite launcher.
+          <h2 style="text-align: center">
+            Welcome to the Minecraft Mod Updater &amp; Builder!
+          </h2>
+          <p style="text-align: left; line-height: 1.6">
+            This tool is your one-stop shop for managing your Minecraft mods. You can
+            easily find updates for your entire mod list, discover new mods, and
+            export a ready-to-use modpack for your favorite launcher.
           </p>
-          <h3 style="text-align: center; margin-top: 2rem;">Ready to Start?</h3>
-          <p style="text-align: left; line-height: 1.6;">
-            Simply drag and drop your <code>.jar</code> files into the upload area above, or use the search bar to find mods directly on Modrinth. Then, click the "Update" button to see the magic happen!
+          <h3 style="text-align: center; margin-top: 2rem">Ready to Start?</h3>
+          <p style="text-align: left; line-height: 1.6">
+            To get started, you can upload an entire modpack
+            <code>.mrpack</code> to update it, drag and drop your individual
+            <code>.jar</code> files, or use the search bar to find new mods. Then,
+            click the "Update" button to see the magic happen!
           </p>
-          <p style="text-align: left; font-style: italic; margin-top: 2rem; font-size: 0.9rem; color: var(--secondary-text);">
-            For more detailed instructions, click the info icon in the top-right corner.
+          <p
+            style="
+              text-align: left;
+              font-style: italic;
+              margin-top: 2rem;
+              font-size: 0.9rem;
+              color: var(--secondary-text);
+            "
+          >
+            For more detailed instructions, click the info icon in the top-right
+            corner.
           </p>
         </div>
       </div>
@@ -971,7 +1097,7 @@
       id="file-input"
       multiple
       style="display: none"
-      accept=".jar"
+      accept=".jar,.mrpack"
     />
 
     <!-- Info Modal -->
@@ -985,11 +1111,27 @@
         </p>
         <h3>How to use:</h3>
         <ul>
-          <li>Select your desired mod loader (Fabric, Forge, etc.) and Minecraft version.</li>
-          <li><b>Update Existing Mods:</b> Drag and drop your local .jar files into the upload area.</li>
-          <li><b>Discover New Mods:</b> Use the search bar to find and add mods directly from Modrinth.</li>
+          <li>
+            Select your desired mod loader (Fabric, Forge, etc.) and the target
+            Minecraft version you want to update to.
+          </li>
+          <li>
+            <b>Update a Modpack:</b> Upload a <code>.mrpack</code> file to load its
+            entire mod list for updating.
+          </li>
+          <li>
+            <b>Update Individual Mods:</b> Drag and drop your local <code>.jar</code>
+            files into the upload area.
+          </li>
+          <li>
+            <b>Discover New Mods:</b> Use the search bar to find and add mods directly
+            from Modrinth.
+          </li>
           <li><b>Process Your List:</b> Click the "Update" button.</li>
-          <li><b>Get Results:</b> The tool will find the latest compatible versions and automatically add any required dependencies (like APIs and libraries) for you.</li>
+          <li>
+            <b>Get Results:</b> The tool will find the latest compatible versions and
+            automatically add any required dependencies for you.
+          </li>
         </ul>
         <h3>Attributions:</h3>
         <p>
@@ -1182,6 +1324,7 @@
       let sectionCounts = {};
       let renderedModIds = new Set();
       let searchedMods = new Map();
+      let isCurrentlySearching = false;
 
       // --- DOM Element References ---
       const dropzone = document.getElementById("dropzone");
@@ -1227,7 +1370,7 @@
         }
       });
 
-      // --- UPGRADED: Custom Alert Modal Logic ---
+      // --- Custom Alert Modal Logic ---
       function showCustomAlert(message, type = "notice") {
         const icons = {
           notice: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--warning-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`,
@@ -1312,6 +1455,11 @@
 
         // Clear the visual file pills from the UI
         fileListContainer.innerHTML = "";
+
+        // Only hide the status message if we are NOT currently searching.
+        if (!isCurrentlySearching) {
+          statusMessage.classList.remove("visible");
+        }
 
         // Reset the dropzone to its initial, non-expanded state
         dropzonePrompt.style.display = "block";
@@ -1507,16 +1655,105 @@
 
       function handleFiles(files) {
         if (files.length === 0) return;
-        dropzonePrompt.style.display = "none";
-        dropzone.classList.add("dropzone-expanded");
-        clearAllButton.style.display = "inline-flex"; // SHOW THE BUTTON
-        for (const file of files) {
-          if (file.name.endsWith(".jar") && !uploadedFiles.has(file.name)) {
-            uploadedFiles.set(file.name, file);
-            createFilePill(file);
+
+        // Check if a .mrpack file is among the dropped files
+        const mrpackFile = Array.from(files).find((file) =>
+          file.name.endsWith(".mrpack")
+        );
+
+        if (mrpackFile) {
+          // If a modpack is found, clear everything and process only the pack.
+          clearDropzone();
+          processMrpack(mrpackFile);
+        } else {
+          // Otherwise, proceed with the normal JAR file handling.
+          dropzonePrompt.style.display = "none";
+          dropzone.classList.add("dropzone-expanded");
+          clearAllButton.style.display = "inline-flex";
+          for (const file of files) {
+            if (file.name.endsWith(".jar") && !uploadedFiles.has(file.name)) {
+              uploadedFiles.set(file.name, file);
+              createFilePill(file);
+            }
           }
         }
       }
+
+      // --- Process .mrpack file ---
+      async function processMrpack(packFile) {
+        try {
+          // Update UI to show processing has started
+          dropzonePrompt.style.display = "none";
+          dropzone.classList.add("dropzone-expanded");
+          clearAllButton.style.display = "inline-flex";
+          createFilePill({ name: `Processing: ${packFile.name}...` }); // Temporary pill
+
+          const zip = await JSZip.loadAsync(packFile);
+          const manifestFile = zip.file("modrinth.index.json");
+
+          if (!manifestFile) {
+            showCustomAlert(
+              "The uploaded file is not a valid Modrinth modpack (missing modrinth.index.json).",
+              "error"
+            );
+            clearDropzone(); // Clear the "Processing..." pill
+            return;
+          }
+
+          const content = await manifestFile.async("string");
+          const manifest = JSON.parse(content);
+
+          // Clear the temporary "Processing..." pill
+          fileListContainer.innerHTML = "";
+
+          // --- Informational Message: Get Source Version and Loader ---
+          let sourceVersion = "unknown";
+          let sourceLoader = "unknown";
+
+          if (manifest.dependencies) {
+            if (manifest.dependencies.minecraft) {
+              sourceVersion = manifest.dependencies.minecraft;
+            }
+            if (manifest.dependencies["fabric-loader"]) {
+              sourceLoader = "Fabric";
+            } else if (manifest.dependencies.forge) {
+              sourceLoader = "Forge";
+            } else if (manifest.dependencies["quilt-loader"]) {
+              sourceLoader = "Quilt";
+            } else if (manifest.dependencies.neoforge) {
+              sourceLoader = "NeoForge";
+            }
+          }
+
+          statusMessage.textContent = `Detected: ${sourceLoader} pack for MC ${sourceVersion}. Ready to find updates for your selected version.`;
+          statusMessage.classList.add("visible");
+          // --- END of Informational Message: Get Source Version and Loader ---
+
+          // The manifest.files array contains the list of mods
+          if (manifest.files && manifest.files.length > 0) {
+            for (const modFile of manifest.files) {
+              // The path often looks like "mods/fabric-api-0.91.0.jar"
+              const filename = modFile.path.split("/").pop();
+              const sha1Hash = modFile.hashes.sha1;
+
+              if (sha1Hash && filename) {
+                // Use the hash as the unique key and store the filename for display.
+                // This reuses your existing `searchedMods` map perfectly.
+                searchedMods.set(sha1Hash, { title: filename });
+                createFilePill({ name: filename });
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Error processing .mrpack file:", error);
+          showCustomAlert(
+            "Could not read the uploaded .mrpack file. It may be corrupt.",
+            "error"
+          );
+          clearDropzone();
+        }
+      }
+
 
       // --- File Pill Logic ---
       function createFilePill(file) {
@@ -1700,10 +1937,16 @@ async function handleUpdate() {
     type: "file",
     data: file,
   }));
-  const searchJobs = Array.from(searchedMods.keys()).map((slug) => ({
-    type: "id",
-    data: slug,
-  }));
+  const searchJobs = Array.from(searchedMods.entries()).map(
+    ([key, modInfo]) => {
+      const isHash = /^[a-f0-9]{40}$/.test(key);
+      return {
+        type: isHash ? "hash" : "id",
+        data: key,
+        title: modInfo.title,
+      };
+    }
+  );
   const jobs = [...fileJobs, ...searchJobs];
 
   // Check if there's anything to do.
@@ -1712,66 +1955,75 @@ async function handleUpdate() {
     return;
   }
 
-  // Reset the UI and state for a new run.
-  resetResults();
-  renderedModIds.clear();
-  updateButton.disabled = true;
-  updateButton.innerHTML = "Searching...";
-  statusMessage.textContent = "Searching for updates and dependencies...";
-  statusMessage.classList.add("visible");
-  setupResultSections();
-  progressBarContainer.style.display = "block";
+  // --- START of new logic ---
+  isCurrentlySearching = true;
+  try {
+    // --- END of new logic ---
 
-  // The rest of the processing loop...
-  const processedIds = new Set();
-  let completedJobs = 0;
-  let totalJobs = jobs.length;
+    // Reset the UI and state for a new run.
+    resetResults();
+    renderedModIds.clear();
+    updateButton.disabled = true;
+    updateButton.innerHTML = "Searching...";
+    statusMessage.textContent = "Searching for updates and dependencies...";
+    statusMessage.classList.add("visible");
+    setupResultSections();
+    progressBarContainer.style.display = "block";
 
-  for (let i = 0; i < jobs.length; i++) {
-    const job = jobs[i];
-    const key = job.type === "file" ? job.data.name : job.data;
+    const processedIds = new Set();
+    let completedJobs = 0;
+    let totalJobs = jobs.length;
 
-    if (processedIds.has(key)) {
-      completedJobs++;
-      continue;
-    }
-    processedIds.add(key);
+    for (let i = 0; i < jobs.length; i++) {
+      const job = jobs[i];
+      const key = job.type === "file" ? job.data.name : job.data;
 
-    const result = await getModUpdateInfo(job);
-
-    if (result.status === "success" && renderedModIds.has(result.modId)) {
-      console.log(`Skipping duplicate render for: ${result.title}`);
-    } else {
-      renderSingleResult(result);
-      if (result.status === "success") {
-        renderedModIds.add(result.modId);
+      if (processedIds.has(key)) {
+        completedJobs++;
+        continue;
       }
-    }
+      processedIds.add(key);
 
-    if (result.status === "success" && result.dependencies) {
-      for (const dep of result.dependencies) {
-        if (dep.dependency_type === "required") {
-          const depId = dep.project_id;
-          if (!processedIds.has(depId)) {
-            jobs.push({ type: "id", data: depId });
-            totalJobs++;
+      const result = await getModUpdateInfo(job);
+
+      if (result.status === "success" && renderedModIds.has(result.modId)) {
+        console.log(`Skipping duplicate render for: ${result.title}`);
+      } else {
+        renderSingleResult(result);
+        if (result.status === "success") {
+          renderedModIds.add(result.modId);
+        }
+      }
+
+      if (result.status === "success" && result.dependencies) {
+        for (const dep of result.dependencies) {
+          if (dep.dependency_type === "required") {
+            const depId = dep.project_id;
+            if (!processedIds.has(depId)) {
+              jobs.push({ type: "id", data: depId });
+              totalJobs++;
+            }
           }
         }
       }
+      completedJobs++;
+      progressBar.style.width = `${(completedJobs / totalJobs) * 100}%`;
     }
-    completedJobs++;
-    progressBar.style.width = `${(completedJobs / totalJobs) * 100}%`;
+
+    finalizeResultsUI();
+    statusMessage.classList.remove("visible");
+
+    setTimeout(() => {
+      progressBarContainer.style.display = "none";
+    }, 1000);
+
+    
+  } finally {
+    isCurrentlySearching = false;
+    updateButton.disabled = false;
+    updateButton.textContent = "Update";
+    updateButton.appendChild(updateButtonIcon);
   }
-
-  finalizeResultsUI();
-  updateButton.disabled = false;
-  updateButton.textContent = "Update";
-  updateButton.appendChild(updateButtonIcon);
-  statusMessage.classList.remove("visible");
-
-  setTimeout(() => {
-    progressBarContainer.style.display = "none";
-  }, 1000);
 }
 
 // --- API Fetcher with Transparent Rate Limit and Custom User-Agent ---
@@ -1819,180 +2071,208 @@ async function fetchWithRetry(url, options, retries = 3) {
 
 // --- Multi-Stage API Check with HASH-FIRST and UNIFIED AUTHOR LOOKUP ---
 async function getModUpdateInfo(job) {
-        const loader = modLoaderSelect.value;
-        const gameVersion = mcVersionSelect.value;
-        let modId;
-        let originalFileName = job.type === "file" ? job.data.name : job.data;
+  const loader = modLoaderSelect.value;
+  const gameVersion = mcVersionSelect.value;
+  let modId;
+  // Use the title from the job object for 'id' and 'hash' types for better error reporting
+  let originalFileName = job.type === "file" ? job.data.name : job.title;
 
-        try {
-          let projectDetails;
+  try {
+    let projectDetails;
+    let hash;
 
-          if (job.type === "id") {
-            const projectUrl = `https://api.modrinth.com/v2/project/${job.data}`;
-            const projectResponse = await fetchWithRetry(projectUrl);
-            if (!projectResponse.ok) throw new Error("Dependency not found.");
-            projectDetails = await projectResponse.json();
-            modId = projectDetails.slug;
-          } else {
-            const hash = await calculateFileHash(job.data);
-            const hashUrl = `https://api.modrinth.com/v2/version_file/${hash}?algorithm=sha1`;
-            const hashResponse = await fetchWithRetry(hashUrl);
+    // Determine the hash based on job type
+    if (job.type === "file") {
+      hash = await calculateFileHash(job.data);
+    } else if (job.type === "hash") {
+      hash = job.data;
+    }
 
-            if (hashResponse.ok) {
-              const versionData = await hashResponse.json();
-              const projectUrl = `https://api.modrinth.com/v2/project/${versionData.project_id}`;
-              const projectResponse = await fetchWithRetry(projectUrl);
-              if (projectResponse.ok) {
-                projectDetails = await projectResponse.json();
-              }
-            } else {
-              const modInfo = await getModIdFromJar(job.data);
-              let projectUrl = `https://api.modrinth.com/v2/project/${modInfo.id}`;
-              let projectResponse = await fetchWithRetry(projectUrl);
-
-              if (projectResponse.ok) {
-                projectDetails = await projectResponse.json();
-              } else if (modInfo.name) {
-                const searchUrl = `https://api.modrinth.com/v2/search?query=${encodeURIComponent(modInfo.name)}&limit=1`;
-                const searchResponse = await fetchWithRetry(searchUrl);
-                if (searchResponse.ok) {
-                  const searchResults = await searchResponse.json();
-                  if (searchResults.hits.length > 0) {
-                    const foundSlug = searchResults.hits[0].slug;
-                    const foundProjectUrl = `https://api.modrinth.com/v2/project/${foundSlug}`;
-                    const foundProjectResponse = await fetchWithRetry(foundProjectUrl);
-                    if (foundProjectResponse.ok) {
-                      projectDetails = await foundProjectResponse.json();
-                    }
-                  }
-                }
-              }
-            }
-
-            if (!projectDetails) {
-              throw new Error("Mod not found on Modrinth by hash, ID, or name.");
-            }
-            modId = projectDetails.slug;
-          }
-
-          const author = await getAuthorDetails(projectDetails.team);
-
-          const versionUrl = `https://api.modrinth.com/v2/project/${modId}/version?loaders=["${loader}"]&game_versions=["${gameVersion}"]`;
-          const versionResponse = await fetchWithRetry(versionUrl);
-          const versions = await versionResponse.json();
-
-          const release = versions.find((v) => v.version_type === "release");
-          const beta = versions.find((v) => v.version_type === "beta");
-          const alpha = versions.find((v) => v.version_type === "alpha");
-          const latestVersion = release || beta || alpha;
-
-          if (!latestVersion) {
-            return {
-              status: "warning",
-              title: projectDetails.title,
-              author_name: author.name,
-              author_url: author.url,
-              description: projectDetails.description,
-              icon_url: projectDetails.icon_url,
-              project_url: `https://modrinth.com/project/${modId}`,
-              client_side: projectDetails.client_side,
-              server_side: projectDetails.server_side,
-              downloads: projectDetails.downloads,
-              reason: "No compatible version found for selected loader/version.",
-            };
-          }
-
-          const primaryFile = latestVersion.files.find((f) => f.primary);
-          if (!primaryFile) {
-            return {
-              status: "warning",
-              title: projectDetails.title,
-              author_name: author.name,
-              author_url: author.url,
-              description: projectDetails.description,
-              icon_url: projectDetails.icon_url,
-              project_url: `https://modrinth.com/project/${modId}`,
-              client_side: projectDetails.client_side,
-              server_side: projectDetails.server_side,
-              downloads: projectDetails.downloads,
-              reason: "Compatible version found, but no primary file to download.",
-            };
-          }
-
-          // --- GATHER ALL DATA FOR THE .MRPACK FILE ---
-          const downloadInfo = {
-            url: primaryFile.url,
-            filename: primaryFile.filename,
-            hashes: primaryFile.hashes,
-            path: `mods/${primaryFile.filename}`,
-            fileSize: primaryFile.size, // For the fileSize field
-            client_side: projectDetails.client_side, // For the env object
-            server_side: projectDetails.server_side, // For the env object
-          };
-          if (!renderedModIds.has(modId)) {
-            successfulDownloads.push(downloadInfo);
-          }
-
-          return {
-            status: "success",
-            modId: modId,
-            title: projectDetails.title,
-            author_name: author.name,
-            author_url: author.url,
-            description: projectDetails.description,
-            icon_url: projectDetails.icon_url,
-            project_url: `https://modrinth.com/project/${modId}`,
-            client_side: projectDetails.client_side,
-            server_side: projectDetails.server_side,
-            downloads: projectDetails.downloads,
-            all_versions: versions,
-            dependencies: latestVersion.dependencies,
-            isDependency: job.type === "id",
-          };
-        } catch (error) {
-          return {
-            status: "failure",
-            title: originalFileName,
-            reason: error.message,
-          };
+    // Primary lookup method: HASH (for .jar and .mrpack files)
+    if (hash) {
+      const hashUrl = `https://api.modrinth.com/v2/version_file/${hash}?algorithm=sha1`;
+      const hashResponse = await fetchWithRetry(hashUrl);
+      if (hashResponse.ok) {
+        const versionData = await hashResponse.json();
+        const projectUrl = `https://api.modrinth.com/v2/project/${versionData.project_id}`;
+        const projectResponse = await fetchWithRetry(projectUrl);
+        if (projectResponse.ok) {
+          projectDetails = await projectResponse.json();
         }
       }
+    }
+
+    // Secondary lookup method: ID (for searched mods)
+    if (!projectDetails && job.type === "id") {
+      const projectUrl = `https://api.modrinth.com/v2/project/${job.data}`;
+      const projectResponse = await fetchWithRetry(projectUrl);
+      if (projectResponse.ok) {
+        projectDetails = await projectResponse.json();
+      }
+    }
+
+    // Tertiary lookup method: Read from JAR (for .jar files that failed hash lookup)
+    if (!projectDetails && job.type === "file") {
+      const modInfo = await getModIdFromJar(job.data);
+      let projectUrl = `https://api.modrinth.com/v2/project/${modInfo.id}`;
+      let projectResponse = await fetchWithRetry(projectUrl);
+
+      if (projectResponse.ok) {
+        projectDetails = await projectResponse.json();
+      } else if (modInfo.name) {
+        // Fallback to searching by name if ID fails
+        const searchUrl = `https://api.modrinth.com/v2/search?query=${encodeURIComponent(
+          modInfo.name
+        )}&limit=1`;
+        const searchResponse = await fetchWithRetry(searchUrl);
+        if (searchResponse.ok) {
+          const searchResults = await searchResponse.json();
+          if (searchResults.hits.length > 0) {
+            const foundSlug = searchResults.hits[0].slug;
+            const foundProjectUrl = `https://api.modrinth.com/v2/project/${foundSlug}`;
+            const foundProjectResponse = await fetchWithRetry(foundProjectUrl);
+            if (foundProjectResponse.ok) {
+              projectDetails = await foundProjectResponse.json();
+            }
+          }
+        }
+      }
+    }
+
+    if (!projectDetails) {
+      // If we still haven't found it, fail the job.
+      throw new Error("Mod not found on Modrinth by hash, ID, or name.");
+    }
+
+    modId = projectDetails.slug;
+
+// --- Get original version from the uploaded file ---
+let originalModInfo = {};
+if (job.type === "file") {
+  originalModInfo = await getModIdFromJar(job.data);
+}
+
+const author = await getAuthorDetails(projectDetails.team);
+
+const versionUrl = `https://api.modrinth.com/v2/project/${modId}/version?loaders=["${loader}"]&game_versions=["${gameVersion}"]`;
+const versionResponse = await fetchWithRetry(versionUrl);
+const versions = await versionResponse.json();
+
+const release = versions.find((v) => v.version_type === "release");
+const beta = versions.find((v) => v.version_type === "beta");
+const alpha = versions.find((v) => v.version_type === "alpha");
+const latestVersion = release || beta || alpha;
+
+if (!latestVersion) {
+  return {
+    status: "warning",
+    title: projectDetails.title,
+    author_name: author.name,
+    author_url: author.url,
+    description: projectDetails.description,
+    icon_url: projectDetails.icon_url,
+    project_url: `https://modrinth.com/project/${modId}`,
+    client_side: projectDetails.client_side,
+    server_side: projectDetails.server_side,
+    downloads: projectDetails.downloads,
+    reason: "No compatible version found for selected loader/version.",
+  };
+}
+
+// --- Compare the versions ---
+const isUpToDate =
+  originalModInfo.version &&
+  latestVersion &&
+  originalModInfo.version === latestVersion.version_number;
+
+const primaryFile = latestVersion.files.find((f) => f.primary);
+if (!primaryFile) {
+  return {
+    status: "warning",
+    // ... (rest of the warning object)
+  };
+}
+
+// --- GATHER ALL DATA FOR THE .MRPACK FILE ---
+const downloadInfo = {
+  // ... (downloadInfo object)
+};
+if (!renderedModIds.has(modId)) {
+  successfulDownloads.push(downloadInfo);
+}
+
+// --- Add the new flag to the return object ---
+return {
+  status: "success",
+  modId: modId,
+  isUpToDate: isUpToDate, // This is the new flag
+  title: projectDetails.title,
+  author_name: author.name,
+  author_url: author.url,
+  description: projectDetails.description,
+  icon_url: projectDetails.icon_url,
+  project_url: `https://modrinth.com/project/${modId}`,
+  client_side: projectDetails.client_side,
+  server_side: projectDetails.server_side,
+  downloads: projectDetails.downloads,
+  all_versions: versions,
+  dependencies: latestVersion.dependencies,
+  isDependency: job.type === "id",
+};
+  } catch (error) {
+    return {
+      status: "failure",
+      title: originalFileName,
+      reason: error.message,
+    };
+  }
+}
 
       // --- Get Mod ID from JAR ---
       async function getModIdFromJar(jarFile) {
-        try {
-          const zip = await JSZip.loadAsync(jarFile);
-          const fabricFile = zip.file("fabric.mod.json");
-          if (fabricFile) {
-            const content = await fabricFile.async("string");
-            const manifest = JSON.parse(content);
-            return { id: manifest.id, name: manifest.name };
-          }
+  try {
+    const zip = await JSZip.loadAsync(jarFile);
+    const fabricFile = zip.file("fabric.mod.json");
+    if (fabricFile) {
+      const content = await fabricFile.async("string");
+      const manifest = JSON.parse(content);
+      // Also return the version property
+      return {
+        id: manifest.id,
+        name: manifest.name,
+        version: manifest.version,
+      };
+    }
 
-          const forgeFile = zip.file("META-INF/mods.toml");
-          if (forgeFile) {
-            const content = await forgeFile.async("string");
-            const manifest = toml.parse(content);
-            const modInfo = manifest.mods && manifest.mods[0];
-            if (modInfo) {
-              return { id: modInfo.modId, name: modInfo.displayName };
-            }
-          }
-          throw new Error("Could not find a valid manifest file.");
-        } catch (e) {
-          throw new Error("Invalid or corrupt JAR file.");
-        }
+    const forgeFile = zip.file("META-INF/mods.toml");
+    if (forgeFile) {
+      const content = await forgeFile.async("string");
+      const manifest = toml.parse(content);
+      const modInfo = manifest.mods && manifest.mods[0];
+      if (modInfo) {
+        // Also return the version property
+        return {
+          id: modInfo.modId,
+          name: modInfo.displayName,
+          version: modInfo.version,
+        };
       }
+    }
+    throw new Error("Could not find a valid manifest file.");
+  } catch (e) {
+    throw new Error("Invalid or corrupt JAR file.");
+  }
+}
 
       // --- Setup Result Sections ---
 function setupResultSections() {
-  // --- NEW: SVG icons for the layout toggle button ---
+  // --- SVG icons for the layout toggle button ---
   const gridIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect></svg>`;
   const listIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>`;
 
   resultsArea.innerHTML = `
     <div id="results-found" class="results-section">
-      <!-- NEW: Header container for title and button -->
+      <!-- Header container for title and button -->
       <div class="results-header-container">
         <h2 id="header-found">Updates Found</h2>
         <button id="layout-toggle-btn" class="layout-toggle" title="Toggle Layout">${gridIcon}</button>
@@ -2206,14 +2486,16 @@ function createSuccessCard(mod) {
           <a href="${
             mod.project_url
           }" target="_blank" rel="noopener noreferrer">${mod.title}</a>
-          <span class="mod-author">by <a href="${
-            mod.author_url
-          }" target="_blank" rel="noopener noreferrer">${mod.author_name}</a></span>
           ${
             mod.isDependency
-              ? '<span class="mod-author">(dependency)</span>'
+              ? '<span class="mod-title-tag">(Dependency)</span>'
               : ""
           }
+        </div>
+        <div class="mod-author">
+          by <a href="${
+            mod.author_url
+          }" target="_blank" rel="noopener noreferrer">${mod.author_name}</a>
         </div>
         <div class="mod-description">${mod.description}</div>
         <div class="mod-meta">
@@ -2309,7 +2591,17 @@ function createSuccessCard(mod) {
   });
 
   updateDynamicContent();
-  return card;
+
+// --- Handle the "Already Updated" state ---
+if (mod.isUpToDate) {
+  const titleElement = card.querySelector(".mod-title");
+  const tag = document.createElement("span");
+  tag.className = "mod-title-tag"; // Use the new shared class
+  tag.textContent = "(Already Updated)"; // Use the shorter text
+  titleElement.appendChild(tag);
+}
+
+return card;
 }
 
 // --- Create Warning Card ---
