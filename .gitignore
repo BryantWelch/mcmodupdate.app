@@ -30,3 +30,4 @@ out/
 .env
 .env.local
 .env.*.local
+ideas.md

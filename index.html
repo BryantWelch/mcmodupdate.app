@@ -213,7 +213,7 @@
         align-items: center;
         justify-content: center;
         gap: 0.5rem;
-        transition: transform 0.2s ease;
+        transition: transform 0.15s ease;
         max-width: 160px;
       }
       .update-button:hover {
@@ -664,6 +664,7 @@
       .results-actions {
         display: flex;
         justify-content: center;
+        align-items: flex-start; /* Aligns the tops of the buttons */
         gap: 1rem;
         margin-top: 1rem;
       }
@@ -973,6 +974,19 @@
     margin-top: 0.5rem; /* Add some space above it */
   }
 }
+
+  .download-button-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem; /* Creates a small space between the button and the text below it */
+}
+
+  .download-size-info {
+    font-size: 0.7rem;
+    margin-top: 0.15rem;
+    color: var(--secondary-text);
+}
 /* End of CSS */
 
 /* Beginning of HTML */
@@ -1009,8 +1023,8 @@
           <select id="mod-loader">
             <option value="fabric">Fabric</option>
             <option value="forge">Forge</option>
-            <option value="quilt">Quilt</option>
             <option value="neoforge">NeoForge</option>
+            <option value="quilt">Quilt</option>
           </select>
         </div>
         <div class="control-group">
@@ -2195,7 +2209,13 @@ if (!primaryFile) {
 
 // --- GATHER ALL DATA FOR THE .MRPACK FILE ---
 const downloadInfo = {
-  // ... (downloadInfo object)
+  url: primaryFile.url,
+  filename: primaryFile.filename,
+  hashes: primaryFile.hashes,
+  path: `mods/${primaryFile.filename}`,
+  fileSize: primaryFile.size, // This is the crucial line
+  client_side: projectDetails.client_side,
+  server_side: projectDetails.server_side,
 };
 if (!renderedModIds.has(modId)) {
   successfulDownloads.push(downloadInfo);
@@ -2393,14 +2413,51 @@ function setupResultSections() {
 
       // --- Finalize Results UI ---
       function finalizeResultsUI() {
+        // Check for the empty state first
+        if (
+          sectionCounts.found === 0 &&
+          sectionCounts.warning === 0 &&
+          sectionCounts.failure === 0
+        ) {
+    resultsArea.innerHTML = `
+      <div class="results-section visible" style="text-align: center;">
+        <h2>No Mods Found</h2>
+        <p style="line-height: 1.6;">
+          We couldn't find any mods matching your selected criteria. This can happen if the mods you uploaded don't have versions available for the selected Minecraft version and loader.
+        </p>
+      </div>
+    `;
+    return;
+        }
+
         const foundSection = document.getElementById("results-found");
         if (foundSection && successfulDownloads.length > 0) {
           const actionsContainer = document.createElement("div");
           actionsContainer.className = "results-actions";
 
+          // --- Create a dedicated container for the "Download All" button and its size ---
+          const downloadAllGroup = document.createElement("div");
+          downloadAllGroup.className = "download-button-group";
+
+          // Create and add the "Download All" button to its group
           const downloadAllBtn = document.createElement("button");
           downloadAllBtn.className = "action-button";
-          downloadAllBtn.innerHTML = `Download All (${successfulDownloads.length}) &darr;`;
+          downloadAllBtn.innerHTML = `Download All (${successfulDownloads.length})
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>`;
           downloadAllBtn.onclick = () => {
             let i = 0;
             function downloadNext() {
@@ -2418,18 +2475,39 @@ function setupResultSections() {
             }
             downloadNext();
           };
+          downloadAllGroup.appendChild(downloadAllBtn);
 
+          // Create the .mrpack button (it will be a sibling to the group)
           const downloadPackBtn = document.createElement("button");
           downloadPackBtn.className = "action-button";
           downloadPackBtn.innerHTML = `Download as .mrpack`;
           downloadPackBtn.onclick = createModpack;
 
-          actionsContainer.appendChild(downloadAllBtn);
+          // Add the group and the button to the main actions container
+          actionsContainer.appendChild(downloadAllGroup);
           actionsContainer.appendChild(downloadPackBtn);
           foundSection.appendChild(actionsContainer);
+
+          // --- Calculate and add the size info to the correct group ---
+          try {
+            const totalSizeBytes = successfulDownloads.reduce(
+              (sum, file) => sum + (file.fileSize || 0),
+              0
+            );
+
+            if (totalSizeBytes > 0) {
+              const formattedSize = formatBytes(totalSizeBytes);
+              const sizeInfo = document.createElement("p");
+              sizeInfo.className = "download-size-info";
+              sizeInfo.textContent = formattedSize; // Set text to ONLY the size
+              downloadAllGroup.appendChild(sizeInfo); // Append to the button's group
+            }
+          } catch (error) {
+            console.error("Could not calculate total download size:", error);
+          }
         }
 
-        // Hide sections that have no results for a cleaner UI
+        // Hide empty sections
         if (sectionCounts.warning === 0) {
           const warningSection = document.getElementById("results-warning");
           if (warningSection) warningSection.style.display = "none";
@@ -2438,8 +2516,10 @@ function setupResultSections() {
           const failureSection = document.getElementById("results-failure");
           if (failureSection) failureSection.style.display = "none";
         }
-        // Check if all categories are empty after processing
-        if (
+      }
+
+      // Check if all categories are empty after processing
+      if (
           sectionCounts.found === 0 &&
           sectionCounts.warning === 0 &&
           sectionCounts.failure === 0
@@ -2450,7 +2530,6 @@ function setupResultSections() {
               <p>We couldn't find any information for the mods in your list on Modrinth. They may be from another source like CurseForge, or the files may be corrupt.</p>
             </div>
           `;
-        }
       }
 
       // --- Create Success Card ---
@@ -2802,6 +2881,18 @@ function createFailureCard(mod) {
           link.click();
           document.body.removeChild(link);
         });
+      }
+
+      function formatBytes(bytes, decimals = 2) {
+        if (!+bytes) return "0 Bytes";
+
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
+
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+        return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
       }
     </script>
   </body>
