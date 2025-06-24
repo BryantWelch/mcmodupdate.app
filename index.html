@@ -87,6 +87,7 @@
           var(--gradient-end)
         );
         -webkit-background-clip: text;
+        background-clip: text;
         -webkit-text-fill-color: transparent;
         margin: 0;
       }
@@ -424,7 +425,11 @@
         position: absolute;
         right: 1rem;
         top: 55%;
-        transform: translateY(-50%);
+        margin-top: -18px;
+        transition: transform 0.15s ease;
+      }
+      .kofi-button:hover {
+        transform: scale(1.05);
       }
       .kofi-button img {
         height: 36px;
@@ -685,6 +690,10 @@
         cursor: pointer;
         font-weight: bold;
         font-size: 1rem;
+        transition: transform 0.15s ease;
+      }
+      .action-button:hover {
+        transform: scale(1.05);
       }
       .search-container {
         position: relative;
@@ -883,7 +892,7 @@
   white-space: nowrap; /* Prevents the tag itself from breaking onto two lines */
 }
 
-/* --- Mobile Responsive Styles --- */
+/* --- Begin Mobile Responsive Styles --- */
 @media (max-width: 700px) {
   /* Make the main container use the full width */
   .main-container {
@@ -974,7 +983,9 @@
     margin-top: 0.5rem; /* Add some space above it */
   }
 }
+/* --- End of Mobile Responsive Styles --- */
 
+/* --- Download Button Styles --- */
   .download-button-group {
     display: flex;
     flex-direction: column;
@@ -987,7 +998,7 @@
     margin-top: 0.15rem;
     color: var(--secondary-text);
 }
-/* End of CSS */
+/* --- End of CSS */
 
 /* Beginning of HTML */
     </style>
@@ -1067,7 +1078,14 @@
           </svg>
         </button>
         <button id="clear-all-button" class="clear-all-button">
-          Clear All
+          Clear Input
+        </button>
+        <button
+          id="clear-results-button"
+          class="clear-all-button"
+          style="display: none"
+        >
+          Clear Results
         </button>
       </div>
       <div id="progress-bar-container" class="progress-bar-container">
@@ -1370,6 +1388,7 @@
       const searchCloseButton = document.getElementById("search-close-button");
       const searchXCloseButton = document.getElementById("search-x-close-button");
       const searchClearButton = document.getElementById("search-clear-button");
+      const clearResultsButton = document.getElementById("clear-results-button");
 
       // --- UI LOGIC ---
       infoButton.addEventListener("click", () => {
@@ -1383,6 +1402,9 @@
           infoModal.classList.remove("visible");
         }
       });
+
+      // --- Clear Results Button Logic ---
+      clearResultsButton.addEventListener("click", resetResults);
 
       // --- Custom Alert Modal Logic ---
       function showCustomAlert(message, type = "notice") {
@@ -1922,6 +1944,9 @@ function resetResults() {
   successfulDownloads = [];
   sectionCounts = { found: 0, warning: 0, failure: 0 };
 
+  // Hide the "Clear Results" button
+  clearResultsButton.style.display = "none";
+
   // Re-enable the update button
   updateButton.disabled = false;
   updateButton.innerHTML = `Update
@@ -2429,6 +2454,8 @@ function setupResultSections() {
     `;
     return;
         }
+        // Show the "Clear Results" button if there are any results
+        clearResultsButton.style.display = "inline-flex";
 
         const foundSection = document.getElementById("results-found");
         if (foundSection && successfulDownloads.length > 0) {
