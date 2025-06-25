@@ -810,6 +810,12 @@
   margin-bottom: 0;
 }
 
+.header-buttons {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
 /* -- Styles for the layout toggle button itself -- */
 .layout-toggle {
   background: transparent;
@@ -2793,18 +2799,29 @@ function setupResultSections() {
   // --- SVG icons for the layout toggle button ---
   const gridIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect></svg>`;
   const listIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>`;
+  const copyIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="m5 15-1 0c-1.1 0-2-.9-2-2l0-9c0-1.1.9-2 2-2l9 0c1.1 0 2 .9 2 2l0 1"></path></svg>`;
 
   resultsArea.innerHTML = `
     <div id="results-found" class="results-section">
-      <!-- Header container for title and button -->
+      <!-- Header container for title and buttons -->
       <div class="results-header-container">
         <h2 id="header-found">Updates Found</h2>
-        <button id="layout-toggle-btn" class="layout-toggle" title="Toggle Layout">${gridIcon}</button>
+        <div class="header-buttons">
+          <button id="copy-found-btn" class="layout-toggle" title="Copy Mod List">${copyIcon}</button>
+          <button id="layout-toggle-btn" class="layout-toggle" title="Toggle Layout">${gridIcon}</button>
+        </div>
       </div>
       <div class="results-list"></div>
     </div>
     <div id="results-warning" class="results-section">
-      <h2 id="header-warning">No Compatible Version Found</h2>
+      <!-- Header container for title and buttons -->
+      <div class="results-header-container">
+        <h2 id="header-warning">No Compatible Version Found</h2>
+        <div class="header-buttons">
+          <button id="copy-warning-btn" class="layout-toggle" title="Copy Mod List">${copyIcon}</button>
+          <button id="warning-layout-toggle-btn" class="layout-toggle" title="Toggle Layout">${gridIcon}</button>
+        </div>
+      </div>
       <div class="results-list"></div>
     </div>
     <div id="results-failure" class="results-section">
@@ -2813,7 +2830,7 @@ function setupResultSections() {
     </div>
   `;
 
-  // --- Logic for the layout toggle button ---
+  // --- Logic for the found section layout toggle button ---
   const layoutToggleBtn = document.getElementById("layout-toggle-btn");
   const foundResultsList = document.querySelector("#results-found .results-list");
 
@@ -2843,6 +2860,84 @@ function setupResultSections() {
 
   // Set the initial layout when the page loads
   setLayout();
+
+  // --- Logic for the warning section layout toggle button ---
+  const warningLayoutToggleBtn = document.getElementById("warning-layout-toggle-btn");
+  const warningResultsList = document.querySelector("#results-warning .results-list");
+
+  // Function to set the warning layout based on stored preference or default
+  function setWarningLayout() {
+    const currentLayout = localStorage.getItem("warning-layout") || "list";
+    if (currentLayout === "grid") {
+      warningResultsList.classList.add("grid-view");
+      warningLayoutToggleBtn.innerHTML = listIcon;
+    } else {
+      warningResultsList.classList.remove("grid-view");
+      warningLayoutToggleBtn.innerHTML = gridIcon;
+    }
+  }
+
+  warningLayoutToggleBtn.addEventListener("click", () => {
+    warningResultsList.classList.toggle("grid-view");
+    // Save the new preference to localStorage
+    if (warningResultsList.classList.contains("grid-view")) {
+      localStorage.setItem("warning-layout", "grid");
+      warningLayoutToggleBtn.innerHTML = listIcon; // Show list icon
+    } else {
+      localStorage.setItem("warning-layout", "list");
+      warningLayoutToggleBtn.innerHTML = gridIcon; // Show grid icon
+    }
+  });
+
+  // Set the initial warning layout when the page loads
+  setWarningLayout();
+
+  // --- Copy to clipboard functionality ---
+  const copyFoundBtn = document.getElementById("copy-found-btn");
+  const copyWarningBtn = document.getElementById("copy-warning-btn");
+
+  copyFoundBtn.addEventListener("click", () => {
+    const foundCards = document.querySelectorAll("#results-found .result-card");
+    const modNames = Array.from(foundCards).map(card => {
+      const titleLink = card.querySelector(".mod-title a");
+      return titleLink ? titleLink.textContent : "";
+    }).filter(name => name).join('\n');
+    copyToClipboard(modNames, copyFoundBtn, "Updates");
+  });
+
+  copyWarningBtn.addEventListener("click", () => {
+    const warningCards = document.querySelectorAll("#results-warning .result-card");
+    const modNames = Array.from(warningCards).map(card => {
+      const titleLink = card.querySelector(".mod-title a");
+      return titleLink ? titleLink.textContent : "";
+    }).filter(name => name).join('\n');
+    copyToClipboard(modNames, copyWarningBtn, "Incompatible mods");
+  });
+}
+
+// Helper function to copy text to clipboard and show feedback
+async function copyToClipboard(text, button, listType) {
+  const originalHTML = button.innerHTML;
+  const successIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+  const errorIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+  
+  try {
+    await navigator.clipboard.writeText(text);
+    button.innerHTML = successIcon;
+    button.style.color = "var(--success-color)";
+    setTimeout(() => {
+      button.innerHTML = originalHTML;
+      button.style.color = "";
+    }, 1500);
+  } catch (err) {
+    console.error('Failed to copy text: ', err);
+    button.innerHTML = errorIcon;
+    button.style.color = "var(--error-color)";
+    setTimeout(() => {
+      button.innerHTML = originalHTML;
+      button.style.color = "";
+    }, 1500);
+  }
 }
 
       // --- Helper to update section headers with counts ---
