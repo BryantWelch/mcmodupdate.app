@@ -461,15 +461,12 @@
         max-height: 0; /* Start with zero height */
         opacity: 0; /* Start fully transparent */
         overflow: hidden; /* Important for the max-height trick */
-        transition: all 0.4s ease-in-out; /* Animate everything */
+        transition: all 0.2s ease-in-out; /* Animate everything */
       }
       .status-message.visible {
         margin-top: 0.5rem; /* Add margin when visible */
-        max-height: 3em; /* Increase height to accommodate longer text */
+        max-height: 2em; /* Animate to a height large enough for the text */
         opacity: 1; /* Animate to be fully visible */
-      }
-      .status-message.no-transition {
-        transition: none; /* Disable transitions when needed */
       }
       #results-area {
         width: 100%;
@@ -1395,7 +1392,7 @@
       let renderedModIds = new Set();
       let searchedMods = new Map();
       let isCurrentlySearching = false;
-      let welcomeMessageHTML = ''; // Store the original welcome message
+      let welcomeMessageSnapshot = null; // Store the welcome message snapshot
 
       // --- DOM Element References ---
       const dropzone = document.getElementById("dropzone");
@@ -1965,31 +1962,27 @@ async function populateMcVersions() {
 
 // Call these functions when the page loads
 document.addEventListener("DOMContentLoaded", () => {
-  // Store the welcome message before it can be destroyed
-  const welcomeElement = document.querySelector('#welcome-message');
-  if (welcomeElement) {
-    welcomeMessageHTML = welcomeElement.outerHTML;
-  }
-  
   populateMcVersions();
   handleScrollButtons(); // This runs our check once on load
+  
+  // Capture the welcome message snapshot
+  welcomeMessageSnapshot = resultsArea.innerHTML;
 });
 
 // --- UI State Reset Function ---
 function resetResults() {
-  // Clear the results area from the screen
-  resultsArea.innerHTML = "";
-  
-  // Restore the original welcome message
-  if (welcomeMessageHTML) {
-    resultsArea.innerHTML = welcomeMessageHTML;
+  // Restore the welcome message from snapshot
+  if (welcomeMessageSnapshot) {
+    resultsArea.innerHTML = welcomeMessageSnapshot;
+  } else {
+    // Fallback if snapshot isn't available
+    resultsArea.innerHTML = "";
   }
 
-  // Hide the progress bar and clear status message
+  // Hide the progress bar and status message
   progressBarContainer.style.display = "none";
   progressBar.style.width = "0%";
   statusMessage.classList.remove("visible");
-  statusMessage.textContent = ""; // Clear the summary message
 
   // Reset the data arrays
   successfulDownloads = [];
@@ -2055,27 +2048,18 @@ async function handleUpdate() {
     renderedModIds.clear();
     updateButton.disabled = true;
     updateButton.innerHTML = "Searching...";
-    
-    // Set up the status message without transition to avoid cutoff
-    statusMessage.classList.add("no-transition");
     statusMessage.textContent = "Searching for updates and dependencies...";
     statusMessage.classList.add("visible");
-    
     setupResultSections();
     progressBarContainer.style.display = "block";
-
-    // Force a reflow, then re-enable transitions for future updates
-    statusMessage.offsetHeight; // Force reflow
-    statusMessage.classList.remove("no-transition");
 
     const processedIds = new Set();
     let allJobs = [...jobs];
     let completedJobs = 0;
-    const originalJobCount = jobs.length; // Track the original number of mods uploaded
-    let dependenciesFound = 0;
-    let totalJobsToProcess = jobs.length; // Track total work including dependencies
+    const allDependencies = new Set(); // Store all discovered dependencies
 
-    // Process jobs in batches and show results incrementally
+    // Phase 1: Process all initial mods in batches
+    statusMessage.textContent = `Searching updates for ${jobs.length} mods...`;
     while (allJobs.length > 0) {
       const batchSize = 25;
       const currentBatch = allJobs.splice(0, batchSize);
@@ -2101,16 +2085,11 @@ async function handleUpdate() {
           }
         }
 
-        // Handle dependencies - add them to the queue for next batch
+        // Collect dependencies but don't process them yet
         if (result.status === "success" && result.dependencies) {
           for (const dep of result.dependencies) {
             if (dep.dependency_type === "required") {
-              const depId = dep.project_id;
-              if (!processedIds.has(depId)) {
-                allJobs.push({ type: "id", data: depId, title: `Dependency: ${depId}` });
-                dependenciesFound++;
-                totalJobsToProcess++; // Increment total work when dependencies are found
-              }
+              allDependencies.add(dep.project_id);
             }
           }
         }
@@ -2118,11 +2097,8 @@ async function handleUpdate() {
         completedJobs++;
       }
       
-      // Update status message and progress bar after processing each batch
-      statusMessage.textContent = `Checking ${originalJobCount} mods (found ${dependenciesFound} dependencies)`;
-      
-      // Update progress bar based on total work including dependencies
-      const progressPercentage = Math.min((completedJobs / totalJobsToProcess) * 100, 95);
+      // Update progress bar after each batch (50% for initial mods)
+      const progressPercentage = Math.min((completedJobs / jobs.length) * 50, 50);
       progressBar.style.width = `${progressPercentage}%`;
       
       // Add a small delay to let the UI update and show the new results
@@ -2131,29 +2107,124 @@ async function handleUpdate() {
       }
     }
 
-    // Complete the progress bar and update status
-    progressBar.style.width = "100%";
+        // Phase 2: Process dependencies
+    // Filter out dependencies that are already processed
+    const unprocessedDependencies = Array.from(allDependencies).filter(depId => !processedIds.has(depId));
+    let actualDependenciesAdded = 0; // Track dependencies that are actually added
     
-    // Set final summary message
-    if (dependenciesFound > 0) {
-      statusMessage.textContent = `Processed ${originalJobCount} mods and found ${dependenciesFound} dependencies`;
-    } else {
-      statusMessage.textContent = `Processed ${originalJobCount} mods`;
+    if (unprocessedDependencies.length > 0) {
+      statusMessage.textContent = `Searching dependencies for ${jobs.length} mods...`;
+      
+      // Create dependency jobs
+      const dependencyJobs = unprocessedDependencies.map(depId => ({
+        type: "id",
+        data: depId,
+        title: `Dependency: ${depId}`
+      }));
+      
+      let depCompletedJobs = 0;
+      
+      // Process dependencies in batches of 25
+      while (dependencyJobs.length > 0) {
+        const batchSize = 25;
+        const currentBatch = dependencyJobs.splice(0, batchSize);
+        
+        const results = await getModUpdateInfoBatch(currentBatch, batchSize);
+        
+        // Process and render dependency results
+        for (const result of results) {
+          const key = result.modId || (result.title + result.reason);
+          
+          if (processedIds.has(key)) {
+            depCompletedJobs++;
+            continue;
+          }
+          processedIds.add(key);
+
+          if (result.status === "success" && renderedModIds.has(result.modId)) {
+            console.log(`Skipping duplicate render for dependency: ${result.title}`);
+          } else {
+            renderSingleResult(result);
+            if (result.status === "success") {
+              renderedModIds.add(result.modId);
+              actualDependenciesAdded++; // Only count successfully added dependencies
+            }
+          }
+          
+          depCompletedJobs++;
+        }
+        
+        // Update progress bar for dependency processing (50% + remaining 50%)
+        const depProgressPercentage = 50 + ((depCompletedJobs / unprocessedDependencies.length) * 50);
+        progressBar.style.width = `${Math.min(depProgressPercentage, 95)}%`;
+        
+        // Add a small delay to let the UI update
+        if (dependencyJobs.length > 0) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
     }
+
+    // Complete the progress bar and create summary
+    progressBar.style.width = "100%";
     
     finalizeResultsUI();
     
-    // Hide progress bar but keep status message as summary
+    // Create comprehensive summary
+    const updatesFound = sectionCounts.found || 0;
+    const notCompatible = sectionCounts.warning || 0;
+    const notFound = sectionCounts.failure || 0;
+    const dependenciesAdded = actualDependenciesAdded || 0;
+    
+    let summaryText = `Found ${updatesFound} updates`;
+    if (notCompatible > 0) summaryText += `, ${notCompatible} not compatible`;
+    if (notFound > 0) summaryText += `, ${notFound} failed to be found`;
+    if (dependenciesAdded > 0) summaryText += ` (${dependenciesAdded} dependencies found & added)`;
+    
+    // Store the summary for the finally block
+    window.finalSummaryText = summaryText;
+    statusMessage.textContent = summaryText;
+    // Keep the status message visible instead of hiding it
+
     setTimeout(() => {
       progressBarContainer.style.display = "none";
     }, 1000);
 
     
+  } catch (error) {
+    console.error("Error in handleUpdate:", error);
+    statusMessage.textContent = `Error processing mods: ${error.message}`;
+    statusMessage.classList.add("visible");
+    
+    // Reset UI state on error
+    progressBarContainer.style.display = "none";
   } finally {
     isCurrentlySearching = false;
+    // Always reset the button state
     updateButton.disabled = false;
-    updateButton.textContent = "Update";
-    updateButton.appendChild(updateButtonIcon);
+    updateButton.innerHTML = `Update
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="17 8 12 3 7 8"></polyline>
+        <line x1="12" y1="3" x2="12" y2="15"></line>
+      </svg>`;
+    
+    // Ensure we show the final summary if it was calculated
+    if (window.finalSummaryText && sectionCounts.found > 0) {
+      statusMessage.textContent = window.finalSummaryText;
+      statusMessage.classList.add("visible");
+      window.finalSummaryText = null; // Clean up
+    }
   }
 }
 
@@ -2161,16 +2232,11 @@ async function handleUpdate() {
 async function fetchWithRetry(url, options, retries = 3) {
   const requestOptions = {
     ...options, // Spread any existing options
-    headers: {
-      // Add identification headers to be a good API citizen
-      // Primary: Custom User-Agent (may be blocked by browsers)
-      "User-Agent": "BryantWelch/mcmodupdate.app/",
-      // Fallbacks: Custom headers that browsers won't block
-      "X-User-Agent": "BryantWelch/mcmodupdate.app/",
-      "X-Client": "mcmodupdate.app",
-      // "X-Client-Version": "1.0",
-      ...(options?.headers || {})
-    },
+          headers: {
+        // Add our custom User-Agent following Modrinth's recommendations
+        // "User-Agent": "BryantWelch/mcmodupdate.app/1.0.0 (https://github.com/BryantWelch/mcmodupdate.app)",
+        ...(options?.headers || {})
+      },
   };
 
   for (let i = 0; i < retries; i++) {
@@ -2190,11 +2256,12 @@ async function fetchWithRetry(url, options, retries = 3) {
       console.warn(
         `Rate limited. Waiting for ${waitTime} seconds until the limit resets.`
       );
-      statusMessage.textContent = `Rate limited. Pausing for ${waitTime} seconds...`;
-
-      await new Promise((resolve) =>
-        setTimeout(resolve, waitTime * 1000)
-      );
+      
+      // Show countdown for rate limiting
+      for (let i = waitTime; i > 0; i--) {
+        statusMessage.textContent = `Rate limited. Pausing for ${i} seconds...`;
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
 
       statusMessage.textContent = originalMessage;
       continue;
