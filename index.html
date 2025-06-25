@@ -927,6 +927,50 @@
   white-space: nowrap; /* Prevents the tag itself from breaking onto two lines */
 }
 
+/* Dependency tag specific styling - same pattern as category tooltip */
+.dependency-tooltip-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.dependency-tag {
+  /* Use the same styling as the base mod-title-tag */
+  font-size: 0.9rem;
+  font-weight: normal;
+  color: var(--secondary-text);
+  margin-left: 0.5rem;
+  font-style: italic;
+  white-space: nowrap;
+  cursor: help;
+}
+
+.dependency-tooltip {
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  
+  position: absolute;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%);
+  
+  background-color: var(--card-bg);
+  color: var(--primary-text);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  z-index: 10;
+  
+  white-space: nowrap;
+  font-size: 0.85rem;
+}
+
+.dependency-tooltip-container:hover .dependency-tooltip {
+  visibility: visible;
+  opacity: 1;
+}
+
 /* --- Begin Mobile Responsive Styles --- */
 @media (max-width: 700px) {
   /* Make the main container use the full width */
@@ -1395,6 +1439,7 @@
       let welcomeMessageSnapshot = null; // Store the welcome message snapshot
       let apiCallCount = 0; // Track total API calls made
       let processingStartTime = 0; // Track when processing started
+      let dependencyMap = new Map(); // Track which mod requires each dependency
 
       // --- DOM Element References ---
       const dropzone = document.getElementById("dropzone");
@@ -2048,6 +2093,7 @@ async function handleUpdate() {
     // Reset the UI and state for a new run.
     resetResults();
     renderedModIds.clear();
+    dependencyMap.clear(); // Reset dependency tracking
     apiCallCount = 0; // Reset API call counter
     processingStartTime = Date.now(); // Start timing
     updateButton.disabled = true;
@@ -2094,6 +2140,8 @@ async function handleUpdate() {
           for (const dep of result.dependencies) {
             if (dep.dependency_type === "required") {
               allDependencies.add(dep.project_id);
+              // Track which mod requires this dependency
+              dependencyMap.set(dep.project_id, result.title);
             }
           }
         }
@@ -2582,13 +2630,14 @@ async function combineResults(jobs, hashResults, projectsData, authorData, versi
         successfulDownloads.push(downloadInfo);
       }
       
-      // Build success response
-      results.push({
-        status: "success",
-        modId: projectDetails.slug,
-        isUpToDate: isUpToDate,
-        categories: projectDetails.categories,
-        title: projectDetails.title,
+              // Build success response
+        results.push({
+          status: "success",
+          modId: projectDetails.slug,
+          projectId: projectDetails.id, // Add project ID for dependency tracking
+          isUpToDate: isUpToDate,
+          categories: projectDetails.categories,
+          title: projectDetails.title,
         author_name: author.name,
         author_url: author.url,
         description: projectDetails.description,
@@ -2963,7 +3012,10 @@ function createSuccessCard(mod) {
           }" target="_blank" rel="noopener noreferrer">${mod.title}</a>
           ${
             mod.isDependency
-              ? '<span class="mod-title-tag">(Dependency)</span>'
+              ? `<span class="dependency-tooltip-container">
+                   <span class="mod-title-tag dependency-tag">(Dependency)</span>
+                   <span class="dependency-tooltip">Required by: ${dependencyMap.get(mod.projectId) || 'Unknown'}</span>
+                 </span>`
               : ""
           }
         </div>
