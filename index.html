@@ -617,6 +617,10 @@
       .changelog-toggle:hover {
         color: var(--primary-text);
       }
+      /* Override hover color change for reason toggle in warning cards */
+      .warning .changelog-toggle:hover {
+        color: var(--warning-color); /* Keep the same warning color on hover */
+      }
       .mod-channel-links {
         display: flex;
         align-items: center;
@@ -2647,6 +2651,8 @@ async function combineResults(jobs, hashResults, projectsData, authorData, versi
            client_side: projectDetails.client_side,
            server_side: projectDetails.server_side,
            downloads: projectDetails.downloads,
+           followers: projectDetails.followers,
+           categories: projectDetails.categories,
            reason: reason
          });
          continue;
@@ -3238,7 +3244,9 @@ function createWarningCard(mod) {
       <div class="mod-details">
         <div class="mod-title">
           <a href="${mod.project_url}" target="_blank" rel="noopener noreferrer">${mod.title}</a>
-          <span class="mod-author">by <a href="${mod.author_url}" target="_blank" rel="noopener noreferrer">${mod.author_name}</a></span>
+        </div>
+        <div class="mod-author">
+          by <a href="${mod.author_url}" target="_blank" rel="noopener noreferrer">${mod.author_name}</a>
         </div>
         <div class="mod-description">${mod.description}</div>
         <div class="mod-meta">
@@ -3247,12 +3255,58 @@ function createWarningCard(mod) {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
             <span>${formatDownloads(mod.downloads)}</span>
           </div>
+          <div class="mod-meta-item">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+            </svg>
+            <span>${formatDownloads(mod.followers)}</span>
+          </div>
+          <div class="mod-meta-item category-tooltip-container" style="display: none;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2H2v10l9.29 9.29a1 1 0 0 0 1.42 0l8-8a1 1 0 0 0 0-1.42L12 2z"></path>
+              <path d="M7 7h.01"></path>
+            </svg>
+            <span class="category-tooltip"></span>
+          </div>
+          <div class="mod-meta-item changelog-toggle" style="color: var(--warning-color); font-weight: bold;">Reason</div>
         </div>
       </div>
     </div>
-    <div class="changelog-content" style="width: 100%; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color); display: block;">
-       <p style="color: var(--warning-color); font-weight: bold; margin: 0;">${mod.reason}</p>
-    </div>`;
+    <div class="changelog-content"></div>`;
+
+  // Get references to the elements we need to update
+  const reasonToggle = card.querySelector(".changelog-toggle");
+  const reasonContent = card.querySelector(".changelog-content");
+
+  // Set up the reason toggle functionality
+  reasonToggle.addEventListener("click", () => {
+    reasonContent.classList.toggle("visible");
+  });
+
+  // Set the reason content (but keep it hidden initially)
+  reasonContent.innerHTML = `<p style="color: var(--warning-color); font-weight: bold; margin: 0;">${mod.reason}</p>`;
+
+  // --- Populate Category Tooltip ---
+  if (mod.categories && mod.categories.length > 0) {
+    const categoryContainer = card.querySelector(".category-tooltip-container");
+    const categoryTooltip = card.querySelector(".category-tooltip");
+
+    // This helper function turns a slug like "world-gen" into "World Gen"
+    function formatCategoryName(slug) {
+      return slug
+        .split("-")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
+    }
+
+    // We map over the array of string slugs and format each one
+    const formattedCategories = mod.categories.map(formatCategoryName);
+    categoryTooltip.textContent = formattedCategories.join(", ");
+
+    // Now that it's populated, make the icon visible
+    categoryContainer.style.display = "flex";
+  }
+
   return card;
 }
 
