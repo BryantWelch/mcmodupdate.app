@@ -3282,6 +3282,17 @@ function createFailureCard(mod) {
 
       // --- Create Modpack ---
       function createModpack() {
+        // Get custom modpack name and version from user
+        const packName = prompt("Enter modpack name:", "My Awesome Pack");
+        if (packName === null) return; // User cancelled
+        
+        const packVersion = prompt("Enter modpack version:", "1.0.0");
+        if (packVersion === null) return; // User cancelled
+        
+        // Clean the pack name for filename (remove invalid characters, keep spaces)
+        const cleanPackName = packName.replace(/[<>:"/\\|?*]/g, "-");
+        const filename = `${cleanPackName}-v${packVersion}.mrpack`;
+        
         const loaderNameMap = {
           fabric: "fabric-loader",
           forge: "forge",
@@ -3295,8 +3306,9 @@ function createFailureCard(mod) {
         const manifest = {
           formatVersion: 1,
           game: "minecraft",
-          versionId: "mc-updater-pack",
-          name: "MC Updater Export",
+          versionId: `${cleanPackName.toLowerCase().replace(/\s+/g, "-")}-${packVersion}`,
+          name: packName,
+          version: packVersion,
           dependencies: {
             minecraft: mcVersionSelect.value,
             [officialLoaderName]: "*",
@@ -3335,7 +3347,7 @@ function createFailureCard(mod) {
         zip.generateAsync({ type: "blob" }).then(function (content) {
           const link = document.createElement("a");
           link.href = URL.createObjectURL(content);
-          link.download = "mc-updater-pack.mrpack";
+          link.download = filename;
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
