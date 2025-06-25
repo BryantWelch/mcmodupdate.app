@@ -465,7 +465,7 @@
       }
       .status-message.visible {
         margin-top: 0.5rem; /* Add margin when visible */
-        max-height: 2em; /* Animate to a height large enough for the text */
+        max-height: 4em; /* Animate to a height large enough for 2-line text */
         opacity: 1; /* Animate to be fully visible */
       }
       #results-area {
@@ -1393,6 +1393,8 @@
       let searchedMods = new Map();
       let isCurrentlySearching = false;
       let welcomeMessageSnapshot = null; // Store the welcome message snapshot
+      let apiCallCount = 0; // Track total API calls made
+      let processingStartTime = 0; // Track when processing started
 
       // --- DOM Element References ---
       const dropzone = document.getElementById("dropzone");
@@ -2046,6 +2048,8 @@ async function handleUpdate() {
     // Reset the UI and state for a new run.
     resetResults();
     renderedModIds.clear();
+    apiCallCount = 0; // Reset API call counter
+    processingStartTime = Date.now(); // Start timing
     updateButton.disabled = true;
     updateButton.innerHTML = "Searching...";
     statusMessage.textContent = "Searching for updates and dependencies...";
@@ -2176,14 +2180,20 @@ async function handleUpdate() {
     const notFound = sectionCounts.failure || 0;
     const dependenciesAdded = actualDependenciesAdded || 0;
     
-    let summaryText = `Found ${updatesFound} updates`;
-    if (notCompatible > 0) summaryText += `, ${notCompatible} not compatible`;
-    if (notFound > 0) summaryText += `, ${notFound} failed to be found`;
-    if (dependenciesAdded > 0) summaryText += ` (${dependenciesAdded} dependencies found & added)`;
+    // Calculate processing time
+    const processingTime = ((Date.now() - processingStartTime) / 1000).toFixed(1);
+    
+    let summaryText = `Updates found: ${updatesFound}`;
+    if (notCompatible > 0) summaryText += `, Not compatible: ${notCompatible}`;
+    if (notFound > 0) summaryText += `, Failed to find: ${notFound}`;
+    if (dependenciesAdded > 0) summaryText += `, Dependencies added: ${dependenciesAdded}`;
+    
+    // Add processing time and API calls on one line below the summary
+    summaryText += `<br>Processing time: ${processingTime}s, API calls used: ${apiCallCount}`;
     
     // Store the summary for the finally block
     window.finalSummaryText = summaryText;
-    statusMessage.textContent = summaryText;
+    statusMessage.innerHTML = summaryText;
     // Keep the status message visible instead of hiding it
 
     setTimeout(() => {
@@ -2221,9 +2231,14 @@ async function handleUpdate() {
     
     // Ensure we show the final summary if it was calculated
     if (window.finalSummaryText && sectionCounts.found > 0) {
-      statusMessage.textContent = window.finalSummaryText;
+      statusMessage.innerHTML = window.finalSummaryText;
       statusMessage.classList.add("visible");
       window.finalSummaryText = null; // Clean up
+    } else if (apiCallCount > 0) {
+      // If we have API calls but no final summary, at least show the API count
+      const fallbackTime = ((Date.now() - processingStartTime) / 1000).toFixed(1);
+      statusMessage.innerHTML = `Processing completed<br>Processing time: ${fallbackTime}s, API calls used: ${apiCallCount}`;
+      statusMessage.classList.add("visible");
     }
   }
 }
@@ -2242,6 +2257,11 @@ async function fetchWithRetry(url, options, retries = 3) {
   for (let i = 0; i < retries; i++) {
     // Use the new requestOptions object
     const response = await fetch(url, requestOptions);
+    
+    // Count successful API calls (including retries)
+    if (response.ok) {
+      apiCallCount++;
+    }
 
     if (response.status === 429) {
       const resetTimestamp = Number(
