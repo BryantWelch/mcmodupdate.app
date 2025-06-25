@@ -2508,24 +2508,56 @@ async function batchOrganizationLookup(orgIds) {
 async function batchVersionLookup(projectIds, loader, gameVersion) {
   if (projectIds.length === 0) return {};
   
-  // For getting compatible versions, we can use the version_files/update endpoint
-  // or make individual calls for each project's versions
+  // Fetch ALL versions for each project in a single API call
+  // Then analyze client-side for both compatibility and precise error messages
   const versionPromises = projectIds.map(async (projectId) => {
-    const versionUrl = `https://api.modrinth.com/v2/project/${projectId}/version?loaders=["${loader}"]&game_versions=["${gameVersion}"]`;
-    const response = await fetchWithRetry(versionUrl);
+    const allVersionsUrl = `https://api.modrinth.com/v2/project/${projectId}/version`;
+    const response = await fetchWithRetry(allVersionsUrl);
     
+    let allVersions = [];
     if (response.ok) {
-      const versions = await response.json();
-      return { projectId, versions };
+      allVersions = await response.json();
     }
     
-    return { projectId, versions: [] };
+    // Filter for compatible versions (both loader and game version match)
+    const compatibleVersions = allVersions.filter(v => 
+      v.loaders.includes(loader) && v.game_versions.includes(gameVersion)
+    );
+    
+    // Analyze what's available for precise error messages
+    const hasGameVersion = allVersions.some(v => v.game_versions.includes(gameVersion));
+    const hasLoader = allVersions.some(v => v.loaders.includes(loader));
+    
+    let compatibilityStatus = 'compatible';
+    if (compatibleVersions.length === 0) {
+      if (hasGameVersion && !hasLoader) {
+        compatibilityStatus = 'wrong-loader';
+      } else if (!hasGameVersion && hasLoader) {
+        compatibilityStatus = 'wrong-version';
+      } else if (!hasGameVersion && !hasLoader) {
+        compatibilityStatus = 'no-versions';
+      } else if (hasGameVersion && hasLoader) {
+        // Both exist separately, but no version supports both
+        compatibilityStatus = 'separate-versions';
+      } else {
+        compatibilityStatus = 'incompatible';
+      }
+    }
+    
+    return { 
+      projectId, 
+      versions: compatibleVersions,
+      allVersions,
+      compatibilityStatus,
+      hasGameVersion,
+      hasLoader
+    };
   });
   
   const results = await Promise.all(versionPromises);
   
   return results.reduce((acc, result) => {
-    acc[result.projectId] = result.versions;
+    acc[result.projectId] = result;
     return acc;
   }, {});
 }
@@ -2573,14 +2605,37 @@ async function combineResults(jobs, hashResults, projectsData, authorData, versi
       // Get author details
       const author = getAuthorFromBatchData(projectDetails, authorData);
       
-      // Get compatible versions
-      const versions = versionData[projectDetails.id] || [];
+      // Get compatible versions and compatibility analysis
+      const versionInfo = versionData[projectDetails.id] || { versions: [], compatibilityStatus: 'no-versions' };
+      const versions = versionInfo.versions || [];
       const release = versions.find(v => v.version_type === "release");
       const beta = versions.find(v => v.version_type === "beta");
       const alpha = versions.find(v => v.version_type === "alpha");
       const latestVersion = release || beta || alpha;
       
              if (!latestVersion) {
+         // Generate precise error message based on compatibility analysis
+         let reason = "No compatible version found for selected loader/version.";
+         const loader = modLoaderSelect.value;
+         const gameVersion = mcVersionSelect.value;
+         
+         switch (versionInfo.compatibilityStatus) {
+           case 'wrong-loader':
+             reason = `Compatible with MC ${gameVersion}, but not available for ${loader.charAt(0).toUpperCase() + loader.slice(1)}.`;
+             break;
+           case 'wrong-version':
+             reason = `Available for ${loader.charAt(0).toUpperCase() + loader.slice(1)}, but no versions found for MC ${gameVersion}.`;
+             break;
+           case 'no-versions':
+             reason = `No versions available for MC ${gameVersion} or ${loader.charAt(0).toUpperCase() + loader.slice(1)}.`;
+             break;
+           case 'separate-versions':
+             reason = `Has versions for both MC ${gameVersion} and ${loader.charAt(0).toUpperCase() + loader.slice(1)}, but no single version supports both.`;
+             break;
+           default:
+             reason = "No compatible version found for selected loader/version.";
+         }
+         
          results.push({
            status: "warning",
            title: projectDetails.title,
@@ -2592,7 +2647,7 @@ async function combineResults(jobs, hashResults, projectsData, authorData, versi
            client_side: projectDetails.client_side,
            server_side: projectDetails.server_side,
            downloads: projectDetails.downloads,
-           reason: "No compatible version found for selected loader/version."
+           reason: reason
          });
          continue;
        }
