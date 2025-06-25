@@ -465,8 +465,11 @@
       }
       .status-message.visible {
         margin-top: 0.5rem; /* Add margin when visible */
-        max-height: 2em; /* Animate to a height large enough for the text */
+        max-height: 3em; /* Increase height to accommodate longer text */
         opacity: 1; /* Animate to be fully visible */
+      }
+      .status-message.no-transition {
+        transition: none; /* Disable transitions when needed */
       }
       #results-area {
         width: 100%;
@@ -1392,6 +1395,7 @@
       let renderedModIds = new Set();
       let searchedMods = new Map();
       let isCurrentlySearching = false;
+      let welcomeMessageHTML = ''; // Store the original welcome message
 
       // --- DOM Element References ---
       const dropzone = document.getElementById("dropzone");
@@ -1961,6 +1965,12 @@ async function populateMcVersions() {
 
 // Call these functions when the page loads
 document.addEventListener("DOMContentLoaded", () => {
+  // Store the welcome message before it can be destroyed
+  const welcomeElement = document.querySelector('#welcome-message');
+  if (welcomeElement) {
+    welcomeMessageHTML = welcomeElement.outerHTML;
+  }
+  
   populateMcVersions();
   handleScrollButtons(); // This runs our check once on load
 });
@@ -1969,11 +1979,17 @@ document.addEventListener("DOMContentLoaded", () => {
 function resetResults() {
   // Clear the results area from the screen
   resultsArea.innerHTML = "";
+  
+  // Restore the original welcome message
+  if (welcomeMessageHTML) {
+    resultsArea.innerHTML = welcomeMessageHTML;
+  }
 
-  // Hide the progress bar and status message
+  // Hide the progress bar and clear status message
   progressBarContainer.style.display = "none";
   progressBar.style.width = "0%";
   statusMessage.classList.remove("visible");
+  statusMessage.textContent = ""; // Clear the summary message
 
   // Reset the data arrays
   successfulDownloads = [];
@@ -2039,54 +2055,95 @@ async function handleUpdate() {
     renderedModIds.clear();
     updateButton.disabled = true;
     updateButton.innerHTML = "Searching...";
+    
+    // Set up the status message without transition to avoid cutoff
+    statusMessage.classList.add("no-transition");
     statusMessage.textContent = "Searching for updates and dependencies...";
     statusMessage.classList.add("visible");
+    
     setupResultSections();
     progressBarContainer.style.display = "block";
 
+    // Force a reflow, then re-enable transitions for future updates
+    statusMessage.offsetHeight; // Force reflow
+    statusMessage.classList.remove("no-transition");
+
     const processedIds = new Set();
+    let allJobs = [...jobs];
     let completedJobs = 0;
-    let totalJobs = jobs.length;
+    const originalJobCount = jobs.length; // Track the original number of mods uploaded
+    let dependenciesFound = 0;
+    let totalJobsToProcess = jobs.length; // Track total work including dependencies
 
-    for (let i = 0; i < jobs.length; i++) {
-      const job = jobs[i];
-      const key = job.type === "file" ? job.data.name : job.data;
-
-      if (processedIds.has(key)) {
-        completedJobs++;
-        continue;
-      }
-      processedIds.add(key);
-
-      const result = await getModUpdateInfo(job);
-
-      if (result.status === "success" && renderedModIds.has(result.modId)) {
-        console.log(`Skipping duplicate render for: ${result.title}`);
-      } else {
-        renderSingleResult(result);
-        if (result.status === "success") {
-          renderedModIds.add(result.modId);
+    // Process jobs in batches and show results incrementally
+    while (allJobs.length > 0) {
+      const batchSize = 25;
+      const currentBatch = allJobs.splice(0, batchSize);
+      
+      const results = await getModUpdateInfoBatch(currentBatch, batchSize);
+      
+      // Process and render results immediately as each batch completes
+      for (const result of results) {
+        const key = result.modId || (result.title + result.reason);
+        
+        if (processedIds.has(key)) {
+          completedJobs++;
+          continue;
         }
-      }
+        processedIds.add(key);
 
-      if (result.status === "success" && result.dependencies) {
-        for (const dep of result.dependencies) {
-          if (dep.dependency_type === "required") {
-            const depId = dep.project_id;
-            if (!processedIds.has(depId)) {
-              jobs.push({ type: "id", data: depId });
-              totalJobs++;
+        if (result.status === "success" && renderedModIds.has(result.modId)) {
+          console.log(`Skipping duplicate render for: ${result.title}`);
+        } else {
+          renderSingleResult(result);
+          if (result.status === "success") {
+            renderedModIds.add(result.modId);
+          }
+        }
+
+        // Handle dependencies - add them to the queue for next batch
+        if (result.status === "success" && result.dependencies) {
+          for (const dep of result.dependencies) {
+            if (dep.dependency_type === "required") {
+              const depId = dep.project_id;
+              if (!processedIds.has(depId)) {
+                allJobs.push({ type: "id", data: depId, title: `Dependency: ${depId}` });
+                dependenciesFound++;
+                totalJobsToProcess++; // Increment total work when dependencies are found
+              }
             }
           }
         }
+        
+        completedJobs++;
       }
-      completedJobs++;
-      progressBar.style.width = `${(completedJobs / totalJobs) * 100}%`;
+      
+      // Update status message and progress bar after processing each batch
+      statusMessage.textContent = `Checking ${originalJobCount} mods (found ${dependenciesFound} dependencies)`;
+      
+      // Update progress bar based on total work including dependencies
+      const progressPercentage = Math.min((completedJobs / totalJobsToProcess) * 100, 95);
+      progressBar.style.width = `${progressPercentage}%`;
+      
+      // Add a small delay to let the UI update and show the new results
+      if (allJobs.length > 0) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
     }
 
+    // Complete the progress bar and update status
+    progressBar.style.width = "100%";
+    
+    // Set final summary message
+    if (dependenciesFound > 0) {
+      statusMessage.textContent = `Processed ${originalJobCount} mods and found ${dependenciesFound} dependencies`;
+    } else {
+      statusMessage.textContent = `Processed ${originalJobCount} mods`;
+    }
+    
     finalizeResultsUI();
-    statusMessage.classList.remove("visible");
-
+    
+    // Hide progress bar but keep status message as summary
     setTimeout(() => {
       progressBarContainer.style.display = "none";
     }, 1000);
@@ -2105,8 +2162,14 @@ async function fetchWithRetry(url, options, retries = 3) {
   const requestOptions = {
     ...options, // Spread any existing options
     headers: {
-      // Add our custom User-Agent to be a good API citizen
-      // "User-Agent": "BryantWelch/mcmodupdate.app/",
+      // Add identification headers to be a good API citizen
+      // Primary: Custom User-Agent (may be blocked by browsers)
+      "User-Agent": "BryantWelch/mcmodupdate.app/",
+      // Fallbacks: Custom headers that browsers won't block
+      "X-User-Agent": "BryantWelch/mcmodupdate.app/",
+      "X-Client": "mcmodupdate.app",
+      // "X-Client-Version": "1.0",
+      ...(options?.headers || {})
     },
   };
 
@@ -2143,171 +2206,353 @@ async function fetchWithRetry(url, options, retries = 3) {
   );
 }
 
-// --- Multi-Stage API Check with HASH-FIRST and UNIFIED AUTHOR LOOKUP ---
-async function getModUpdateInfo(job) {
+// --- Main Batch Processing Function ---
+async function getModUpdateInfoBatch(jobs, batchSize = 25) {
+  // Process the entire job list as a single batch since we're already batching at the higher level
+  return await processBatch(jobs);
+}
+
+async function processBatch(jobs) {
   const loader = modLoaderSelect.value;
   const gameVersion = mcVersionSelect.value;
-  let modId;
-  // Use the title from the job object for 'id' and 'hash' types for better error reporting
-  let originalFileName = job.type === "file" ? job.data.name : job.title;
-
-  try {
-    let projectDetails;
-    let hash;
-
-    // Determine the hash based on job type
+  
+  // Step 1: Collect all hashes and project IDs
+  const hashJobs = [];
+  const projectIdJobs = [];
+  const fileJobs = [];
+  
+  for (const job of jobs) {
     if (job.type === "file") {
-      hash = await calculateFileHash(job.data);
+      const hash = await calculateFileHash(job.data);
+      if (hash) {
+        hashJobs.push({ job, hash });
+      } else {
+        fileJobs.push(job);
+      }
     } else if (job.type === "hash") {
-      hash = job.data;
+      hashJobs.push({ job, hash: job.data });
+    } else if (job.type === "id") {
+      projectIdJobs.push(job);
     }
-
-    // Primary lookup method: HASH (for .jar and .mrpack files)
-    if (hash) {
-      const hashUrl = `https://api.modrinth.com/v2/version_file/${hash}?algorithm=sha1`;
-      const hashResponse = await fetchWithRetry(hashUrl);
-      if (hashResponse.ok) {
-        const versionData = await hashResponse.json();
-        const projectUrl = `https://api.modrinth.com/v2/project/${versionData.project_id}`;
-        const projectResponse = await fetchWithRetry(projectUrl);
-        if (projectResponse.ok) {
-          projectDetails = await projectResponse.json();
-        }
-      }
-    }
-
-    // Secondary lookup method: ID (for searched mods)
-    if (!projectDetails && job.type === "id") {
-      const projectUrl = `https://api.modrinth.com/v2/project/${job.data}`;
-      const projectResponse = await fetchWithRetry(projectUrl);
-      if (projectResponse.ok) {
-        projectDetails = await projectResponse.json();
-      }
-    }
-
-    // Tertiary lookup method: Read from JAR (for .jar files that failed hash lookup)
-    if (!projectDetails && job.type === "file") {
-      const modInfo = await getModIdFromJar(job.data);
-      let projectUrl = `https://api.modrinth.com/v2/project/${modInfo.id}`;
-      let projectResponse = await fetchWithRetry(projectUrl);
-
-      if (projectResponse.ok) {
-        projectDetails = await projectResponse.json();
-      } else if (modInfo.name) {
-        // Fallback to searching by name if ID fails
-        const searchUrl = `https://api.modrinth.com/v2/search?query=${encodeURIComponent(
-          modInfo.name
-        )}&limit=1`;
-        const searchResponse = await fetchWithRetry(searchUrl);
-        if (searchResponse.ok) {
-          const searchResults = await searchResponse.json();
-          if (searchResults.hits.length > 0) {
-            const foundSlug = searchResults.hits[0].slug;
-            const foundProjectUrl = `https://api.modrinth.com/v2/project/${foundSlug}`;
-            const foundProjectResponse = await fetchWithRetry(foundProjectUrl);
-            if (foundProjectResponse.ok) {
-              projectDetails = await foundProjectResponse.json();
-            }
-          }
-        }
-      }
-    }
-
-    if (!projectDetails) {
-      // If we still haven't found it, fail the job.
-      throw new Error("Mod not found on Modrinth by hash, ID, or name.");
-    }
-
-    modId = projectDetails.slug;
-
-// --- Get original version from the uploaded file ---
-let originalModInfo = {};
-if (job.type === "file") {
-  originalModInfo = await getModIdFromJar(job.data);
-}
-
-const author = await getAuthorDetails(projectDetails);
-
-const versionUrl = `https://api.modrinth.com/v2/project/${modId}/version?loaders=["${loader}"]&game_versions=["${gameVersion}"]`;
-const versionResponse = await fetchWithRetry(versionUrl);
-const versions = await versionResponse.json();
-
-const release = versions.find((v) => v.version_type === "release");
-const beta = versions.find((v) => v.version_type === "beta");
-const alpha = versions.find((v) => v.version_type === "alpha");
-const latestVersion = release || beta || alpha;
-
-if (!latestVersion) {
-  return {
-    status: "warning",
-    title: projectDetails.title,
-    author_name: author.name,
-    author_url: author.url,
-    description: projectDetails.description,
-    icon_url: projectDetails.icon_url,
-    project_url: `https://modrinth.com/project/${modId}`,
-    client_side: projectDetails.client_side,
-    server_side: projectDetails.server_side,
-    downloads: projectDetails.downloads,
-    reason: "No compatible version found for selected loader/version.",
-  };
-}
-
-// --- Compare the versions ---
-const isUpToDate =
-  originalModInfo.version &&
-  latestVersion &&
-  originalModInfo.version === latestVersion.version_number;
-
-const primaryFile = latestVersion.files.find((f) => f.primary);
-if (!primaryFile) {
-  return {
-    status: "warning",
-    // ... (rest of the warning object)
-  };
-}
-
-// --- GATHER ALL DATA FOR THE .MRPACK FILE ---
-const downloadInfo = {
-  url: primaryFile.url,
-  filename: primaryFile.filename,
-  hashes: primaryFile.hashes,
-  path: `mods/${primaryFile.filename}`,
-  fileSize: primaryFile.size, // This is the crucial line
-  client_side: projectDetails.client_side,
-  server_side: projectDetails.server_side,
-};
-if (!renderedModIds.has(modId)) {
-  successfulDownloads.push(downloadInfo);
-}
-
-// --- Add the new flag to the return object ---
-return {
-  status: "success",
-  modId: modId,
-  isUpToDate: isUpToDate,
-  categories: projectDetails.categories,
-  title: projectDetails.title,
-  author_name: author.name,
-  author_url: author.url,
-  description: projectDetails.description,
-  icon_url: projectDetails.icon_url,
-  project_url: `https://modrinth.com/project/${modId}`,
-  client_side: projectDetails.client_side,
-  server_side: projectDetails.server_side,
-  followers: projectDetails.followers,
-  downloads: projectDetails.downloads,
-  all_versions: versions,
-  dependencies: latestVersion.dependencies,
-  isDependency: job.type === "id",
-};
-  } catch (error) {
-    return {
-      status: "failure",
-      title: originalFileName,
-      reason: error.message,
-    };
   }
+  
+  // Step 2: Batch hash lookups
+  const hashResults = await batchHashLookup(hashJobs);
+  
+  // Step 3: Batch project lookups
+  const allProjectIds = [
+    ...hashResults.map(r => r.versionData?.project_id).filter(Boolean),
+    ...projectIdJobs.map(j => j.data)
+  ];
+  
+  const projectsData = await batchProjectLookup(allProjectIds);
+  
+  // Step 4: Batch author lookups
+  const authorData = await batchAuthorLookup(projectsData);
+  
+  // Step 5: Batch version lookups for compatible versions
+  const versionData = await batchVersionLookup(allProjectIds, loader, gameVersion);
+  
+  // Step 6: Combine results
+  return await combineResults(jobs, hashResults, projectsData, authorData, versionData);
+}
+
+// --- Batch Hash Lookup Function ---
+async function batchHashLookup(hashJobs) {
+  if (hashJobs.length === 0) return [];
+  
+  // Use the batch version_files endpoint
+  const hashes = hashJobs.map(hj => hj.hash);
+  
+  const response = await fetchWithRetry('https://api.modrinth.com/v2/version_files', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      algorithm: "sha1",
+      hashes: hashes
+    })
+  });
+  
+  if (response.ok) {
+    const versionMap = await response.json();
+    return hashJobs.map(hj => ({
+      job: hj.job,
+      hash: hj.hash,
+      versionData: versionMap[hj.hash] || null
+    }));
+  }
+  
+  return hashJobs.map(hj => ({ job: hj.job, hash: hj.hash, versionData: null }));
+}
+
+// --- Batch Project Lookup Function ---
+async function batchProjectLookup(projectIds) {
+  if (projectIds.length === 0) return {};
+  
+  // Remove duplicates
+  const uniqueIds = [...new Set(projectIds.filter(Boolean))];
+  
+  // Use batch projects endpoint
+  const idsParam = JSON.stringify(uniqueIds);
+  const response = await fetchWithRetry(
+    `https://api.modrinth.com/v2/projects?ids=${encodeURIComponent(idsParam)}`
+  );
+  
+  if (response.ok) {
+    const projects = await response.json();
+    // Convert array to map for easy lookup
+    return projects.reduce((acc, project) => {
+      acc[project.id] = project;
+      return acc;
+    }, {});
+  }
+  
+  return {};
+}
+
+// --- Batch Author Lookup Function ---
+async function batchAuthorLookup(projectsData) {
+  const projects = Object.values(projectsData);
+  
+  // Collect team IDs and organization IDs
+  const teamIds = projects.map(p => p.team).filter(Boolean);
+  const orgIds = projects.map(p => p.organization).filter(Boolean);
+  
+  // Batch fetch teams and organizations in parallel
+  const [teamsData, orgsData] = await Promise.all([
+    batchTeamLookup(teamIds),
+    batchOrganizationLookup(orgIds)
+  ]);
+  
+  return { teams: teamsData, organizations: orgsData };
+}
+
+async function batchTeamLookup(teamIds) {
+  if (teamIds.length === 0) return {};
+  
+  const uniqueIds = [...new Set(teamIds)];
+  const idsParam = JSON.stringify(uniqueIds);
+  
+  const response = await fetchWithRetry(
+    `https://api.modrinth.com/v3/teams?ids=${encodeURIComponent(idsParam)}`
+  );
+  
+  if (response.ok) {
+    const teams = await response.json();
+    return teams.reduce((acc, team) => {
+      acc[team[0]?.team_id] = team;
+      return acc;
+    }, {});
+  }
+  
+  return {};
+}
+
+async function batchOrganizationLookup(orgIds) {
+  if (orgIds.length === 0) return {};
+  
+  const uniqueIds = [...new Set(orgIds)];
+  const idsParam = JSON.stringify(uniqueIds);
+  
+  const response = await fetchWithRetry(
+    `https://api.modrinth.com/v3/organizations?ids=${encodeURIComponent(idsParam)}`
+  );
+  
+  if (response.ok) {
+    const orgs = await response.json();
+    return orgs.reduce((acc, org) => {
+      acc[org.id] = org;
+      return acc;
+    }, {});
+  }
+  
+  return {};
+}
+
+// --- Batch Version Lookup Function ---
+async function batchVersionLookup(projectIds, loader, gameVersion) {
+  if (projectIds.length === 0) return {};
+  
+  // For getting compatible versions, we can use the version_files/update endpoint
+  // or make individual calls for each project's versions
+  const versionPromises = projectIds.map(async (projectId) => {
+    const versionUrl = `https://api.modrinth.com/v2/project/${projectId}/version?loaders=["${loader}"]&game_versions=["${gameVersion}"]`;
+    const response = await fetchWithRetry(versionUrl);
+    
+    if (response.ok) {
+      const versions = await response.json();
+      return { projectId, versions };
+    }
+    
+    return { projectId, versions: [] };
+  });
+  
+  const results = await Promise.all(versionPromises);
+  
+  return results.reduce((acc, result) => {
+    acc[result.projectId] = result.versions;
+    return acc;
+  }, {});
+}
+
+// --- Results Combination Function ---
+async function combineResults(jobs, hashResults, projectsData, authorData, versionData) {
+  const results = [];
+  
+  for (const job of jobs) {
+    try {
+      let projectDetails = null;
+      let versionDetails = null;
+      let originalModInfo = {};
+      
+      // Find project details based on job type
+      if (job.type === "hash" || job.type === "file") {
+        const hashResult = hashResults.find(hr => hr.job === job);
+        if (hashResult?.versionData) {
+          projectDetails = projectsData[hashResult.versionData.project_id];
+          versionDetails = hashResult.versionData;
+        }
+        
+                 // Get original version from uploaded file if available
+         if (job.type === "file") {
+           try {
+             originalModInfo = await getModIdFromJar(job.data);
+           } catch (e) {
+             // Ignore errors getting mod info from JAR
+             originalModInfo = {};
+           }
+         }
+      } else if (job.type === "id") {
+        projectDetails = projectsData[job.data];
+      }
+      
+             if (!projectDetails) {
+         results.push({
+           status: "failure",
+           title: job.type === "file" ? job.data.name : job.title,
+           reason: "Mod not found on Modrinth"
+         });
+         continue;
+       }
+      
+      // Get author details
+      const author = getAuthorFromBatchData(projectDetails, authorData);
+      
+      // Get compatible versions
+      const versions = versionData[projectDetails.id] || [];
+      const release = versions.find(v => v.version_type === "release");
+      const beta = versions.find(v => v.version_type === "beta");
+      const alpha = versions.find(v => v.version_type === "alpha");
+      const latestVersion = release || beta || alpha;
+      
+             if (!latestVersion) {
+         results.push({
+           status: "warning",
+           title: projectDetails.title,
+           author_name: author.name,
+           author_url: author.url,
+           description: projectDetails.description,
+           icon_url: projectDetails.icon_url,
+           project_url: `https://modrinth.com/project/${projectDetails.slug}`,
+           client_side: projectDetails.client_side,
+           server_side: projectDetails.server_side,
+           downloads: projectDetails.downloads,
+           reason: "No compatible version found for selected loader/version."
+         });
+         continue;
+       }
+      
+             const primaryFile = latestVersion.files.find(f => f.primary);
+       if (!primaryFile) {
+         results.push({
+           status: "warning",
+           title: projectDetails.title,
+           author_name: author.name,
+           author_url: author.url,
+           reason: "No primary file found for latest version."
+         });
+         continue;
+       }
+      
+      // Compare versions if we have original mod info
+      const isUpToDate = originalModInfo.version && 
+        latestVersion && 
+        originalModInfo.version === latestVersion.version_number;
+      
+      // Gather download info for .mrpack file
+      const downloadInfo = {
+        url: primaryFile.url,
+        filename: primaryFile.filename,
+        hashes: primaryFile.hashes,
+        path: `mods/${primaryFile.filename}`,
+        fileSize: primaryFile.size,
+        client_side: projectDetails.client_side,
+        server_side: projectDetails.server_side,
+      };
+      
+      // Add to successful downloads if not already tracked
+      if (!renderedModIds.has(projectDetails.slug)) {
+        successfulDownloads.push(downloadInfo);
+      }
+      
+      // Build success response
+      results.push({
+        status: "success",
+        modId: projectDetails.slug,
+        isUpToDate: isUpToDate,
+        categories: projectDetails.categories,
+        title: projectDetails.title,
+        author_name: author.name,
+        author_url: author.url,
+        description: projectDetails.description,
+        icon_url: projectDetails.icon_url,
+        project_url: `https://modrinth.com/project/${projectDetails.slug}`,
+        client_side: projectDetails.client_side,
+        server_side: projectDetails.server_side,
+        followers: projectDetails.followers,
+        downloads: projectDetails.downloads,
+        all_versions: versions,
+        dependencies: latestVersion.dependencies,
+        isDependency: job.type === "id"
+      });
+      
+    } catch (error) {
+      results.push({
+        status: "failure",
+        title: job.type === "file" ? job.data.name : job.title,
+        reason: error.message
+      });
+    }
+  }
+  
+  return results;
+}
+
+function getAuthorFromBatchData(projectDetails, authorData) {
+  // Check for organization first
+  if (projectDetails.organization) {
+    const org = authorData.organizations[projectDetails.organization];
+    if (org) {
+      return {
+        name: org.name,
+        url: `https://modrinth.com/organization/${org.slug}`
+      };
+    }
+  }
+  
+  // Fall back to team owner
+  const team = authorData.teams[projectDetails.team];
+  if (team) {
+    const owner = team.find(member => member.is_owner || member.role === "Owner");
+    if (owner?.user) {
+      return {
+        name: owner.user.username,
+        url: `https://modrinth.com/user/${owner.user.username}`
+      };
+    }
+  }
+  
+  return { name: "unknown", url: "#" };
 }
 
       // --- Get Mod ID from JAR ---
@@ -2831,48 +3076,7 @@ function createFailureCard(mod) {
 
 // --- Helper Functions ---
 
-// --- Reusable function to get author details from a team ID ---
-async function getAuthorDetails(projectDetails) {  
-  try {  
-    // Step 1: Check if project has an organization first  
-    if (projectDetails.organization) {  
-      const orgUrl = `https://api.modrinth.com/v3/project/${projectDetails.slug}/organization`;  
-      const orgResponse = await fetchWithRetry(orgUrl);  
-        
-      if (orgResponse.ok) {  
-        const orgData = await orgResponse.json();  
-        return {  
-          name: orgData.name,  
-          url: `https://modrinth.com/organization/${orgData.slug}`,  
-        };  
-      }  
-    }  
-  
-    // Step 2: If no organization, find individual owner  
-    const membersUrl = `https://api.modrinth.com/v2/team/${projectDetails.team}/members`;  
-    const membersResponse = await fetchWithRetry(membersUrl);  
-  
-    if (membersResponse.ok) {  
-      const teamMembers = await membersResponse.json();  
-        
-      // Look for owner using is_owner field or "Owner" role  
-      const owner = teamMembers.find(member =>   
-        member.is_owner || member.role === "Owner"  
-      );  
-        
-      if (owner && owner.user) {  
-        return {  
-          name: owner.user.username,  
-          url: `https://modrinth.com/user/${owner.user.username}`,  
-        };  
-      }  
-    }  
-  } catch (error) {  
-    console.error("Failed to fetch author details:", error);  
-  }  
-  
-  return { name: "unknown", url: "#" };  
-}
+
 
       // --- File Hash Calculation ---
       async function calculateFileHash(file) {
