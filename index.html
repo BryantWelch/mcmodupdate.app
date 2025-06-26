@@ -816,6 +816,132 @@
   align-items: center;
 }
 
+/* -- Styles for search boxes in results sections -- */
+.search-box {
+  background-color: var(--bg-color);
+  color: var(--primary-text);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.9rem;
+  width: 200px;
+  transition: border-color 0.2s ease;
+}
+
+.search-box:focus {
+  outline: none;
+  border-color: var(--gradient-start);
+}
+
+.search-box::placeholder {
+  color: var(--secondary-text);
+}
+
+/* -- Styles for sort dropdown -- */
+.sort-dropdown-container {
+  position: relative;
+  display: inline-block;
+}
+
+.sort-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  min-width: 150px;
+  display: none;
+  overflow: visible;
+}
+
+.sort-dropdown.show {
+  display: block;
+}
+
+.sort-option {
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  color: var(--primary-text);
+  font-size: 0.9rem;
+  transition: background-color 0.2s ease;
+  border: none;
+  background: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sort-option:first-child {
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+}
+
+.sort-option:last-child {
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+}
+
+.sort-option:hover {
+  background-color: var(--dropzone-hover-bg);
+  border-color: var(--gradient-start);
+}
+
+.sort-option.active {
+  background-color: var(--gradient-start);
+  color: white;
+}
+
+.sort-option.has-submenu {
+  position: relative;
+}
+
+.sort-submenu {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  min-width: 140px;
+  display: none;
+  overflow: hidden;
+  z-index: 1001;
+}
+
+.sort-option.has-submenu:hover .sort-submenu {
+  display: block;
+}
+
+.sort-submenu .sort-option {
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+}
+
+.sort-submenu .sort-option:first-child {
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+}
+
+.sort-submenu .sort-option:last-child {
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+}
+
+.submenu-arrow {
+  font-size: 0.6em;
+  color: var(--secondary-text);
+  transition: color 0.2s ease;
+  flex-shrink: 0;
+}
+
+.sort-option.has-submenu:hover .submenu-arrow {
+  color: var(--primary-text);
+}
+
 /* -- Styles for the layout toggle button itself -- */
 .layout-toggle {
   background: transparent;
@@ -987,7 +1113,19 @@
   .main-container {
     padding: 0 1rem;
   }
-
+  
+  /* Make search boxes smaller on mobile */
+  .search-box {
+    width: 150px;
+  }
+  
+  /* Adjust sort dropdown on mobile */
+  .sort-dropdown {
+    right: 0;
+    left: auto;
+    min-width: 180px;
+  }
+  
   /* Reduce header size */
   h1 {
     font-size: 2.2rem;
@@ -2045,6 +2183,11 @@ function resetResults() {
   successfulDownloads = [];
   sectionCounts = { found: 0, warning: 0, failure: 0 };
 
+  // Reset sort states
+  if (window.resetSortStates) {
+    window.resetSortStates();
+  }
+
   // Hide the "Clear Results" button
   clearResultsButton.style.display = "none";
 
@@ -2800,6 +2943,7 @@ function setupResultSections() {
   const gridIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect></svg>`;
   const listIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>`;
   const copyIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="m5 15-1 0c-1.1 0-2-.9-2-2l0-9c0-1.1.9-2 2-2l9 0c1.1 0 2 .9 2 2l0 1"></path></svg>`;
+  const sortIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="7,10 12,5 17,10"></polyline><polyline points="7,14 12,19 17,14"></polyline></svg>`;
 
   resultsArea.innerHTML = `
     <div id="results-found" class="results-section">
@@ -2807,6 +2951,57 @@ function setupResultSections() {
       <div class="results-header-container">
         <h2 id="header-found">Updates Found</h2>
         <div class="header-buttons">
+          <input type="text" id="search-found" class="search-box" placeholder="Filter mods..." style="margin-right: 0.5rem;">
+          <div class="sort-dropdown-container">
+            <button id="sort-found-btn" class="layout-toggle" title="Sort Results">${sortIcon}</button>
+            <div id="sort-found-dropdown" class="sort-dropdown">
+              <div class="sort-option active" data-sort="default">Default</div>
+              <div class="sort-option has-submenu">
+                Name <span class="submenu-arrow">▶</span>
+                <div class="sort-submenu">
+                  <div class="sort-option" data-sort="name" data-direction="false">A-Z</div>
+                  <div class="sort-option" data-sort="name" data-direction="true">Z-A</div>
+                </div>
+              </div>
+              <div class="sort-option has-submenu">
+                Downloads <span class="submenu-arrow">▶</span>
+                <div class="sort-submenu">
+                  <div class="sort-option" data-sort="downloads" data-direction="false">High to Low</div>
+                  <div class="sort-option" data-sort="downloads" data-direction="true">Low to High</div>
+                </div>
+              </div>
+              <div class="sort-option has-submenu">
+                Followers <span class="submenu-arrow">▶</span>
+                <div class="sort-submenu">
+                  <div class="sort-option" data-sort="followers" data-direction="false">High to Low</div>
+                  <div class="sort-option" data-sort="followers" data-direction="true">Low to High</div>
+                </div>
+              </div>
+              <div class="sort-option has-submenu">
+                Last Updated <span class="submenu-arrow">▶</span>
+                <div class="sort-submenu">
+                  <div class="sort-option" data-sort="updated" data-direction="false">Newest First</div>
+                  <div class="sort-option" data-sort="updated" data-direction="true">Oldest First</div>
+                </div>
+              </div>
+              <div class="sort-option has-submenu">
+                Environments <span class="submenu-arrow">▶</span>
+                <div class="sort-submenu">
+                  <div class="sort-option" data-sort="clientserver" data-filter="client">Client Only</div>
+                  <div class="sort-option" data-sort="clientserver" data-filter="server">Server Only</div>
+                  <div class="sort-option" data-sort="clientserver" data-filter="both">Client & Server</div>
+                </div>
+              </div>
+              <div class="sort-option has-submenu">
+                Channels <span class="submenu-arrow">▶</span>
+                <div class="sort-submenu">
+                  <div class="sort-option" data-sort="channel" data-filter="release">Release</div>
+                  <div class="sort-option" data-sort="channel" data-filter="beta">Beta</div>
+                  <div class="sort-option" data-sort="channel" data-filter="alpha">Alpha</div>
+                </div>
+              </div>
+            </div>
+          </div>
           <button id="copy-found-btn" class="layout-toggle" title="Copy Mod List">${copyIcon}</button>
           <button id="layout-toggle-btn" class="layout-toggle" title="Toggle Layout">${gridIcon}</button>
         </div>
@@ -2818,6 +3013,42 @@ function setupResultSections() {
       <div class="results-header-container">
         <h2 id="header-warning">No Compatible Version Found</h2>
         <div class="header-buttons">
+          <input type="text" id="search-warning" class="search-box" placeholder="Filter mods..." style="margin-right: 0.5rem;">
+          <div class="sort-dropdown-container">
+            <button id="sort-warning-btn" class="layout-toggle" title="Sort Results">${sortIcon}</button>
+            <div id="sort-warning-dropdown" class="sort-dropdown">
+              <div class="sort-option active" data-sort="default">Default</div>
+              <div class="sort-option has-submenu">
+                Name <span class="submenu-arrow">▶</span>
+                <div class="sort-submenu">
+                  <div class="sort-option" data-sort="name" data-direction="false">A-Z</div>
+                  <div class="sort-option" data-sort="name" data-direction="true">Z-A</div>
+                </div>
+              </div>
+              <div class="sort-option has-submenu">
+                Downloads <span class="submenu-arrow">▶</span>
+                <div class="sort-submenu">
+                  <div class="sort-option" data-sort="downloads" data-direction="false">High to Low</div>
+                  <div class="sort-option" data-sort="downloads" data-direction="true">Low to High</div>
+                </div>
+              </div>
+              <div class="sort-option has-submenu">
+                Followers <span class="submenu-arrow">▶</span>
+                <div class="sort-submenu">
+                  <div class="sort-option" data-sort="followers" data-direction="false">High to Low</div>
+                  <div class="sort-option" data-sort="followers" data-direction="true">Low to High</div>
+                </div>
+              </div>
+              <div class="sort-option has-submenu">
+                Environments <span class="submenu-arrow">▶</span>
+                <div class="sort-submenu">
+                  <div class="sort-option" data-sort="clientserver" data-filter="client">Client Only</div>
+                  <div class="sort-option" data-sort="clientserver" data-filter="server">Server Only</div>
+                  <div class="sort-option" data-sort="clientserver" data-filter="both">Client & Server</div>
+                </div>
+              </div>
+            </div>
+          </div>
           <button id="copy-warning-btn" class="layout-toggle" title="Copy Mod List">${copyIcon}</button>
           <button id="warning-layout-toggle-btn" class="layout-toggle" title="Toggle Layout">${gridIcon}</button>
         </div>
@@ -2913,6 +3144,419 @@ function setupResultSections() {
     }).filter(name => name).join('\n');
     copyToClipboard(modNames, copyWarningBtn, "Incompatible mods");
   });
+
+  // --- Search functionality ---
+  const searchFoundInput = document.getElementById("search-found");
+  const searchWarningInput = document.getElementById("search-warning");
+
+  // Function to filter cards based on search term
+  function filterCards(searchTerm, sectionSelector) {
+    const cards = document.querySelectorAll(`${sectionSelector} .result-card`);
+    const lowerSearchTerm = searchTerm.toLowerCase();
+    
+    cards.forEach(card => {
+      const titleElement = card.querySelector(".mod-title a");
+      const title = titleElement ? titleElement.textContent.toLowerCase() : "";
+      
+      if (title.includes(lowerSearchTerm)) {
+        card.style.display = "";
+      } else {
+        card.style.display = "none";
+      }
+    });
+  }
+
+  // Add event listeners for search inputs
+  searchFoundInput.addEventListener("input", (e) => {
+    filterCards(e.target.value, "#results-found");
+  });
+
+  searchWarningInput.addEventListener("input", (e) => {
+    filterCards(e.target.value, "#results-warning");
+  });
+
+  // --- Sort functionality ---
+  const sortFoundBtn = document.getElementById("sort-found-btn");
+  const sortFoundDropdown = document.getElementById("sort-found-dropdown");
+  const sortWarningBtn = document.getElementById("sort-warning-btn");
+  const sortWarningDropdown = document.getElementById("sort-warning-dropdown");
+
+  let currentFoundSort = 'default';
+  let currentWarningSort = 'default';
+  let foundSortDirection = {}; // Track sort direction for each sort type
+  let warningSortDirection = {}; // Track sort direction for each sort type
+
+  // Toggle dropdown visibility
+  function toggleSortDropdown(dropdown, otherDropdown) {
+    dropdown.classList.toggle('show');
+    otherDropdown.classList.remove('show'); // Close other dropdown
+  }
+
+  // Close dropdowns when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.sort-dropdown-container')) {
+      sortFoundDropdown.classList.remove('show');
+      sortWarningDropdown.classList.remove('show');
+    }
+  });
+
+  // Prevent dropdown from closing when hovering over submenus
+  [sortFoundDropdown, sortWarningDropdown].forEach(dropdown => {
+    dropdown.addEventListener('mouseleave', (e) => {
+      // Small delay to allow moving to submenu
+      setTimeout(() => {
+        if (!dropdown.matches(':hover') && !dropdown.querySelector('.sort-submenu:hover')) {
+          // Could add additional logic here if needed
+        }
+      }, 100);
+    });
+  });
+
+  // Sort button click handlers
+  sortFoundBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleSortDropdown(sortFoundDropdown, sortWarningDropdown);
+  });
+
+  sortWarningBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleSortDropdown(sortWarningDropdown, sortFoundDropdown);
+  });
+
+  // Sort option selection handlers
+  sortFoundDropdown.addEventListener('click', (e) => {
+    if (e.target.classList.contains('sort-option') && e.target.dataset.sort) {
+      const sortType = e.target.dataset.sort;
+      
+      // First clear any existing filters when switching options
+      clearFilters('#results-found');
+      
+      if (sortType === 'default') {
+        // Default order - just clear everything and show all cards
+        selectSortOption(sortFoundDropdown, 'default');
+        currentFoundSort = 'default';
+        clearFilters('#results-found');
+        restoreOriginalOrder('#results-found');
+      } else if (e.target.dataset.filter) {
+        // This is a filter option
+        const filterValue = e.target.dataset.filter;
+        selectSortOption(sortFoundDropdown, sortType, false, e.target.textContent, filterValue);
+        currentFoundSort = sortType;
+        applyFiltering('#results-found', sortType, filterValue);
+      } else if (e.target.dataset.direction !== undefined) {
+        // This is a sorting option
+        const isReversed = e.target.dataset.direction === 'true';
+        foundSortDirection[sortType] = isReversed;
+        selectSortOption(sortFoundDropdown, sortType, isReversed, e.target.textContent);
+        currentFoundSort = sortType;
+        applySorting('#results-found', sortType, isReversed);
+      }
+      
+      sortFoundDropdown.classList.remove('show');
+    }
+  });
+
+  sortWarningDropdown.addEventListener('click', (e) => {
+    if (e.target.classList.contains('sort-option') && e.target.dataset.sort) {
+      const sortType = e.target.dataset.sort;
+      
+      // First clear any existing filters when switching options
+      clearFilters('#results-warning');
+      
+      if (sortType === 'default') {
+        // Default order - just clear everything and show all cards
+        selectSortOption(sortWarningDropdown, 'default');
+        currentWarningSort = 'default';
+        clearFilters('#results-warning');
+        restoreOriginalOrder('#results-warning');
+      } else if (e.target.dataset.filter) {
+        // This is a filter option
+        const filterValue = e.target.dataset.filter;
+        selectSortOption(sortWarningDropdown, sortType, false, e.target.textContent, filterValue);
+        currentWarningSort = sortType;
+        applyFiltering('#results-warning', sortType, filterValue);
+      } else if (e.target.dataset.direction !== undefined) {
+        // This is a sorting option
+        const isReversed = e.target.dataset.direction === 'true';
+        warningSortDirection[sortType] = isReversed;
+        selectSortOption(sortWarningDropdown, sortType, isReversed, e.target.textContent);
+        currentWarningSort = sortType;
+        applySorting('#results-warning', sortType, isReversed);
+      }
+      
+      sortWarningDropdown.classList.remove('show');
+    }
+  });
+
+  // Update active sort option
+  function selectSortOption(dropdown, sortType, isReversed = false, optionText = '', filterValue = '') {
+    // Remove active class from all options
+    dropdown.querySelectorAll('.sort-option').forEach(option => {
+      option.classList.remove('active');
+    });
+    
+    if (sortType === 'default') {
+      const defaultOption = dropdown.querySelector('[data-sort="default"]');
+      if (defaultOption) defaultOption.classList.add('active');
+    } else if (filterValue) {
+      // Find the specific filter option that was clicked
+      const targetOption = dropdown.querySelector(`[data-sort="${sortType}"][data-filter="${filterValue}"]`);
+      if (targetOption) targetOption.classList.add('active');
+      
+      // Also highlight the root option (the parent menu item)
+      const rootOption = targetOption.closest('.sort-option.has-submenu');
+      if (rootOption) rootOption.classList.add('active');
+    } else {
+      // Find the specific sorting option that was clicked
+      const targetOption = dropdown.querySelector(`[data-sort="${sortType}"][data-direction="${isReversed}"]`);
+      if (targetOption) targetOption.classList.add('active');
+      
+      // Also highlight the root option (the parent menu item)
+      const rootOption = targetOption.closest('.sort-option.has-submenu');
+      if (rootOption) rootOption.classList.add('active');
+    }
+  }
+
+  // Apply sorting to a section
+  function applySorting(sectionSelector, sortType, isReversed = false) {
+    const section = document.querySelector(sectionSelector);
+    const resultsList = section.querySelector('.results-list');
+    const cards = Array.from(resultsList.querySelectorAll('.result-card'));
+    
+    // Add original order index to each card if not already present
+    cards.forEach((card, index) => {
+      if (!card.dataset.originalIndex) {
+        card.dataset.originalIndex = index;
+      }
+    });
+    
+    if (sortType === 'default') {
+      // Sort by original index
+      cards.sort((a, b) => {
+        return parseInt(a.dataset.originalIndex) - parseInt(b.dataset.originalIndex);
+      });
+    } else {
+      // Sort cards based on type
+      cards.sort((a, b) => {
+        switch (sortType) {
+          case 'name':
+            const nameA = a.querySelector('.mod-title a')?.textContent.toLowerCase() || '';
+            const nameB = b.querySelector('.mod-title a')?.textContent.toLowerCase() || '';
+            return nameA.localeCompare(nameB);
+            
+                  case 'downloads':
+          const downloadsA = extractDownloads(a);
+          const downloadsB = extractDownloads(b);
+          return downloadsB - downloadsA; // High to low
+          
+        case 'followers':
+          const followersA = extractFollowers(a);
+          const followersB = extractFollowers(b);
+          return followersB - followersA; // High to low
+          
+                case 'updated':
+          const dateA = extractDate(a);
+          const dateB = extractDate(b);
+          return dateB - dateA; // Newest first
+          
+        case 'clientserver':
+          const clientServerA = extractClientServer(a);
+          const clientServerB = extractClientServer(b);
+          return clientServerA.localeCompare(clientServerB);
+          
+        case 'channel':
+          const channelA = extractChannel(a);
+          const channelB = extractChannel(b);
+          return channelA.localeCompare(channelB);
+              
+        default:
+          return 0;
+        }
+      });
+    }
+
+    // Reverse the order if requested
+    if (isReversed && sortType !== 'default') {
+      cards.reverse();
+    }
+
+    // Re-append cards in sorted order (this preserves all event listeners)
+    cards.forEach(card => resultsList.appendChild(card));
+  }
+
+  // Apply filtering to a section
+  function applyFiltering(sectionSelector, filterType, filterValue) {
+    const section = document.querySelector(sectionSelector);
+    const resultsList = section.querySelector('.results-list');
+    const cards = Array.from(resultsList.querySelectorAll('.result-card'));
+
+    cards.forEach(card => {
+      let shouldShow = true;
+
+      if (filterType === 'clientserver') {
+        const cardSupport = extractClientServer(card);
+        shouldShow = cardSupport === filterValue;
+      } else if (filterType === 'channel') {
+        const cardChannel = extractChannel(card);
+        shouldShow = cardChannel === filterValue;
+      }
+
+      if (shouldShow) {
+        card.style.display = '';
+      } else {
+        card.style.display = 'none';
+      }
+    });
+  }
+
+  // Clear all filters for a section
+  function clearFilters(sectionSelector) {
+    const section = document.querySelector(sectionSelector);
+    const cards = section.querySelectorAll('.result-card');
+    cards.forEach(card => {
+      card.style.display = '';
+    });
+  }
+
+  // Restore original order for a section
+  function restoreOriginalOrder(sectionSelector) {
+    const section = document.querySelector(sectionSelector);
+    const resultsList = section.querySelector('.results-list');
+    const cards = Array.from(resultsList.querySelectorAll('.result-card'));
+
+    // Sort by original index
+    cards.sort((a, b) => {
+      const indexA = parseInt(a.dataset.originalIndex) || 0;
+      const indexB = parseInt(b.dataset.originalIndex) || 0;
+      return indexA - indexB;
+    });
+
+    // Re-append cards in original order
+    cards.forEach(card => resultsList.appendChild(card));
+  }
+
+  // Helper functions to extract data from cards
+  function extractDownloads(card) {
+    // Look for the downloads meta item - it has a download icon (polyline with points="7 10 12 15 17 10")
+    const metaItems = card.querySelectorAll('.mod-meta-item');
+    for (let item of metaItems) {
+      const svg = item.querySelector('svg polyline[points="7 10 12 15 17 10"]');
+      if (svg) {
+        // This is the downloads item
+        const span = item.querySelector('span');
+        if (span) {
+          const text = span.textContent.trim();
+          const num = parseFloat(text);
+          if (text.includes('M')) return num * 1000000;
+          if (text.includes('K')) return num * 1000;
+          if (text.includes('B')) return num * 1000000000;
+          return num;
+        }
+      }
+    }
+    return 0;
+  }
+
+  function extractFollowers(card) {
+    // Look for the followers meta item - it has a heart icon
+    const metaItems = card.querySelectorAll('.mod-meta-item');
+    for (let item of metaItems) {
+      const svg = item.querySelector('svg path[d*="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"]');
+      if (svg) {
+        // This is the followers item
+        const span = item.querySelector('span');
+        if (span) {
+          const text = span.textContent.trim();
+          const num = parseFloat(text);
+          if (text.includes('M')) return num * 1000000;
+          if (text.includes('K')) return num * 1000;
+          if (text.includes('B')) return num * 1000000000;
+          return num;
+        }
+      }
+    }
+    return 0;
+  }
+
+  function extractDate(card) {
+    // Look for the date span that gets populated by formatTimeAgo
+    const dateSpan = card.querySelector('.mod-meta-date');
+    if (dateSpan && dateSpan.textContent) {
+      const dateText = dateSpan.textContent.trim();
+      
+      // Parse relative time formats like "2d ago", "3h ago", "1mo ago"
+      const match = dateText.match(/(\d+)(s|m|h|d|mo|y)\s+ago/i);
+      if (match) {
+        const amount = parseInt(match[1]);
+        const unit = match[2].toLowerCase();
+        const now = Date.now();
+        
+        switch (unit) {
+          case 's': return now - (amount * 1000);
+          case 'm': return now - (amount * 60 * 1000);
+          case 'h': return now - (amount * 60 * 60 * 1000);
+          case 'd': return now - (amount * 24 * 60 * 60 * 1000);
+          case 'mo': return now - (amount * 30 * 24 * 60 * 60 * 1000);
+          case 'y': return now - (amount * 365 * 24 * 60 * 60 * 1000);
+          default: return now;
+        }
+      }
+    }
+    
+    // If no date found, return current time (will appear as same age)
+    return Date.now();
+  }
+
+  function extractClientServer(card) {
+    // Look for client/server support in mod-meta-item spans
+    const metaItems = card.querySelectorAll('.mod-meta-item span');
+    
+    for (let span of metaItems) {
+      const text = span.textContent.trim().toLowerCase();
+      if (text === 'client & server') return 'both';
+      if (text === 'client-side') return 'client';
+      if (text === 'server-side') return 'server';
+    }
+    
+    return 'none';
+  }
+
+  function extractChannel(card) {
+    // Look for visible channel links - these are shown based on the selected version type
+    const alphaLink = card.querySelector('.channel-link.alpha');
+    const betaLink = card.querySelector('.channel-link.beta');
+    const releaseLink = card.querySelector('.channel-link.release');
+    
+    // Check which channel link is visible (has display: inline)
+    if (alphaLink && alphaLink.style.display === 'inline') return 'alpha';
+    if (betaLink && betaLink.style.display === 'inline') return 'beta';
+    if (releaseLink && releaseLink.style.display === 'inline') return 'release';
+    
+    return 'release'; // Default to release if no visible channel found
+  }
+
+
+
+  // Reset sort states when results are cleared
+  window.resetSortStates = function() {
+    currentFoundSort = 'default';
+    currentWarningSort = 'default';
+    foundSortDirection = {};
+    warningSortDirection = {};
+    
+    // Reset dropdown selections
+    if (sortFoundDropdown) {
+      selectSortOption(sortFoundDropdown, 'default');
+    }
+    if (sortWarningDropdown) {
+      selectSortOption(sortWarningDropdown, 'default');
+    }
+    
+    // Clear any applied filters by showing all cards
+    document.querySelectorAll('.result-card').forEach(card => {
+      card.style.display = '';
+    });
+  };
 }
 
 // Helper function to copy text to clipboard and show feedback
@@ -3568,7 +4212,7 @@ function createFailureCard(mod) {
         const i = Math.floor(Math.log(bytes) / Math.log(k));
 
         return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
-      }
+              }
     </script>
   </body>
 </html>
