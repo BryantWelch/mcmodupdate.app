@@ -517,6 +517,15 @@
       .result-card.warning {
         border-left: 4px solid var(--warning-color);
       }
+      .result-card.success {
+        border-left: 4px solid var(--success-color);
+      }
+      .result-card.dependency {
+        border-left: 4px solid #3b82f6; /* Blue color for dependencies */
+      }
+      .result-card.already-up-to-date {
+        border-left: 4px solid #ffffff; /* White color for already up-to-date */
+      }
       .mod-icon-link {
         flex-shrink: 0;
       }
@@ -1366,32 +1375,38 @@
         
         <h2>MC Mod Updater &amp; Builder</h2>
         <p>
-          This tool helps you update your existing Minecraft mods or build a brand new mod list from scratch. It uses the Modrinth API to find the latest compatible versions and can export your list as a standard Modrinth modpack.
+          This tool helps you update your existing Minecraft mods or build a brand new mod list from scratch. It uses the Modrinth API to find the latest compatible versions and can export your list as a standard Modrinth modpack. Note: This tool only searches Modrinth - mods from CurseForge or other sources won't be found. Dependencies are automatically detected and added to ensure your modpack works properly.
         </p>
-        <h3>How to use:</h3>
+        
+        <h3>How to Use:</h3>
         <ul>
-          <li>
-            Select your desired mod loader (Fabric, Forge, etc.) and the target
-            Minecraft version you want to update to.
-          </li>
-          <li>
-            <b>Update a Modpack:</b> Upload a <code>.mrpack</code> file to load its
-            entire mod list for updating.
-          </li>
-          <li>
-            <b>Update Individual Mods:</b> Drag and drop your local <code>.jar</code>
-            files into the upload area.
-          </li>
-          <li>
-            <b>Discover New Mods:</b> Use the search bar to find and add mods directly
-            from Modrinth.
-          </li>
-          <li><b>Process Your List:</b> Click the "Update" button.</li>
-          <li>
-            <b>Get Results:</b> The tool will find the latest compatible versions and
-            automatically add any required dependencies for you.
-          </li>
+          <li><b>Loader / Version:</b> Select your desired mod loader (Fabric, Forge, NeoForge, Quilt) and target Minecraft version.</li>
+          <li><b>Upload a Modpack:</b> Drop a <code>.mrpack</code> file to load its entire mod list for updating.</li>
+          <li><b>Upload Individual Mods:</b> Drag and drop your local <code>.jar</code> files into the upload area.</li>
+          <li><b>Search for New Mods:</b> Use the search bar to find and add mods directly from Modrinth.</li>
+          <li><b>Process Your List:</b> Click "Update" to find the latest compatible versions and dependencies.</li>
         </ul>
+
+        <h3>Understanding Results:</h3>
+        <p><b>Color-Coded Borders:</b></p>
+        <ul>
+          <li><b style="color: #4caf50;">Green border:</b> Successfully found updates for these mods</li>
+          <li><b style="color: #3b82f6;">Blue border:</b> Dependencies automatically added to ensure compatibility</li>
+          <li><b style="color: #ffffff;">White border:</b> Mods already up-to-date with the latest version</li>
+          <li><b style="color: #ffc107;">Yellow border:</b> No compatible version found for your selected loader/version</li>
+          <li><b style="color: #f44336;">Red border:</b> Mod not found on Modrinth or file could not be processed</li>
+        </ul>
+
+        <h3>Features &amp; Tools:</h3>
+        <ul>
+          <li><b>Search &amp; Filter:</b> Use the search boxes to quickly find specific mods in your results</li>
+          <li><b>Sort Options:</b> Click the sort button to organize by name, downloads, followers, or filter by environment/channel</li>
+          <li><b>Layout Toggle:</b> Switch between detailed list view and compact grid view using the layout button</li>
+          <li><b>Copy Lists:</b> Use the copy button to quickly copy mod names to your clipboard</li>
+          <li><b>Version Selection:</b> Choose between Release, Beta, or Alpha versions for each mod</li>
+          <li><b>Download Options:</b> Download individual mods or get everything as a ready-to-use <code>.mrpack</code> file</li>
+        </ul>
+
         <h3>Attributions:</h3>
         <p>
           This tool relies on the Modrinth API for all mod data. Please be aware of their ratelimits. The ratelimit is currently 300 requests per minute. The application will automatically pause and resume to respect these limits.
@@ -3781,7 +3796,18 @@ async function copyToClipboard(text, button, listType) {
       // --- Create Success Card ---
 function createSuccessCard(mod) {
   const card = document.createElement("div");
-  card.className = "result-card";
+  let cardClasses = "result-card";
+  
+  // Determine the appropriate border color class
+  if (mod.isDependency) {
+    cardClasses += " dependency";
+  } else if (mod.isUpToDate) {
+    cardClasses += " already-up-to-date";
+  } else {
+    cardClasses += " success";
+  }
+  
+  card.className = cardClasses;
 
   const clientServerInfo = getClientServerSupport(
     mod.client_side,
@@ -3933,12 +3959,12 @@ function createSuccessCard(mod) {
 
   updateDynamicContent();
 
-// --- Handle the "Already Updated" state ---
+// --- Handle the "Already Up-to-Date" state ---
 if (mod.isUpToDate) {
   const titleElement = card.querySelector(".mod-title");
   const tag = document.createElement("span");
   tag.className = "mod-title-tag"; // Use the new shared class
-  tag.textContent = "(Already Updated)"; // Use the shorter text
+  tag.textContent = "(Already Up-to-Date)";
   titleElement.appendChild(tag);
 }
 
