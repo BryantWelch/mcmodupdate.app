@@ -1824,6 +1824,10 @@
       }
 
       // --- Mod Search Functionality ---
+      let currentSearchQuery = "";
+      let currentSearchOffset = 0;
+      let totalSearchResults = 0;
+      
       function debounce(func, delay) {
         let timeout;
         return function(...args) {
@@ -1833,21 +1837,98 @@
         };
       }
 
-      async function performSearch(query) {
+      async function performSearch(query, isLoadMore = false) {
         if (!query) {
           searchResultsContainer.innerHTML = "<p>Start typing to find mods.</p>";
+          currentSearchQuery = "";
+          currentSearchOffset = 0;
+          totalSearchResults = 0;
           return;
         }
-        searchResultsContainer.innerHTML = "<p>Searching...</p>";
 
-        const searchUrl = `https://api.modrinth.com/v2/search?query=${encodeURIComponent(query)}&limit=10`;
+        // If this is a new search (not load more), reset everything
+        if (!isLoadMore) {
+          currentSearchQuery = query;
+          currentSearchOffset = 0;
+          searchResultsContainer.innerHTML = "<p>Searching...</p>";
+        }
+
+        const searchUrl = `https://api.modrinth.com/v2/search?query=${encodeURIComponent(query)}&limit=10&offset=${currentSearchOffset}`;
         try {
           const response = await fetchWithRetry(searchUrl);
           const data = await response.json();
-          renderSearchResults(data.hits);
+          
+          // Store total results count
+          totalSearchResults = data.total_hits;
+          
+          if (isLoadMore) {
+            appendSearchResults(data.hits);
+          } else {
+            renderSearchResults(data.hits);
+          }
+          
+          // Update offset for next load
+          currentSearchOffset += 10;
+          
+          // Show/hide load more button based on whether there are more results
+          updateLoadMoreButton();
+          
         } catch (error) {
-          searchResultsContainer.innerHTML = "<p>Error fetching search results.</p>";
+          if (!isLoadMore) {
+            searchResultsContainer.innerHTML = "<p>Error fetching search results.</p>";
+          }
           console.error("Search failed:", error);
+        }
+      }
+
+      async function loadMoreResults() {
+        if (!currentSearchQuery) return;
+        
+        // Show loading state on the button
+        const loadMoreBtn = document.getElementById("load-more-btn");
+        if (loadMoreBtn) {
+          loadMoreBtn.textContent = "Loading...";
+          loadMoreBtn.disabled = true;
+        }
+        
+        await performSearch(currentSearchQuery, true);
+        
+        // Reset button state
+        if (loadMoreBtn) {
+          loadMoreBtn.textContent = "Show 10 more";
+          loadMoreBtn.disabled = false;
+        }
+      }
+
+      function updateLoadMoreButton() {
+        let loadMoreBtn = document.getElementById("load-more-btn");
+        
+        // Check if there are more results to load
+        const hasMoreResults = currentSearchOffset < totalSearchResults;
+        
+        if (hasMoreResults && currentSearchQuery) {
+          // Create button if it doesn't exist
+          if (!loadMoreBtn) {
+            loadMoreBtn = document.createElement("button");
+            loadMoreBtn.id = "load-more-btn";
+            loadMoreBtn.className = "action-button";
+            loadMoreBtn.style.marginTop = "1rem";
+            loadMoreBtn.style.width = "100%";
+            loadMoreBtn.textContent = "Show 10 more";
+            loadMoreBtn.addEventListener("click", loadMoreResults);
+            searchResultsContainer.appendChild(loadMoreBtn);
+          } else {
+            loadMoreBtn.style.display = "block";
+          }
+          
+          // Update button text with remaining count
+          const remainingResults = totalSearchResults - currentSearchOffset;
+          const showCount = Math.min(10, remainingResults);
+          loadMoreBtn.textContent = `Show ${showCount} more`;
+          
+        } else if (loadMoreBtn) {
+          // Hide button if no more results
+          loadMoreBtn.style.display = "none";
         }
       }
 
@@ -1879,6 +1960,10 @@
         searchClearButton.classList.remove("show");
         // Reset the search results in the modal
         searchResultsContainer.innerHTML = "<p>Start typing to find mods.</p>";
+        // Reset search state
+        currentSearchQuery = "";
+        currentSearchOffset = 0;
+        totalSearchResults = 0;
         // Give focus back to the input field so the user can type a new query
         searchInput.focus();
       });
@@ -1912,6 +1997,20 @@
           searchResultsContainer.innerHTML = "<p>No mods found.</p>";
           return;
         }
+        hits.forEach(hit => {
+          const card = createSearchResultCard(hit);
+          searchResultsContainer.appendChild(card);
+        });
+      }
+
+      function appendSearchResults(hits) {
+        // Remove the load more button temporarily if it exists
+        const loadMoreBtn = document.getElementById("load-more-btn");
+        if (loadMoreBtn) {
+          loadMoreBtn.remove();
+        }
+        
+        // Add new result cards
         hits.forEach(hit => {
           const card = createSearchResultCard(hit);
           searchResultsContainer.appendChild(card);
