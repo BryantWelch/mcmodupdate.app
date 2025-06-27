@@ -628,6 +628,40 @@
         visibility: visible;
         opacity: 1;
       }
+
+      /* --- Meta Data Tooltip Styles (Environment, Downloads, etc.) --- */
+      .meta-tooltip-container {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+      }
+
+      .meta-tooltip {
+        visibility: hidden;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+
+        position: absolute;
+        bottom: 125%;
+        left: 50%;
+        transform: translateX(-50%);
+
+        background-color: var(--card-bg);
+        color: var(--primary-text);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        padding: 0.5rem 0.75rem;
+        z-index: 10;
+
+        white-space: nowrap;
+        font-size: 0.85rem;
+      }
+
+      .meta-tooltip-container:hover .meta-tooltip {
+        visibility: visible;
+        opacity: 1;
+      }
       .changelog-toggle {
         cursor: pointer;
         text-decoration: underline;
@@ -2103,20 +2137,27 @@
               </div>
               <div class="mod-description">${mod.description}</div>
               <div class="mod-meta">
-                <div class="mod-meta-item">${clientServerInfo.svg}<span>${clientServerInfo.text}</span></div>
-                <div class="mod-meta-item">
+                <div class="mod-meta-item meta-tooltip-container">
+                  ${clientServerInfo.svg}
+                  <span>${clientServerInfo.text}</span>
+                  <span class="meta-tooltip">Supported Environments</span>
+                </div>
+                <div class="mod-meta-item meta-tooltip-container">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                   <span class="mod-meta-date">${formatTimeAgo(mod.date_modified)}</span>
+                  <span class="meta-tooltip">Last Updated</span>
                 </div>
-                <div class="mod-meta-item">
+                <div class="mod-meta-item meta-tooltip-container">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                   <span>${formatDownloads(mod.downloads)}</span>
+                  <span class="meta-tooltip">Total Downloads</span>
                 </div>
-                <div class="mod-meta-item">
+                <div class="mod-meta-item meta-tooltip-container">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
                   </svg>
                   <span>${formatDownloads(mod.follows)}</span>
+                  <span class="meta-tooltip">Followers</span>
                 </div>
                 <div class="mod-meta-item category-tooltip-container" style="display: none;">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -4135,22 +4176,27 @@ function createSuccessCard(mod) {
         </div>
         <div class="mod-description">${mod.description}</div>
         <div class="mod-meta">
-          <div class="mod-meta-item">${
-            clientServerInfo.svg
-          }<span>${clientServerInfo.text}</span></div>
-          <div class="mod-meta-item">
+          <div class="mod-meta-item meta-tooltip-container">
+            ${clientServerInfo.svg}
+            <span>${clientServerInfo.text}</span>
+            <span class="meta-tooltip">Supported Environments</span>
+          </div>
+          <div class="mod-meta-item meta-tooltip-container">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
             <span class="mod-meta-date"></span>
+            <span class="meta-tooltip">Last Updated</span>
           </div>
-          <div class="mod-meta-item">
+          <div class="mod-meta-item meta-tooltip-container">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
             <span>${formatDownloads(mod.downloads)}</span>
+            <span class="meta-tooltip">Total Downloads</span>
           </div>
-          <div class="mod-meta-item">
+          <div class="mod-meta-item meta-tooltip-container">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
             </svg>
             <span>${formatDownloads(mod.followers)}</span>
+            <span class="meta-tooltip">Followers</span>
           </div>
           <div class="mod-meta-item category-tooltip-container" style="display: none;">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -4298,16 +4344,22 @@ function createWarningCard(mod) {
         </div>
         <div class="mod-description">${mod.description}</div>
         <div class="mod-meta">
-          <div class="mod-meta-item">${clientServerInfo.svg}<span>${clientServerInfo.text}</span></div>
-          <div class="mod-meta-item">
+          <div class="mod-meta-item meta-tooltip-container">
+            ${clientServerInfo.svg}
+            <span>${clientServerInfo.text}</span>
+            <span class="meta-tooltip">Supported Environments</span>
+          </div>
+          <div class="mod-meta-item meta-tooltip-container">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
             <span>${formatDownloads(mod.downloads)}</span>
+            <span class="meta-tooltip">Total Downloads</span>
           </div>
-          <div class="mod-meta-item">
+          <div class="mod-meta-item meta-tooltip-container">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
             </svg>
             <span>${formatDownloads(mod.followers)}</span>
+            <span class="meta-tooltip">Followers</span>
           </div>
           <div class="mod-meta-item category-tooltip-container" style="display: none;">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
