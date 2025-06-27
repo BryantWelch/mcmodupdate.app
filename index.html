@@ -4071,14 +4071,36 @@ async function copyToClipboard(text, button, listType) {
           };
           downloadAllGroup.appendChild(downloadAllBtn);
 
+          // Create the .zip button
+          const downloadZipBtn = document.createElement("button");
+          downloadZipBtn.className = "action-button";
+          downloadZipBtn.innerHTML = `Download .zip
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path>
+            <polyline points="8 16 12 20 16 16"></polyline>
+            <path d="M12 12v8"></path>
+          </svg>`;
+          downloadZipBtn.onclick = downloadAllAsZip;
+
           // Create the .mrpack button (it will be a sibling to the group)
           const downloadPackBtn = document.createElement("button");
           downloadPackBtn.className = "action-button";
           downloadPackBtn.innerHTML = `Download as .mrpack`;
           downloadPackBtn.onclick = createModpack;
 
-          // Add the group and the button to the main actions container
+          // Add the group and buttons to the main actions container
           actionsContainer.appendChild(downloadAllGroup);
+          actionsContainer.appendChild(downloadZipBtn);
           actionsContainer.appendChild(downloadPackBtn);
           foundSection.appendChild(actionsContainer);
 
@@ -4497,6 +4519,64 @@ function createFailureCard(mod) {
         if (days < 30) return `${days}d ago`;
         if (months < 12) return `${months}mo ago`;
         return `${years}y ago`;
+      }
+
+      // --- Download All as ZIP ---
+      async function downloadAllAsZip() {
+        const zip = new JSZip();
+        const modsFolder = zip.folder("mods");
+        
+        // Use default filename
+        const filename = "MC-Mod-Updater.zip";
+        
+        // Show progress (we'll update the button text)
+        const originalButtons = document.querySelectorAll('.action-button');
+        const zipButton = Array.from(originalButtons).find(btn => btn.textContent.includes('Download .zip'));
+        const originalText = zipButton.innerHTML;
+        
+        try {
+          zipButton.innerHTML = 'Creating ZIP...';
+          zipButton.disabled = true;
+          
+          // Fetch all mod files and add them to the ZIP
+          for (let i = 0; i < successfulDownloads.length; i++) {
+            const dl = successfulDownloads[i];
+            
+            // Update progress
+            zipButton.innerHTML = `Adding ${i + 1}/${successfulDownloads.length}...`;
+            
+            try {
+              const response = await fetch(dl.url);
+              if (response.ok) {
+                const blob = await response.blob();
+                modsFolder.file(dl.filename, blob);
+              } else {
+                console.warn(`Failed to download ${dl.filename}`);
+              }
+            } catch (error) {
+              console.warn(`Error downloading ${dl.filename}:`, error);
+            }
+          }
+          
+          // Generate and download the ZIP
+          zipButton.innerHTML = 'Generating ZIP...';
+          const content = await zip.generateAsync({ type: "blob" });
+          
+          const link = document.createElement("a");
+          link.href = URL.createObjectURL(content);
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          
+        } catch (error) {
+          console.error("Error creating ZIP:", error);
+          alert("Error creating ZIP file. Please try again.");
+        } finally {
+          // Restore button
+          zipButton.innerHTML = originalText;
+          zipButton.disabled = false;
+        }
       }
 
       // --- Create Modpack ---
