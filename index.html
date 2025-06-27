@@ -821,6 +821,13 @@
         cursor: not-allowed;
       }
 
+      /* Specific styling for the search modal load more button */
+      #load-more-btn {
+        width: 95% !important; /* Slightly smaller to accommodate hover scale effect */
+        margin: 1rem auto 0 auto !important; /* Center the button */
+        display: block !important; /* Ensure block display for margin auto to work */
+      }
+
 /* -- Styles for the header and the toggle button's container -- */
 .results-header-container {
   display: flex;
@@ -2081,10 +2088,13 @@
         const projectUrl = `https://modrinth.com/project/${mod.slug}`;
         const authorUrl = `https://modrinth.com/user/${mod.author}`;
 
+        // Get client/server support info using the same function as success cards
+        const clientServerInfo = getClientServerSupport(mod.client_side, mod.server_side);
+
         card.innerHTML = `
           <div class="result-card-main">
             <a href="${projectUrl}" target="_blank" rel="noopener noreferrer" class="mod-icon-link">
-              <img src="${mod.icon_url}" alt="${mod.title} icon" class="mod-icon" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGcgaWQ9Ik1pbmVjcmFmdCI+PHBhdGggZD0ibTIxIDFoLTE4YTIgMiAwIDAgMCAtMiAydjE4YTIgMiAwIDAgMCAyIDJoMThhMiAyIDAgMCAwIDItMnYtMThhMiAyIDAgMCAwIC0yLTJ6bS0xNSA4LjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYzYS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV6bTExIDhhLjUuNSAwIDAgMSAtLjUuNWgtMmEuNS41IDAgMCAxIC0uNS0uNXYtMS41aC00djEuNWEuNS41IDAgMCAxIC0uNS41aC0yYS41LjUgMCAwIDEgLS41LS41di01YS41LjUgMCAwIDEgLjUtLjVoMi41di0xLjVhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYxLjVoMi41YS41LjUgMCAwIDEgLjUuNXptMS04YS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXoiIGZpbGw9IiMzMDNjNDIiLz48L2c+PC9zdmc+'">
+              <img src="${mod.icon_url}" alt="${mod.title} icon" class="mod-icon" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGcgaWQ9Ik1pbmVjcmFmdCI+PHBhdGggZD0ibTIxIDFoLTE4YTIgMiAwIDAgMCAtMiAydjE4YTIgMiAwIDAgMCAyIDJoMThhMiAyIDAgMCAwIDItMnYtMThhMiAyIDAgMCAwIC0yLTJ6bS0xNSA4LjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYzYS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV6bTExIDhhLjUuNSAwIDAgMSAtLjUuNWgtMmEuNS41IDAgMCAxIC0uNS0uNXYtMS1aC00djEuNWEuNS41IDAgMCAxIC0uNS41aC0yYS41LjUgMCAwIDEgLS41LS41di01YS41LjUgMCAwIDEgLjUtLjVoMi41di0xLjVhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYxLjVoMi41YS41LjUgMCAwIDEgLjUuNXptMS04YS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXoiIGZpbGw9IiMzMDNjNDIiLz48L2c+PC9zdmc+'">
             </a>
             <div class="mod-details">
               <div class="mod-title">
@@ -2092,11 +2102,57 @@
                 <span class="mod-author">by <a href="${authorUrl}" target="_blank" rel="noopener noreferrer">${mod.author}</a></span>
               </div>
               <div class="mod-description">${mod.description}</div>
+              <div class="mod-meta">
+                <div class="mod-meta-item">${clientServerInfo.svg}<span>${clientServerInfo.text}</span></div>
+                <div class="mod-meta-item">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                  <span class="mod-meta-date">${formatTimeAgo(mod.date_modified)}</span>
+                </div>
+                <div class="mod-meta-item">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                  <span>${formatDownloads(mod.downloads)}</span>
+                </div>
+                <div class="mod-meta-item">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                  </svg>
+                  <span>${formatDownloads(mod.follows)}</span>
+                </div>
+                <div class="mod-meta-item category-tooltip-container" style="display: none;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2H2v10l9.29 9.29a1 1 0 0 0 1.42 0l8-8a1 1 0 0 0 0-1.42L12 2z"></path>
+                    <path d="M7 7h.01"></path>
+                  </svg>
+                  <span class="category-tooltip"></span>
+                </div>
+              </div>
             </div>
             <div class="mod-actions">
               <button class="add-mod-button" data-slug="${mod.slug}" data-project-id="${mod.project_id}" data-title="${mod.title}">Add</button>
             </div>
           </div>`;
+
+        // Populate Category Tooltip if categories exist - using display_categories for cleaner results
+        const categoriesToShow = mod.display_categories || mod.categories;
+        if (categoriesToShow && categoriesToShow.length > 0) {
+          const categoryContainer = card.querySelector(".category-tooltip-container");
+          const categoryTooltip = card.querySelector(".category-tooltip");
+
+          // Format category names (turn "world-gen" into "World Gen")
+          function formatCategoryName(slug) {
+            return slug
+              .split("-")
+              .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+              .join(" ");
+          }
+
+          // Use the same simple approach as success/warning cards
+          const formattedCategories = categoriesToShow.map(formatCategoryName);
+          categoryTooltip.textContent = formattedCategories.join(", ");
+
+          // Make the category icon visible
+          categoryContainer.style.display = "flex";
+        }
 
         const addButton = card.querySelector(".add-mod-button");
         // Disable button if already added
