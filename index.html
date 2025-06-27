@@ -866,7 +866,7 @@
 .results-header-container {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-end;
   border-bottom: 1px solid var(--border-color);
   padding-bottom: 0.5rem;
   margin-bottom: 1rem;
@@ -3350,7 +3350,7 @@ function setupResultSections() {
     <div id="results-warning" class="results-section">
       <!-- Header container for title and buttons -->
       <div class="results-header-container">
-        <h2 id="header-warning">No Compatible Version Found</h2>
+        <h2 id="header-warning">Not Compatible</h2>
         <div class="header-buttons">
           <input type="text" id="search-warning" class="search-box" placeholder="Filter mods..." style="margin-right: 0.5rem;">
           <div class="sort-dropdown-container">
@@ -3935,7 +3935,7 @@ async function copyToClipboard(text, button, listType) {
             baseText = "Updates Found";
             break;
           case "warning":
-            baseText = "No Compatible Version Found";
+            baseText = "Not Compatible";
             break;
           case "failure":
             baseText = "Could Not Find Mod";
