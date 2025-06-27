@@ -1116,110 +1116,162 @@
   opacity: 1;
 }
 
-/* --- Begin Mobile Responsive Styles --- */
-@media (max-width: 700px) {
-  /* Make the main container use the full width */
-  .main-container {
-    padding: 0 1rem;
-  }
-  
-  /* Make search boxes smaller on mobile */
-  .search-box {
-    width: 150px;
-  }
-  
-  /* Adjust sort dropdown on mobile */
-  .sort-dropdown {
-    right: 0;
-    left: auto;
-    min-width: 180px;
-  }
-  
-  /* Reduce header size */
-  h1 {
-    font-size: 2.2rem;
-  }
+  /* --- Begin Mobile Responsive Styles --- */
+  @media (max-width: 700px) {
+    /* Make the main container use the full width */
+    .main-container {
+      padding: 0 1rem;
+    }
+    
+    /* Make search boxes smaller on mobile */
+    .search-box {
+      width: 150px;
+    }
+    
+    /* Adjust sort dropdown on mobile */
+    .sort-dropdown {
+      right: 0;
+      left: auto;
+      min-width: 180px;
+    }
+    
+    /* Reduce header size */
+    h1 {
+      font-size: 2.2rem;
+    }
 
-  /* --- 1. Stack the main controls vertically --- */
-  .controls {
-    flex-direction: column;
-    align-items: stretch; /* Make all control groups full-width */
-    gap: 1rem;
-  }
+    /* --- 1. Stack the main controls vertically --- */
+    .controls {
+      flex-direction: column;
+      align-items: stretch; /* Make all control groups full-width */
+      gap: 1rem;
+    }
 
-  .control-group {
-    display: flex;
-    flex-direction: column; /* Stack label above the input/select */
-    align-items: flex-start;
-    gap: 0.25rem;
-  }
+    .control-group {
+      display: flex;
+      flex-direction: column; /* Stack label above the input/select */
+      align-items: flex-start;
+      gap: 0.25rem;
+    }
 
-  /* Make inputs and selects full-width */
-  .search-container input,
-  .control-group select {
-    width: 100%;
-    box-sizing: border-box;
-  }
+    /* Make inputs and selects full-width */
+    .search-container input,
+    .control-group select {
+      width: 100%;
+      box-sizing: border-box;
+    }
 
-  /* Make Update/Clear buttons full width */
-  .action-buttons-container {
-    flex-direction: column;
-    align-items: center;
-    width: 100%;
-    max-width: 400px;
-    gap: 1rem; /* Add a gap for nice spacing when both buttons are visible */
-  }
+    /* Make Update/Clear buttons full width */
+    .action-buttons-container {
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+      max-width: 400px;
+      gap: 1rem; /* Add a gap for nice spacing when both buttons are visible */
+    }
 
-  /* Center the welcome message content */
-  #welcome-message h2,
-  #welcome-message p {
-    text-align: center;
-  }
+    /* Center the welcome message content */
+    #welcome-message h2,
+    #welcome-message p {
+      text-align: center;
+    }
 
-  /* --- Stack the result card content --- */
-  .result-card-main {
-    flex-direction: column;
-    align-items: center; /* Center the icon */
-    gap: 0.5rem;
-  }
+    /* --- Stack the result card content --- */
+    .result-card-main {
+      flex-direction: column;
+      align-items: center; /* Center the icon */
+      gap: 0.5rem;
+    }
 
-  .mod-details,
-  .mod-actions {
-    width: 100%; /* Allow details and actions to take full width */
-    align-items: center; /* Makes dropdown/button full width */
-  }
+    .mod-details,
+    .mod-actions {
+      width: 100%; /* Allow details and actions to take full width */
+      align-items: center; /* Makes dropdown/button full width */
+    }
 
-  .mod-details {
-    text-align: center; /* Center the text below the icon */
-  }
+    .mod-details {
+      text-align: center; /* Center the text below the icon */
+    }
 
-  .mod-meta {
-    justify-content: center; /* Center the metadata items */
-    margin-top: 1rem;
-  }
+    .mod-meta {
+      justify-content: center; /* Center the metadata items */
+      margin-top: 1rem;
+    }
 
-  /* --- Fix the Footer Layout --- */
-  .footer-content {
-    flex-direction: column; /* Stack the columns vertically */
-    text-align: center; /* Center the text inside each column */
-    gap: 2rem; /* Add more space between the stacked sections */
-  }
+    /* --- Fix the Footer Layout --- */
+    .footer-content {
+      flex-direction: column; /* Stack the columns vertically */
+      text-align: center; /* Center the text inside each column */
+      gap: 2rem; /* Add more space between the stacked sections */
+    }
 
-  .footer-bottom {
-    display: flex;
-    flex-direction: column; /* Stack the copyright and Ko-fi button */
-    align-items: center;
-    gap: 1rem;
-    padding-top: 1.5rem;
-  }
+    .footer-bottom {
+      display: flex;
+      flex-direction: column; /* Stack the copyright and Ko-fi button */
+      align-items: center;
+      gap: 1rem;
+      padding-top: 1.5rem;
+    }
 
-  .kofi-button {
-    position: static; /* Remove absolute positioning */
-    transform: none; /* Reset the transform */
-    margin-top: 0.5rem; /* Add some space above it */
+    .kofi-button {
+      position: static; /* Remove absolute positioning */
+      transform: none; /* Reset the transform */
+      margin-top: 0.5rem; /* Add some space above it */
+    }
+
+    /* --- Mobile-friendly Info Modal --- */
+    .modal-content {
+      width: 95%;
+      max-width: none;
+      margin: 1rem;
+      padding: 1.5rem;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+
+    .modal-content h2 {
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .modal-content h3 {
+      font-size: 1.2rem;
+      margin-top: 1.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .modal-content ul {
+      padding-left: 1.25rem;
+    }
+
+    .modal-content li {
+      margin-bottom: 0.5rem;
+      line-height: 1.4;
+    }
+
+    /* --- Mobile Section Headers Layout --- */
+    .results-header-container {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 1rem;
+    }
+
+    .results-header-container h2 {
+      text-align: center;
+      margin-bottom: 0;
+    }
+
+    .header-buttons {
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+
+    .search-box {
+      width: 120px;
+    }
   }
-}
-/* --- End of Mobile Responsive Styles --- */
+  /* --- End of Mobile Responsive Styles --- */
 
 /* --- Download Button Styles --- */
   .download-button-group {
