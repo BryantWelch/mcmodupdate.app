@@ -763,17 +763,26 @@
       }
       .search-clear-button {
         position: absolute;
-        right: 0.5rem;
+        right: 8px;
         top: 50%;
         transform: translateY(-50%);
         background: none;
         border: none;
         color: var(--secondary-text);
-        font-size: 1.5rem;
+        font-size: 1.4rem;
         cursor: pointer;
         display: none; /* Hidden by default */
-        padding: 0 0.5rem;
+        padding: 4px;
         line-height: 1;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        align-items: center;
+        justify-content: center;
+      }
+      
+      .search-clear-button.show {
+        display: flex;
       }
       .search-clear-button:hover {
         color: var(--primary-text);
@@ -1269,6 +1278,17 @@
 
     .search-box {
       width: 120px;
+    }
+
+    /* --- Mobile-specific search clear button positioning --- */
+    .search-clear-button {
+      right: 0.5rem !important;
+      top: calc(50% + 12px) !important;
+      font-size: 1.4rem;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      line-height: 1;
     }
   }
   /* --- End of Mobile Responsive Styles --- */
@@ -1838,9 +1858,9 @@
         
         // Show or hide the clear button
         if (query.length > 0) {
-          searchClearButton.style.display = "block";
+          searchClearButton.classList.add("show");
         } else {
-          searchClearButton.style.display = "none";
+          searchClearButton.classList.remove("show");
         }
 
         // Perform search
@@ -1856,7 +1876,7 @@
         // Clear the input field
         searchInput.value = "";
         // Hide the clear button itself
-        searchClearButton.style.display = "none";
+        searchClearButton.classList.remove("show");
         // Reset the search results in the modal
         searchResultsContainer.innerHTML = "<p>Start typing to find mods.</p>";
         // Give focus back to the input field so the user can type a new query
