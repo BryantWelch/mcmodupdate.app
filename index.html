@@ -319,7 +319,16 @@
       }
       #search-modal {
         align-items: flex-start; /* Aligns content to the top */
-        padding-top: 15vh; /* Adds space from the top */
+        justify-content: center; /* Center horizontally */
+        padding-top: 0; /* Remove the viewport-based padding */
+      }
+      
+      #search-modal .modal-content {
+        position: absolute;
+        top: 280px; /* Position directly below the controls - adjust this value as needed */
+        max-width: 800px; /* Match the main container width */
+        width: calc(100% - 2rem); /* Account for some margin */
+        margin: 0 1rem; /* Side margins */
       }
       .modal-overlay.visible {
         opacity: 1; /* Fade in to full opacity */
@@ -1290,6 +1299,29 @@
       padding: 0;
       line-height: 1;
     }
+
+    /* --- Mobile search modal positioning --- */
+    #search-modal .modal-content {
+      width: 95% !important;
+      max-width: none !important;
+      margin: 1rem !important;
+      padding: 1.5rem !important;
+      max-height: 85vh !important;
+      overflow-y: auto !important;
+      position: relative !important;
+      top: auto !important;
+      bottom: auto !important;
+      left: auto !important;
+      right: auto !important;
+      border-radius: 12px !important;
+    }
+    
+    /* Position the search modal overlay differently on mobile */
+    #search-modal {
+      align-items: center !important;
+      justify-content: center !important;
+      padding-top: 0 !important;
+    }
   }
   /* --- End of Mobile Responsive Styles --- */
 
@@ -1800,6 +1832,13 @@
       // Listen for scroll events to show/hide the buttons
       window.addEventListener("scroll", handleScrollButtons);
 
+      // Listen for window resize to reposition search modal
+      window.addEventListener("resize", () => {
+        if (searchModal.classList.contains("visible")) {
+          positionSearchModal();
+        }
+      });
+
       // --- Clear All Button Logic ---
       function clearDropzone() {
         // Clear the underlying file data
@@ -1934,6 +1973,20 @@
 
       const debouncedSearch = debounce(performSearch, 500);
 
+      // --- Position Search Modal Function ---
+      function positionSearchModal() {
+        const controlsElement = document.querySelector('.controls');
+        const modalContent = document.querySelector('#search-modal .modal-content');
+        
+        if (controlsElement && modalContent) {
+          const controlsRect = controlsElement.getBoundingClientRect();
+          const controlsBottom = controlsRect.bottom + window.scrollY;
+          
+          // Position the modal 8px below the controls
+          modalContent.style.top = `${controlsBottom + 8}px`;
+        }
+      }
+
       searchInput.addEventListener("input", (e) => {
         const query = e.target.value.trim();
         
@@ -1946,6 +1999,7 @@
 
         // Perform search
         if (query.length > 1) {
+          positionSearchModal();
           searchModal.classList.add("visible");
           debouncedSearch(query);
         } else {
@@ -1970,6 +2024,7 @@
       
       searchInput.addEventListener("focus", () => {
         if(searchInput.value.trim().length > 1) {
+            positionSearchModal();
             searchModal.classList.add("visible");
         }
       });
