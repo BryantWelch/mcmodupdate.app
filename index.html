@@ -1853,23 +1853,24 @@
               <div class="mod-description">${mod.description}</div>
             </div>
             <div class="mod-actions">
-              <button class="add-mod-button" data-slug="${mod.slug}" data-title="${mod.title}">Add</button>
+              <button class="add-mod-button" data-slug="${mod.slug}" data-project-id="${mod.project_id}" data-title="${mod.title}">Add</button>
             </div>
           </div>`;
 
         const addButton = card.querySelector(".add-mod-button");
         // Disable button if already added
-        if (searchedMods.has(mod.slug) || renderedModIds.has(mod.slug)) {
+        if (searchedMods.has(mod.project_id) || renderedModIds.has(mod.slug)) {
             addButton.disabled = true;
             addButton.textContent = "Added";
         }
 
         addButton.addEventListener("click", (e) => {
           const slug = e.target.dataset.slug;
+          const projectId = e.target.dataset.projectId;
           const title = e.target.dataset.title;
 
-          if (!searchedMods.has(slug)) {
-            searchedMods.set(slug, { title: title });
+          if (!searchedMods.has(projectId)) {
+            searchedMods.set(projectId, { title: title });
             createFilePill({ name: `${title} (Searched)` });
             dropzonePrompt.style.display = "none";
             dropzone.classList.add("dropzone-expanded");
