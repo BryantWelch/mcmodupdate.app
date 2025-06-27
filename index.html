@@ -176,6 +176,12 @@
         position: relative;
         display: inline-flex;
         align-items: center;
+        border: 1px solid transparent;
+        transition: border-color 0.2s ease;
+        cursor: pointer;
+      }
+      .file-pill:hover {
+        border-color: var(--gradient-start);
       }
       .file-pill span {
         max-width: 200px;
@@ -797,12 +803,16 @@
         padding: 0.5rem 1rem;
         padding-right: 2.5rem;
         font-size: 1rem;
-        transition: border-color 0.2s ease;
+        transition: border-color 0.2s ease, color 0.2s ease;
         margin-left: 0.3rem;
+      }
+      .search-container input:hover {
+        background-color: var(--pill-bg);
       }
       .search-container input:focus {
         outline: none;
         border-color: var(--gradient-start);
+        color: var(--primary-text);
       }
       .search-clear-button {
         position: absolute;
