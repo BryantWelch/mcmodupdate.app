@@ -903,12 +903,17 @@
   padding: 0.4rem 0.8rem;
   font-size: 0.9rem;
   width: 200px;
-  transition: border-color 0.2s ease;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.search-box:hover {
+  background-color: var(--pill-bg);
 }
 
 .search-box:focus {
   outline: none;
   border-color: var(--gradient-start);
+  background-color: var(--bg-color);
 }
 
 .search-box::placeholder {
@@ -4071,6 +4076,10 @@ async function copyToClipboard(text, button, listType) {
           };
           downloadAllGroup.appendChild(downloadAllBtn);
 
+          // Create a dedicated container for the "Download .zip" button and its size
+          const downloadZipGroup = document.createElement("div");
+          downloadZipGroup.className = "download-button-group";
+
           // Create the .zip button
           const downloadZipBtn = document.createElement("button");
           downloadZipBtn.className = "action-button";
@@ -4091,20 +4100,26 @@ async function copyToClipboard(text, button, listType) {
             <path d="M12 12v8"></path>
           </svg>`;
           downloadZipBtn.onclick = downloadAllAsZip;
+          downloadZipGroup.appendChild(downloadZipBtn);
 
-          // Create the .mrpack button (it will be a sibling to the group)
+          // Create a dedicated container for the "Download as .mrpack" button and its size
+          const downloadPackGroup = document.createElement("div");
+          downloadPackGroup.className = "download-button-group";
+
+          // Create the .mrpack button
           const downloadPackBtn = document.createElement("button");
           downloadPackBtn.className = "action-button";
           downloadPackBtn.innerHTML = `Download as .mrpack`;
           downloadPackBtn.onclick = createModpack;
+          downloadPackGroup.appendChild(downloadPackBtn);
 
-          // Add the group and buttons to the main actions container
+          // Add all the groups to the main actions container
           actionsContainer.appendChild(downloadAllGroup);
-          actionsContainer.appendChild(downloadZipBtn);
-          actionsContainer.appendChild(downloadPackBtn);
+          actionsContainer.appendChild(downloadZipGroup);
+          actionsContainer.appendChild(downloadPackGroup);
           foundSection.appendChild(actionsContainer);
 
-          // --- Calculate and add the size info to the correct group ---
+          // --- Calculate and add the size info to all button groups ---
           try {
             const totalSizeBytes = successfulDownloads.reduce(
               (sum, file) => sum + (file.fileSize || 0),
@@ -4113,11 +4128,59 @@ async function copyToClipboard(text, button, listType) {
 
             if (totalSizeBytes > 0) {
               const formattedSize = formatBytes(totalSizeBytes);
-              const sizeInfo = document.createElement("p");
-              sizeInfo.className = "download-size-info";
-              sizeInfo.textContent = formattedSize; // Set text to ONLY the size
-              downloadAllGroup.appendChild(sizeInfo); // Append to the button's group
+              
+              // Add size info to Download All button (total mod files)
+              const sizeInfoAll = document.createElement("p");
+              sizeInfoAll.className = "download-size-info";
+              sizeInfoAll.textContent = formattedSize;
+              downloadAllGroup.appendChild(sizeInfoAll);
+              
+              // Add size info to Download .zip button (same as Download All)
+              const sizeInfoZip = document.createElement("p");
+              sizeInfoZip.className = "download-size-info";
+              sizeInfoZip.textContent = formattedSize;
+              downloadZipGroup.appendChild(sizeInfoZip);
             }
+            
+            // Calculate .mrpack size (just the manifest JSON, very small)
+            const loaderNameMap = {
+              fabric: "fabric-loader",
+              forge: "forge",
+              quilt: "quilt-loader",
+              neoforge: "neoforge",
+            };
+            const selectedLoader = modLoaderSelect.value;
+            const officialLoaderName = loaderNameMap[selectedLoader] || selectedLoader;
+            
+            const manifest = {
+              formatVersion: 1,
+              game: "minecraft",
+              versionId: "temp",
+              name: "temp",
+              version: "1.0.0",
+              dependencies: {
+                minecraft: mcVersionSelect.value,
+                [officialLoaderName]: "*",
+              },
+              files: successfulDownloads.map((dl) => ({
+                path: dl.path,
+                hashes: dl.hashes,
+                downloads: [dl.url],
+                fileSize: dl.fileSize,
+                env: {}
+              })),
+            };
+            
+            // Calculate actual manifest size
+            const manifestJson = JSON.stringify(manifest, null, 2);
+            const manifestBytes = new Blob([manifestJson]).size;
+            
+            // Add size info to Download .mrpack button (tiny manifest file only)
+            const sizeInfoPack = document.createElement("p");
+            sizeInfoPack.className = "download-size-info";
+            sizeInfoPack.textContent = formatBytes(manifestBytes);
+            downloadPackGroup.appendChild(sizeInfoPack);
+            
           } catch (error) {
             console.error("Could not calculate total download size:", error);
           }
