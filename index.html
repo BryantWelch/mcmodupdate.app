@@ -2287,15 +2287,27 @@
           clearDropzone();
           processMrpack(mrpackFile);
         } else {
-          // Otherwise, proceed with the normal JAR file handling.
-          dropzonePrompt.style.display = "none";
-          dropzone.classList.add("dropzone-expanded");
-          clearAllButton.style.display = "inline-flex";
-          for (const file of files) {
-            if (file.name.endsWith(".jar") && !uploadedFiles.has(file.name)) {
+          // Check if there are any valid JAR files first
+          const validJarFiles = Array.from(files).filter((file) =>
+            file.name.endsWith(".jar") && !uploadedFiles.has(file.name)
+          );
+          
+          if (validJarFiles.length > 0) {
+            // Only update UI if we have valid files
+            dropzonePrompt.style.display = "none";
+            dropzone.classList.add("dropzone-expanded");
+            clearAllButton.style.display = "inline-flex";
+            
+            for (const file of validJarFiles) {
               uploadedFiles.set(file.name, file);
               createFilePill(file);
             }
+          } else {
+            // No valid files found, show an alert
+            showCustomAlert(
+              "Please upload valid Minecraft mod files (.jar) or a Modrinth modpack (.mrpack).",
+              "notice"
+            );
           }
         }
       }
