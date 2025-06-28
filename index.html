@@ -1378,6 +1378,91 @@
       justify-content: center !important;
       padding-top: 0 !important;
     }
+
+    /* --- Mobile dropzone adjustments --- */
+    body #dropzone.dropzone {
+      width: 90% !important;
+      max-width: 350px !important;
+      margin: 0 auto !important;
+      left: auto !important;
+      right: auto !important;
+      box-sizing: border-box !important;
+    }
+    
+    body #dropzone.dropzone.dropzone-expanded {
+      width: 90% !important;
+      max-width: 90vw !important;
+      margin: 0 auto !important;
+      box-sizing: border-box !important;
+    }
+
+    /* --- Mobile welcome message adjustments --- */
+    body #welcome-message {
+      padding: 0 1rem !important;
+      box-sizing: border-box !important;
+    }
+
+    /* --- Mobile result cards adjustments --- */
+    body .result-card {
+      margin: 0 1rem 1rem 1rem !important;
+      box-sizing: border-box !important;
+    }
+
+    /* --- Mobile mod actions layout - side by side --- */
+    body .mod-actions {
+      flex-direction: row !important;
+      justify-content: space-between !important;
+      align-items: center !important;
+      gap: 0.75rem !important;
+    }
+    
+    body .mod-actions select {
+      flex: 1 !important;
+      min-width: 0 !important;
+    }
+    
+    body .mod-actions .download-btn {
+      flex-shrink: 0 !important;
+      white-space: nowrap !important;
+    }
+
+    /* --- Mobile download buttons container --- */
+    body .results-actions {
+      flex-direction: column !important;
+      gap: 0.75rem !important;
+      align-items: center !important;
+      margin: 0 1rem !important;
+    }
+    
+    body .download-button-group {
+      width: 100% !important;
+      max-width: 300px !important;
+    }
+    
+    body .download-button-group button {
+      width: 100% !important;
+      font-size: 0.9rem !important;
+    }
+
+    /* --- Mobile grid view layout adjustments --- */
+    body .results-list.grid-view .mod-actions {
+      flex-direction: column !important;
+      gap: 0.5rem !important;
+    }
+    
+    body .results-list.grid-view .version-select {
+      width: 100% !important;
+      margin: 0 !important;
+      text-align: left !important;
+    }
+    
+    body .results-list.grid-view .grid-bottom-line {
+      flex-direction: row !important;
+      justify-content: space-between !important;
+      align-items: center !important;
+      gap: 1rem !important;
+      padding: 0 0.25rem !important;
+    }
   }
   /* --- End of Mobile Responsive Styles --- */
 
