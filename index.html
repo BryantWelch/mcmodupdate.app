@@ -1898,7 +1898,7 @@
       clearResultsButton.addEventListener("click", resetResults);
 
       // --- Custom Alert Modal Logic ---
-      function showCustomAlert(message, type = "notice") {
+      function showCustomAlert(message, type = "notice", customTitle = null) {
         const icons = {
           notice: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--warning-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`,
           error: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--error-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`,
@@ -1908,8 +1908,11 @@
           error: "Error",
         };
 
+        // Use custom title if provided, otherwise use default for the type
+        const titleText = customTitle || titles[type] || "Notice";
+        
         // Set the text content of the title, excluding the icon
-        alertTitle.childNodes[1].nodeValue = titles[type] || "Notice";
+        alertTitle.childNodes[1].nodeValue = titleText;
         alertIcon.innerHTML = icons[type] || icons.notice;
         
         alertMessage.textContent = message;
@@ -2372,10 +2375,11 @@
           clearDropzone();
           processMrpack(mrpackFile);
         } else {
-          // Check if there are any valid JAR files first
-          const validJarFiles = Array.from(files).filter((file) =>
-            file.name.endsWith(".jar") && !uploadedFiles.has(file.name)
-          );
+          // Separate validation for better error messages
+          const jarFiles = Array.from(files).filter((file) => file.name.endsWith(".jar"));
+          const duplicateFiles = jarFiles.filter((file) => uploadedFiles.has(file.name));
+          const validJarFiles = jarFiles.filter((file) => !uploadedFiles.has(file.name));
+          const invalidFiles = Array.from(files).filter((file) => !file.name.endsWith(".jar"));
           
           if (validJarFiles.length > 0) {
             // Only update UI if we have valid files
@@ -2388,11 +2392,31 @@
               createFilePill(file);
             }
           } else {
-            // No valid files found, show an alert
-            showCustomAlert(
-              "Please upload valid Minecraft mod files (.jar) or a Modrinth modpack (.mrpack).",
-              "notice"
-            );
+            // Provide specific error messages based on what went wrong
+            if (duplicateFiles.length > 0 && invalidFiles.length === 0) {
+              // Only duplicates
+              const fileNames = duplicateFiles.map(f => f.name).join(", ");
+              showCustomAlert(
+                `The following mod file(s) are already uploaded: ${fileNames}`,
+                "notice",
+                "Duplicate Files"
+              );
+            } else if (duplicateFiles.length > 0 && invalidFiles.length > 0) {
+              // Both duplicates and invalid files
+              const duplicateNames = duplicateFiles.map(f => f.name).join(", ");
+              showCustomAlert(
+                `Some files are already uploaded (${duplicateNames}) and others are not valid mod files. Please upload valid Minecraft mod files (.jar) or a Modrinth modpack (.mrpack).`,
+                "notice",
+                "Mixed File Issues"
+              );
+            } else {
+              // Only invalid file types
+              showCustomAlert(
+                "Please upload valid Minecraft mod files (.jar) or a Modrinth modpack (.mrpack).",
+                "notice",
+                "Invalid File Type"
+              );
+            }
           }
         }
       }
