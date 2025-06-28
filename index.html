@@ -2611,6 +2611,9 @@ document.addEventListener("DOMContentLoaded", () => {
   populateMcVersions();
   handleScrollButtons(); // This runs our check once on load
   
+  // Clear the search input on page load/refresh
+  searchInput.value = "";
+  
   // Capture the welcome message snapshot
   welcomeMessageSnapshot = resultsArea.innerHTML;
 });
