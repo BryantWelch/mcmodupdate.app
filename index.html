@@ -1082,10 +1082,15 @@
   font-size: 1rem;
   font-weight: 600;
   line-height: 1.3;
-  height: 2.6em; /* Reserve space for 2 lines */
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  height: auto;
+  min-height: 2.6em;
+  text-align: center;
+}
+
+/* In grid view, make title link and chain icon inline, tags on new line */
+.results-list.grid-view .mod-title > a,
+.results-list.grid-view .mod-title > .dependency-chain-tooltip-container {
+  display: inline;
 }
 
 /* Hide elements not needed in compact view */
@@ -1135,6 +1140,17 @@
 .results-list.grid-view .download-link:hover {
   color: var(--primary-text);
 }
+
+/* Tags styling in grid view - make them appear on new line */
+.results-list.grid-view .mod-title-tag,
+.results-list.grid-view .dependency-tooltip-container {
+  display: block;
+  margin-left: 0; /* Remove left margin since they're on their own line */
+  margin-top: 0.25rem;
+  text-align: center;
+}
+
+
 
 /* This new class will style ALL tags */
 .mod-title-tag {
@@ -3647,10 +3663,36 @@ function setupResultSections() {
     if (currentLayout === "grid") {
       warningResultsList.classList.add("grid-view");
       warningLayoutToggleBtn.innerHTML = listIcon;
+      // Auto-expand reason sections in grid view
+      expandAllReasons();
     } else {
       warningResultsList.classList.remove("grid-view");
       warningLayoutToggleBtn.innerHTML = gridIcon;
+      // Auto-hide reason sections in list view
+      hideAllReasons();
     }
+  }
+
+  // Function to expand all reason sections in warning cards
+  function expandAllReasons() {
+    const warningCards = document.querySelectorAll("#results-warning .result-card");
+    warningCards.forEach(card => {
+      const reasonContent = card.querySelector(".changelog-content");
+      if (reasonContent) {
+        reasonContent.classList.add("visible");
+      }
+    });
+  }
+
+  // Function to hide all reason sections in warning cards
+  function hideAllReasons() {
+    const warningCards = document.querySelectorAll("#results-warning .result-card");
+    warningCards.forEach(card => {
+      const reasonContent = card.querySelector(".changelog-content");
+      if (reasonContent) {
+        reasonContent.classList.remove("visible");
+      }
+    });
   }
 
   warningLayoutToggleBtn.addEventListener("click", () => {
@@ -3659,9 +3701,13 @@ function setupResultSections() {
     if (warningResultsList.classList.contains("grid-view")) {
       localStorage.setItem("warning-layout", "grid");
       warningLayoutToggleBtn.innerHTML = listIcon; // Show list icon
+      // Auto-expand reason sections in grid view
+      expandAllReasons();
     } else {
       localStorage.setItem("warning-layout", "list");
       warningLayoutToggleBtn.innerHTML = gridIcon; // Show grid icon
+      // Auto-hide reason sections in list view
+      hideAllReasons();
     }
   });
 
