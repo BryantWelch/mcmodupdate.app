@@ -2806,18 +2806,7 @@ async function handleUpdate() {
         }
         processedIds.add(key);
 
-        if (result.status === "success" && renderedModIds.has(result.modId)) {
-          console.log(`Skipping duplicate render for: ${result.title}`);
-        } else {
-          renderSingleResult(result);
-          if (result.status === "success") {
-            renderedModIds.add(result.modId);
-            // Store mod ID to name mapping for dependency tooltips
-            modIdToNameMap.set(result.projectId, result.title);
-          }
-        }
-
-        // Collect dependencies but don't process them yet
+        // Collect dependencies BEFORE rendering the card
         if (result.status === "success" && result.dependencies) {
           const requiredDeps = [];
           for (const dep of result.dependencies) {
@@ -2833,6 +2822,17 @@ async function handleUpdate() {
           if (requiredDeps.length > 0) {
             // Store dependencies for reverse lookup
             reverseDependencyMap.set(result.projectId, requiredDeps);
+          }
+        }
+
+        if (result.status === "success" && renderedModIds.has(result.modId)) {
+          console.log(`Skipping duplicate render for: ${result.title}`);
+        } else {
+          renderSingleResult(result);
+          if (result.status === "success") {
+            renderedModIds.add(result.modId);
+            // Store mod ID to name mapping for dependency tooltips
+            modIdToNameMap.set(result.projectId, result.title);
           }
         }
         
@@ -2878,6 +2878,10 @@ async function handleUpdate() {
           const key = result.modId || (result.title + result.reason);
           
           if (processedIds.has(key)) {
+            // Even if already processed, we still need to update dependency tooltips
+            if (result.status === "success" && result.projectId) {
+              updateDependencyChainTooltip(result.projectId, result.title);
+            }
             depCompletedJobs++;
             continue;
           }
@@ -2892,6 +2896,8 @@ async function handleUpdate() {
               actualDependenciesAdded++; // Only count successfully added dependencies
               // Store mod ID to name mapping for dependency tooltips
               modIdToNameMap.set(result.projectId, result.title);
+              // Update any cards that were waiting for this dependency name
+              updateDependencyChainTooltip(result.projectId, result.title);
             }
           }
           
@@ -2911,9 +2917,6 @@ async function handleUpdate() {
 
     // Complete the progress bar and create summary
     progressBar.style.width = "100%";
-    
-    // Update all dependency chain tooltips now that all mods are processed
-    updateAllDependencyChainTooltips();
     
     finalizeResultsUI();
     
@@ -4196,76 +4199,44 @@ async function copyToClipboard(text, button, listType) {
         }
       }
 
-      // --- Update All Dependency Chain Tooltips ---
-      function updateAllDependencyChainTooltips() {
-        // Process all result cards to add missing chain icons and update tooltips
+      // --- Update Dependency Chain Tooltip ---
+      function updateDependencyChainTooltip(projectId, dependencyName) {
+        // Find all cards that are waiting for this dependency name
         const resultCards = document.querySelectorAll('.result-card');
         
         resultCards.forEach(card => {
+          // Check if this card has dependencies that include the projectId
           const titleLink = card.querySelector('.mod-title a');
           if (!titleLink) return;
           
-          // Find the projectId by looking through our modIdToNameMap for the title
           const modTitle = titleLink.textContent;
-          let projectId = null;
+          let cardProjectId = null;
           
-          // Find projectId by matching the title
+          // Find this card's projectId
           for (const [id, name] of modIdToNameMap.entries()) {
             if (name === modTitle) {
-              projectId = id;
+              cardProjectId = id;
               break;
             }
           }
           
-          if (projectId && reverseDependencyMap.has(projectId)) {
-            const dependencyIds = reverseDependencyMap.get(projectId);
-            const dependencyNames = [];
-            
-            for (const depId of dependencyIds) {
-              const modName = modIdToNameMap.get(depId);
-              if (modName) {
-                dependencyNames.push(modName);
-              } else {
-                // Fallback to dependency ID if we can't find the name
-                dependencyNames.push(depId);
+          if (!cardProjectId || !reverseDependencyMap.has(cardProjectId)) {
+            return;
+          }
+          
+          const dependencyIds = reverseDependencyMap.get(cardProjectId);
+          
+          // Check if this card depends on the projectId we just processed
+          if (dependencyIds.includes(projectId)) {
+            const chainTooltip = card.querySelector('.dependency-chain-tooltip');
+            if (chainTooltip) {
+              // Update the tooltip with the actual dependency names
+              const dependencyNames = [];
+              for (const depId of dependencyIds) {
+                const modName = modIdToNameMap.get(depId);
+                dependencyNames.push(modName || depId);
               }
-            }
-            
-            // Check if chain icon already exists
-            let chainContainer = card.querySelector('.dependency-chain-tooltip-container');
-            
-            if (!chainContainer && dependencyNames.length > 0) {
-              // Create and add the chain icon
-              const modTitleDiv = card.querySelector('.mod-title');
-              if (modTitleDiv) {
-                chainContainer = document.createElement('span');
-                chainContainer.className = 'dependency-chain-tooltip-container';
-                chainContainer.innerHTML = `
-                  <svg class="dependency-chain-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-                  </svg>
-                  <span class="dependency-chain-tooltip">Depends on: ${dependencyNames.join(", ")}</span>
-                `;
-                
-                // Insert chain icon right after the title link but before any existing tags
-                const titleLink = modTitleDiv.querySelector('a');
-                const firstTag = modTitleDiv.querySelector('.mod-title-tag, .dependency-tooltip-container');
-                
-                if (firstTag) {
-                  // Insert before the first existing tag
-                  modTitleDiv.insertBefore(chainContainer, firstTag);
-                } else {
-                  // No existing tags, just append after the title link
-                  modTitleDiv.appendChild(chainContainer);
-                }
-              }
-            } else if (chainContainer && dependencyNames.length > 0) {
-              // Update existing tooltip
-              const tooltip = chainContainer.querySelector('.dependency-chain-tooltip');
-              if (tooltip) {
-                tooltip.textContent = `Depends on: ${dependencyNames.join(", ")}`;
-              }
+              chainTooltip.textContent = `Depends on: ${dependencyNames.join(", ")}`;
             }
           }
         });
@@ -4518,17 +4489,7 @@ function createSuccessCard(mod) {
           <a href="${
             mod.project_url
           }" target="_blank" rel="noopener noreferrer">${mod.title}</a>
-          ${
-            reverseDependencyMap.has(mod.projectId)
-              ? `<span class="dependency-chain-tooltip-container">
-                   <svg class="dependency-chain-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                     <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-                     <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-                   </svg>
-                   <span class="dependency-chain-tooltip">Depends on: Loading...</span>
-                 </span>`
-              : ""
-          }
+
           ${
             mod.isDependency
               ? `<span class="dependency-tooltip-container">
@@ -4659,31 +4620,39 @@ function createSuccessCard(mod) {
 
   updateDynamicContent();
 
-// --- Populate Dependency Chain Tooltip ---
-// Check if this mod has dependencies to show chain icon
-
-if (reverseDependencyMap.has(mod.projectId)) {
-  const dependencyIds = reverseDependencyMap.get(mod.projectId);
-  const chainTooltip = card.querySelector(".dependency-chain-tooltip");
-  
-  console.log(`Found dependencies for ${mod.title}:`, dependencyIds);
-  
-  // Find the mod names for the dependency IDs using our mapping
-  const dependencyNames = [];
-  for (const depId of dependencyIds) {
-    const modName = modIdToNameMap.get(depId);
-    if (modName) {
-      dependencyNames.push(modName);
+  // --- Add Dependency Chain Icon if needed ---
+  if (reverseDependencyMap.has(mod.projectId)) {
+    const dependencyIds = reverseDependencyMap.get(mod.projectId);
+    const dependencyNames = [];
+    
+    // Get dependency names (some might still be "Loading...")
+    for (const depId of dependencyIds) {
+      const modName = modIdToNameMap.get(depId);
+      dependencyNames.push(modName || "Loading...");
+    }
+    
+    const initialTooltipText = `Depends on: ${dependencyNames.join(", ")}`;
+    
+    // Create and add the chain icon
+    const modTitleDiv = card.querySelector('.mod-title');
+    const chainContainer = document.createElement('span');
+    chainContainer.className = 'dependency-chain-tooltip-container';
+    chainContainer.innerHTML = `
+      <svg class="dependency-chain-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+      </svg>
+      <span class="dependency-chain-tooltip">${initialTooltipText}</span>
+    `;
+    
+    // Insert before any existing tags
+    const firstTag = modTitleDiv.querySelector('.mod-title-tag, .dependency-tooltip-container');
+    if (firstTag) {
+      modTitleDiv.insertBefore(chainContainer, firstTag);
     } else {
-      // Fallback to dependency ID if we can't find the name yet
-      dependencyNames.push(depId);
+      modTitleDiv.appendChild(chainContainer);
     }
   }
-  
-  if (chainTooltip && dependencyNames.length > 0) {
-    chainTooltip.textContent = `Depends on: ${dependencyNames.join(", ")}`;
-  }
-}
 
 // --- Handle the "Already Up-to-Date" state ---
 if (mod.isUpToDate) {
