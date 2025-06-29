@@ -761,6 +761,35 @@
         font-weight: bold;
         font-size: 0.9rem;
       }
+
+      /* Ignore Mode Styles */
+      .header-button.ignore-mode-active {
+        background: var(--gradient-start);
+        color: white;
+      }
+      
+      .download-link.ignore-mode {
+        background-color: var(--error-color);
+        color: white;
+      }
+      
+      .download-link.ignore-mode.ignored {
+        background-color: #2196F3; /* Blue for un-ignore */
+        color: white;
+      }
+      
+      .download-link.ignored-state {
+        background-color: var(--border-color);
+        color: var(--secondary-text);
+        cursor: not-allowed;
+      }
+      
+      .result-card.ignored {
+        opacity: 0.4;
+        filter: grayscale(50%);
+      }
+
+
       .results-actions {
         display: flex;
         justify-content: center;
@@ -3394,6 +3423,7 @@ async function combineResults(jobs, hashResults, projectsData, authorData, versi
         fileSize: primaryFile.size,
         client_side: projectDetails.client_side,
         server_side: projectDetails.server_side,
+        projectId: projectDetails.id, // Add project ID for ignore functionality
       };
       
       // Add to successful downloads if not already tracked
@@ -3505,6 +3535,7 @@ function setupResultSections() {
   const listIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>`;
   const copyIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="m5 15-1 0c-1.1 0-2-.9-2-2l0-9c0-1.1.9-2 2-2l9 0c1.1 0 2 .9 2 2l0 1"></path></svg>`;
   const sortIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="7,10 12,5 17,10"></polyline><polyline points="7,14 12,19 17,14"></polyline></svg>`;
+  const ignoreIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M4.93 4.93l14.14 14.14"></path></svg>`;
 
   resultsArea.innerHTML = `
     <div id="results-found" class="results-section">
@@ -3513,6 +3544,7 @@ function setupResultSections() {
         <h2 id="header-found">Updates Found</h2>
         <div class="header-buttons">
           <input type="text" id="search-found" class="search-box" placeholder="Filter mods..." style="margin-right: 0.5rem;">
+          <button id="ignore-found-btn" class="layout-toggle header-button" title="Toggle ignore mode">${ignoreIcon}</button>
           <div class="sort-dropdown-container">
             <button id="sort-found-btn" class="layout-toggle" title="Sort Results">${sortIcon}</button>
             <div id="sort-found-dropdown" class="sort-dropdown">
@@ -3575,6 +3607,7 @@ function setupResultSections() {
         <h2 id="header-warning">Not Compatible</h2>
         <div class="header-buttons">
           <input type="text" id="search-warning" class="search-box" placeholder="Filter mods..." style="margin-right: 0.5rem;">
+
           <div class="sort-dropdown-container">
             <button id="sort-warning-btn" class="layout-toggle" title="Sort Results">${sortIcon}</button>
             <div id="sort-warning-dropdown" class="sort-dropdown">
@@ -3714,12 +3747,181 @@ function setupResultSections() {
   // Set the initial warning layout when the page loads
   setWarningLayout();
 
+// --- Ignore Mode Functionality (Global Scope) ---
+let isIgnoreMode = false;
+let ignoredMods = new Set();
+// Make ignoredMods globally accessible
+window.ignoredMods = ignoredMods;
+
+// Function to handle download or ignore button clicks
+window.handleDownloadOrIgnore = function(event, projectId) {
+  if (isIgnoreMode) {
+    // In ignore mode, always toggle ignore status, never download
+    event.preventDefault();
+    event.stopPropagation();
+    window.toggleIgnoreStatus(projectId);
+    return false;
+  } else if (!ignoredMods.has(projectId)) {
+    // In normal mode for non-ignored mods: allow normal download
+    // Don't prevent default - let the normal link behavior work
+    return true;
+  } else {
+    // Ignored mods in normal mode do nothing (button is disabled)
+    event.preventDefault();
+    event.stopPropagation();
+    return false;
+  }
+};
+
+// Function to toggle ignore status of a specific mod
+window.toggleIgnoreStatus = function(projectId) {
+  const card = document.querySelector(`[data-project-id="${projectId}"]`);
+  const btn = card.querySelector('.download-link');
+  
+  if (!card || !btn) {
+    console.error('Could not find card or button for project ID:', projectId);
+    return;
+  }
+  
+  if (ignoredMods.has(projectId)) {
+    // Un-ignore
+    ignoredMods.delete(projectId);
+    card.classList.remove('ignored');
+    btn.textContent = 'Ignore';
+    btn.classList.remove('ignored');
+  } else {
+    // Ignore
+    ignoredMods.add(projectId);
+    card.classList.add('ignored');
+    btn.textContent = 'Un-ignore';
+    btn.classList.add('ignored');
+  }
+  
+  window.updateDownloadCounters();
+};
+
+// Function to update download counters excluding ignored mods
+window.updateDownloadCounters = function() {
+  try {
+    // Check if successfulDownloads exists and is accessible
+    if (typeof successfulDownloads !== 'undefined' && successfulDownloads) {
+      const nonIgnoredDownloads = successfulDownloads.filter(dl => {
+        return !window.ignoredMods.has(dl.projectId);
+      });
+      
+      // Update Download All button text more reliably
+      const downloadAllBtn = document.querySelector('.action-button');
+      if (downloadAllBtn) {
+        const svgContent = downloadAllBtn.querySelector('svg');
+        const svgHTML = svgContent ? svgContent.outerHTML : '';
+        downloadAllBtn.innerHTML = `Download All (${nonIgnoredDownloads.length})\n          ${svgHTML}`;
+      }
+      
+      // Update all size info elements
+      const sizeInfoElements = document.querySelectorAll('.download-size-info');
+      if (sizeInfoElements.length > 0) {
+        if (nonIgnoredDownloads.length > 0) {
+          const totalSizeBytes = nonIgnoredDownloads.reduce(
+            (sum, file) => sum + (file.fileSize || 0),
+            0
+          );
+          const formattedSize = formatBytes(totalSizeBytes);
+          
+          // Update Download All and Download ZIP size info (same size)
+          sizeInfoElements.forEach((sizeInfo, index) => {
+            if (index < 2) { // First two are Download All and Download ZIP
+              sizeInfo.textContent = formattedSize;
+            }
+            // The third one (.mrpack) keeps its original tiny size
+          });
+        } else {
+          // If no mods to download, show 0 bytes
+          sizeInfoElements.forEach((sizeInfo, index) => {
+            if (index < 2) { // First two are Download All and Download ZIP
+              sizeInfo.textContent = '0 Bytes';
+            }
+          });
+        }
+      }
+      
+
+    } else {
+      console.log('successfulDownloads not available, skipping counter update');
+    }
+  } catch (error) {
+    console.error('Error updating download counters:', error);
+  }
+};
+
+// Function to toggle ignore mode for the found section
+function toggleIgnoreMode() {
+    isIgnoreMode = !isIgnoreMode;
+    const ignoreModeBtn = document.getElementById('ignore-found-btn');
+    const sectionElement = document.getElementById('results-found');
+    
+    if (isIgnoreMode) {
+      ignoreModeBtn.classList.add('ignore-mode-active');
+      sectionElement.classList.add('ignore-mode-active');
+    } else {
+      ignoreModeBtn.classList.remove('ignore-mode-active');
+      sectionElement.classList.remove('ignore-mode-active');
+    }
+    
+    // Transform all download buttons in the found section
+    const downloadLinks = document.querySelectorAll('#results-found .download-link');
+    downloadLinks.forEach(btn => {
+      const projectId = btn.dataset.projectId;
+      const isIgnored = ignoredMods.has(projectId);
+      
+      if (isIgnoreMode) {
+        // In ignore mode: remove download functionality
+        btn.classList.add('ignore-mode');
+        btn.classList.remove('ignored-state');
+        btn.textContent = isIgnored ? 'Un-ignore' : 'Ignore';
+        if (isIgnored) btn.classList.add('ignored');
+        
+        // Store original href and remove it to prevent accidental downloads
+        if (!btn.dataset.originalHref && btn.href !== '#') {
+          btn.dataset.originalHref = btn.href;
+        }
+        btn.href = '#';
+        btn.removeAttribute('download');
+      } else {
+        // In normal mode: restore download functionality
+        btn.classList.remove('ignore-mode', 'ignored');
+        if (isIgnored) {
+          btn.classList.add('ignored-state');
+          btn.textContent = 'Ignored';
+          btn.href = '#';
+          btn.removeAttribute('download');
+        } else {
+          btn.classList.remove('ignored-state');
+          btn.textContent = 'Download';
+          
+          // Restore original href if it exists
+          if (btn.dataset.originalHref) {
+            btn.href = btn.dataset.originalHref;
+          }
+        }
+      }
+    });
+  }
+
+
+
+  // Add event listener for ignore mode button
+  const ignoreFoundBtn = document.getElementById('ignore-found-btn');
+
+  if (ignoreFoundBtn) {
+    ignoreFoundBtn.addEventListener('click', toggleIgnoreMode);
+  }
+
   // --- Copy to clipboard functionality ---
   const copyFoundBtn = document.getElementById("copy-found-btn");
   const copyWarningBtn = document.getElementById("copy-warning-btn");
 
   copyFoundBtn.addEventListener("click", () => {
-    const foundCards = document.querySelectorAll("#results-found .result-card");
+    const foundCards = document.querySelectorAll("#results-found .result-card:not(.ignored)");
     const modNames = Array.from(foundCards).map(card => {
       const titleLink = card.querySelector(".mod-title a");
       return titleLink ? titleLink.textContent : "";
@@ -3728,7 +3930,7 @@ function setupResultSections() {
   });
 
   copyWarningBtn.addEventListener("click", () => {
-    const warningCards = document.querySelectorAll("#results-warning .result-card");
+    const warningCards = document.querySelectorAll("#results-warning .result-card:not(.ignored)");
     const modNames = Array.from(warningCards).map(card => {
       const titleLink = card.querySelector(".mod-title a");
       return titleLink ? titleLink.textContent : "";
@@ -4311,6 +4513,9 @@ async function copyToClipboard(text, button, listType) {
 
         const foundSection = document.getElementById("results-found");
         if (foundSection && successfulDownloads.length > 0) {
+          // Calculate non-ignored downloads first
+          const nonIgnoredDownloads = successfulDownloads.filter(dl => !window.ignoredMods || !window.ignoredMods.has(dl.projectId));
+          
           const actionsContainer = document.createElement("div");
           actionsContainer.className = "results-actions";
 
@@ -4321,7 +4526,7 @@ async function copyToClipboard(text, button, listType) {
           // Create and add the "Download All" button to its group
           const downloadAllBtn = document.createElement("button");
           downloadAllBtn.className = "action-button";
-          downloadAllBtn.innerHTML = `Download All (${successfulDownloads.length})
+          downloadAllBtn.innerHTML = `Download All (${nonIgnoredDownloads.length})
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="20"
@@ -4338,10 +4543,21 @@ async function copyToClipboard(text, button, listType) {
             <line x1="12" y1="15" x2="12" y2="3"></line>
           </svg>`;
           downloadAllBtn.onclick = () => {
+            // Filter out ignored mods using the global ignoredMods set
+            const downloadsToProcess = successfulDownloads.filter(dl => {
+              const isIgnored = window.ignoredMods && window.ignoredMods.has(dl.projectId);
+              return !isIgnored;
+            });
+            
+            if (downloadsToProcess.length === 0) {
+              alert('No mods to download. All mods are currently ignored.');
+              return;
+            }
+            
             let i = 0;
             function downloadNext() {
-              if (i < successfulDownloads.length) {
-                const dl = successfulDownloads[i];
+              if (i < downloadsToProcess.length) {
+                const dl = downloadsToProcess[i];
                 const link = document.createElement("a");
                 link.href = dl.url;
                 link.setAttribute("download", dl.filename);
@@ -4379,7 +4595,7 @@ async function copyToClipboard(text, button, listType) {
             <polyline points="8 16 12 20 16 16"></polyline>
             <path d="M12 12v8"></path>
           </svg>`;
-          downloadZipBtn.onclick = downloadAllAsZip;
+          downloadZipBtn.onclick = () => downloadAllAsZip();
           downloadZipGroup.appendChild(downloadZipBtn);
 
           // Create a dedicated container for the "Download as .mrpack" button and its size
@@ -4390,7 +4606,7 @@ async function copyToClipboard(text, button, listType) {
           const downloadPackBtn = document.createElement("button");
           downloadPackBtn.className = "action-button";
           downloadPackBtn.innerHTML = `Download as .mrpack`;
-          downloadPackBtn.onclick = createModpack;
+          downloadPackBtn.onclick = () => createModpack();
           downloadPackGroup.appendChild(downloadPackBtn);
 
           // Add all the groups to the main actions container
@@ -4401,7 +4617,7 @@ async function copyToClipboard(text, button, listType) {
 
           // --- Calculate and add the size info to all button groups ---
           try {
-            const totalSizeBytes = successfulDownloads.reduce(
+            const totalSizeBytes = nonIgnoredDownloads.reduce(
               (sum, file) => sum + (file.fileSize || 0),
               0
             );
@@ -4442,7 +4658,7 @@ async function copyToClipboard(text, button, listType) {
                 minecraft: mcVersionSelect.value,
                 [officialLoaderName]: "*",
               },
-              files: successfulDownloads.map((dl) => ({
+              files: nonIgnoredDownloads.map((dl) => ({
                 path: dl.path,
                 hashes: dl.hashes,
                 downloads: [dl.url],
@@ -4506,6 +4722,7 @@ function createSuccessCard(mod) {
   }
   
   card.className = cardClasses;
+  card.setAttribute('data-project-id', mod.projectId);
 
   const clientServerInfo = getClientServerSupport(
     mod.client_side,
@@ -4528,7 +4745,7 @@ function createSuccessCard(mod) {
           mod.icon_url
         }" alt="${
     mod.title
-  } icon" class="mod-icon" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGcgaWQ9Ik1pbmVjcmFmdCI+PHBhdGggZD0ibTIxIDFoLTE4YTIgMiAwIDAgMCAtMiAydjE4YTIgMiAwIDAgMCAyIDJoMThhMiAyIDAgMCAwIDItMnYtMThhMiAyIDAgMCAwIC0yLTJ6bS0xNSA4LjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYzYS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV6bTExIDhhLjUuNSAwIDAgMSAtLjUuNWgtMmEuNS41IDAgMCAxIC0uNS0uNXYtMS41aC00djEuNWEuNS41IDAgMCAxIC0uNS41aC0yYS41LjUgMCAwIDEgLS41LS41di01YS41LjUgMCAwIDEgLjUtLjVoMi41di0xLjVhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYxLjVoMi41YS41LjUgMCAwIDEgLjUuNXptMS04YS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXoiIGZpbGw9IiMzMDNjNDIiLz48L2c+PC9zdmc+'">
+  } icon" class="mod-icon" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGcgaWQ9Ik1pbmVjcmFmdCI+PHBhdGggZD0ibTIxIDFoLTE4YTIgMiAwIDAgMCAtMiAydjE4YTIgMiAwIDAgMCAyIDJoMThhMiAyIDAgMCAwIDItMnYtMThhMiAyIDAgMCAwIC0yLTJ6bS0xNSA4LjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYzYS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV6bTExIDhhLjUuNSAwIDAgMSAtLjUuNWgtMmEuNS41IDAgMCAxIC0uNS0uNXYtMS1aC00djEuNWEuNS41IDAgMCAxIC0uNS41aC0yYS41LjUgMCAwIDEgLS41LS41di01YS41LjUgMCAwIDEgLjUtLjVoMi41di0xLjVhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYxLjVoMi41YS41LjUgMCAwIDEgLjUuNXptMS04YS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXoiIGZpbGw9IiMzMDNjNDIiLz48L2c+PC9zdmc+'">
       </a>
       <div class="mod-details">
         <div class="mod-title">
@@ -4600,7 +4817,7 @@ function createSuccessCard(mod) {
             <a href="#" target="_blank" rel="noopener noreferrer" class="channel-link beta" style="display: none;">Beta</a>
             <a href="#" target="_blank" rel="noopener noreferrer" class="channel-link alpha" style="display: none;">Alpha</a>
           </div>
-          <a href="#" class="download-link">Download</a>
+          <a href="#" class="download-link" data-project-id="${mod.projectId}">Download</a>
         </div>
       </div>
     </div>
@@ -4665,6 +4882,11 @@ function createSuccessCard(mod) {
   });
 
   updateDynamicContent();
+
+  // --- Add ignore mode event handler to download link ---
+  downloadLink.addEventListener('click', (event) => {
+    window.handleDownloadOrIgnore(event, mod.projectId);
+  });
 
   // --- Add Dependency Chain Icon if needed ---
   if (reverseDependencyMap.has(mod.projectId)) {
@@ -4738,6 +4960,7 @@ function createWarningCard(mod) {
   const card = document.createElement("div");
   // We keep the 'warning' class for the yellow border
   card.className = "result-card warning";
+  card.setAttribute('data-project-id', mod.projectId);
   const clientServerInfo = getClientServerSupport(
     mod.client_side,
     mod.server_side
@@ -4746,7 +4969,7 @@ function createWarningCard(mod) {
   card.innerHTML = `
     <div class="result-card-main">
       <a href="${mod.project_url}" target="_blank" rel="noopener noreferrer" class="mod-icon-link">
-        <img src="${mod.icon_url}" alt="${mod.title} icon" class="mod-icon" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGcgaWQ9Ik1pbmVjcmFmdCI+PHBhdGggZD0ibTIxIDFoLTE4YTIgMiAwIDAgMCAtMiAydjE4YTIgMiAwIDAgMCAyIDJoMThhMiAyIDAgMCAwIDItMnYtMThhMiAyIDAgMCAwIC0yLTJ6bS0xNSA4LjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYzYS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV6bTExIDhhLjUuNSAwIDAgMSAtLjUuNWgtMmEuNS41IDAgMCAxIC0uNS0uNXYtMS41aC00djEuNWEuNS41IDAgMCAxIC0uNS41aC0yYS41LjUgMCAwIDEgLS41LS41di01YS41LjUgMCAwIDEgLjUtLjVoMi41di0xLjVhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYxLjVoMi41YS41LjUgMCAwIDEgLjUuNXptMS04YS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXoiIGZpbGw9IiMzMDNjNDIiLz48L2c+PC9zdmc+'">
+        <img src="${mod.icon_url}" alt="${mod.title} icon" class="mod-icon" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGcgaWQ9Ik1pbmVjcmFmdCI+PHBhdGggZD0ibTIxIDFoLTE4YTIgMiAwIDAgMCAtMiAydjE4YTIgMiAwIDAgMCAyIDJoMThhMiAyIDAgMCAwIDItMnYtMThhMiAyIDAgMCAwIC0yLTJ6bS0xNSA4LjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYzYS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV6bTExIDhhLjUuNSAwIDAgMSAtLjUuNWgtMmEuNS41IDAgMCAxIC0uNS0uNXYtMS1aC00djEuNWEuNS41IDAgMCAxIC0uNS41aC0yYS41LjUgMCAwIDEgLS41LS41di01YS41LjUgMCAwIDEgLjUtLjVoMi41di0xLjVhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYxLjVoMi41YS41LjUgMCAwIDEgLjUuNXptMS04YS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXoiIGZpbGw9IiMzMDNjNDIiLz48L2c+PC9zdmc+'">
       </a>
       <div class="mod-details">
         <div class="mod-title">
@@ -4784,6 +5007,7 @@ function createWarningCard(mod) {
           <div class="mod-meta-item changelog-toggle" style="color: var(--warning-color); font-weight: bold;">Reason</div>
         </div>
       </div>
+
     </div>
     <div class="changelog-content"></div>`;
 
@@ -4925,6 +5149,17 @@ function createFailureCard(mod) {
         const zip = new JSZip();
         const modsFolder = zip.folder("mods");
         
+        // Filter out ignored mods using the global ignoredMods set
+        const downloadsToProcess = successfulDownloads.filter(dl => {
+          return !window.ignoredMods || !window.ignoredMods.has(dl.projectId);
+        });
+
+        
+        if (downloadsToProcess.length === 0) {
+          alert('No mods to download. All mods are currently ignored.');
+          return;
+        }
+        
         // Use default filename
         const filename = "MC-Mod-Updater.zip";
         
@@ -4938,11 +5173,11 @@ function createFailureCard(mod) {
           zipButton.disabled = true;
           
           // Fetch all mod files and add them to the ZIP
-          for (let i = 0; i < successfulDownloads.length; i++) {
-            const dl = successfulDownloads[i];
+          for (let i = 0; i < downloadsToProcess.length; i++) {
+            const dl = downloadsToProcess[i];
             
             // Update progress
-            zipButton.innerHTML = `Adding ${i + 1}/${successfulDownloads.length}...`;
+            zipButton.innerHTML = `Adding ${i + 1}/${downloadsToProcess.length}...`;
             
             try {
               const response = await fetch(dl.url);
@@ -5001,6 +5236,17 @@ function createFailureCard(mod) {
         const selectedLoader = modLoaderSelect.value;
         const officialLoaderName = loaderNameMap[selectedLoader] || selectedLoader;
 
+        // Filter out ignored mods using the global ignoredMods set
+        const filteredDownloads = successfulDownloads.filter(dl => {
+          return !window.ignoredMods || !window.ignoredMods.has(dl.projectId);
+        });
+
+        
+        if (filteredDownloads.length === 0) {
+          alert('No mods to include in modpack. All mods are currently ignored.');
+          return;
+        }
+
         const manifest = {
           formatVersion: 1,
           game: "minecraft",
@@ -5012,7 +5258,7 @@ function createFailureCard(mod) {
             [officialLoaderName]: "*",
           },
           // --- BUILD THE FULL FILE ENTRY ---
-          files: successfulDownloads.map((dl) => {
+          files: filteredDownloads.map((dl) => {
             const fileEntry = {
               path: dl.path,
               hashes: dl.hashes,
