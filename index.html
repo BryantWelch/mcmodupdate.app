@@ -2980,6 +2980,48 @@ async function handleUpdate() {
     const unprocessedDependencies = Array.from(allDependencies).filter(depId => !processedIds.has(depId));
     let actualDependenciesAdded = 0; // Track dependencies that are actually added
     
+    // Handle cached dependencies that need their download info added
+    // Check each dependency to see if it's already rendered but missing from successfulDownloads
+    for (const depId of allDependencies) {
+      // Check if this dependency is already in successfulDownloads
+      const alreadyInDownloads = successfulDownloads.some(dl => dl.projectId === depId);
+      
+      if (!alreadyInDownloads) {
+        // Get cached dependency from cache
+        const loader = modLoaderSelect.value;
+        const gameVersion = mcVersionSelect.value;
+        const cacheKey = getCacheKey(depId, loader, gameVersion, "id");
+        const cachedResult = getCachedResult(cacheKey);
+        
+        if (cachedResult && cachedResult.status === "success") {
+          // Add cached dependency to successfulDownloads
+          if (cachedResult.all_versions && cachedResult.all_versions.length > 0) {
+            const latestVersion = cachedResult.all_versions.find(v => v.version_type === "release") || 
+                                 cachedResult.all_versions.find(v => v.version_type === "beta") || 
+                                 cachedResult.all_versions.find(v => v.version_type === "alpha");
+            
+            if (latestVersion) {
+              const primaryFile = latestVersion.files.find(f => f.primary);
+              if (primaryFile) {
+                const downloadInfo = {
+                  url: primaryFile.url,
+                  filename: primaryFile.filename,
+                  hashes: primaryFile.hashes,
+                  path: `mods/${primaryFile.filename}`,
+                  fileSize: primaryFile.size,
+                  client_side: cachedResult.client_side,
+                  server_side: cachedResult.server_side,
+                  projectId: cachedResult.projectId,
+                };
+                
+                successfulDownloads.push(downloadInfo);
+              }
+            }
+          }
+        }
+      }
+    }
+    
     if (unprocessedDependencies.length > 0) {
       statusMessage.textContent = `Searching dependencies for ${jobs.length} mods...`;
       
