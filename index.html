@@ -1209,6 +1209,8 @@
   cursor: help;
 }
 
+
+
 .dependency-tooltip {
   visibility: hidden;
   opacity: 0;
@@ -1276,6 +1278,51 @@
 }
 
 .dependency-chain-tooltip-container:hover .dependency-chain-tooltip {
+  visibility: visible;
+  opacity: 1;
+}
+
+/* Cache indicator styling */
+.cache-indicator-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.5rem;
+}
+
+.cache-icon {
+  color: var(--secondary-text);
+  cursor: help;
+  transition: color 0.2s ease;
+}
+
+.cache-icon:hover {
+  color: var(--primary-text);
+}
+
+.cache-tooltip {
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  
+  position: absolute;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%);
+  
+  background-color: var(--card-bg);
+  color: var(--primary-text);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  z-index: 10;
+  
+  white-space: nowrap;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.cache-indicator-container:hover .cache-tooltip {
   visibility: visible;
   opacity: 1;
 }
@@ -1940,6 +1987,9 @@
       let dependencyMap = new Map(); // Track which mod requires each dependency
       let reverseDependencyMap = new Map(); // Track what dependencies each mod has
       let modIdToNameMap = new Map(); // Track mod ID to name mapping
+      
+      // Default mod icon as a data URL
+      const DEFAULT_MOD_ICON = 'data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGcgaWQ9Ik1pbmVjcmFmdCI+PHBhdGggZD0ibTIxIDFoLTE4YTIgMiAwIDAgMCAtMiAydjE4YTIgMiAwIDAgMCAyIDJoMThhMiAyIDAgMCAwIDItMnYtMThhMiAyIDAgMCAwIC0yLTJ6bS0xNSA4LjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYzYS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV6bTExIDhhLjUuNSAwIDAgMSAtLjUuNWgtMmEuNS41IDAgMCAxIC0uNS0uNXYtMS41aC00djEuNWEuNS41IDAgMCAxIC0uNS41aC0yYS41LjUgMCAwIDEgLS41LS41di01YS41LjUgMCAwIDEgLjUtLjVoMi41di0xLjVhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYxLjVoMi41YS41LjUgMCAwIDEgLjUuNXptMS04YS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXoiIGZpbGw9IiMzMDNjNDIiLz48L2c+PC9zdmc+';
 
       // --- DOM Element References ---
       const dropzone = document.getElementById("dropzone");
@@ -2323,7 +2373,7 @@
         card.innerHTML = `
           <div class="result-card-main">
             <a href="${projectUrl}" target="_blank" rel="noopener noreferrer" class="mod-icon-link">
-              <img src="${mod.icon_url}" alt="${mod.title} icon" class="mod-icon" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGcgaWQ9Ik1pbmVjcmFmdCI+PHBhdGggZD0ibTIxIDFoLTE4YTIgMiAwIDAgMCAtMiAydjE4YTIgMiAwIDAgMCAyIDJoMThhMiAyIDAgMCAwIDItMnYtMThhMiAyIDAgMCAwIC0yLTJ6bS0xNSA4LjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYzYS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV6bTExIDhhLjUuNSAwIDAgMSAtLjUuNWgtMmEuNS41IDAgMCAxIC0uNS0uNXYtMS1aC00djEuNWEuNS41IDAgMCAxIC0uNS41aC0yYS41LjUgMCAwIDEgLS41LS41di01YS41LjUgMCAwIDEgLjUtLjVoMi41di0xLjVhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYxLjVoMi41YS41LjUgMCAwIDEgLjUuNXptMS04YS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXoiIGZpbGw9IiMzMDNjNDIiLz48L2c+PC9zdmc+'">
+              <img src="${mod.icon_url}" alt="${mod.title} icon" class="mod-icon" onerror="this.src=DEFAULT_MOD_ICON">
             </a>
             <div class="mod-details">
               <div class="mod-title">
@@ -2821,6 +2871,7 @@ async function handleUpdate() {
     modIdToNameMap.clear(); // Reset mod name mapping
     apiCallCount = 0; // Reset API call counter
     processingStartTime = Date.now(); // Start timing
+    cacheStats = { hits: 0, misses: 0, stores: 0 }; // Reset cache stats for this run
     updateButton.disabled = true;
     updateButton.innerHTML = "Searching...";
     statusMessage.textContent = "Searching for updates and dependencies...";
@@ -2878,6 +2929,36 @@ async function handleUpdate() {
             renderedModIds.add(result.modId);
             // Store mod ID to name mapping for dependency tooltips
             modIdToNameMap.set(result.projectId, result.title);
+            
+            // Add to successfulDownloads if it has the required download info
+            // This handles both cached and fresh results
+            if (result.all_versions && result.all_versions.length > 0) {
+              const latestVersion = result.all_versions.find(v => v.version_type === "release") || 
+                                   result.all_versions.find(v => v.version_type === "beta") || 
+                                   result.all_versions.find(v => v.version_type === "alpha");
+              
+              if (latestVersion) {
+                const primaryFile = latestVersion.files.find(f => f.primary);
+                if (primaryFile) {
+                  const downloadInfo = {
+                    url: primaryFile.url,
+                    filename: primaryFile.filename,
+                    hashes: primaryFile.hashes,
+                    path: `mods/${primaryFile.filename}`,
+                    fileSize: primaryFile.size,
+                    client_side: result.client_side,
+                    server_side: result.server_side,
+                    projectId: result.projectId,
+                  };
+                  
+                  // Check if this download info is already in the array (avoid duplicates)
+                  const isDuplicate = successfulDownloads.some(dl => dl.projectId === result.projectId);
+                  if (!isDuplicate) {
+                    successfulDownloads.push(downloadInfo);
+                  }
+                }
+              }
+            }
           }
         }
         
@@ -2979,8 +3060,25 @@ async function handleUpdate() {
     if (notFound > 0) summaryText += `, Failed to find: ${notFound}`;
     if (dependenciesAdded > 0) summaryText += `, Dependencies added: ${dependenciesAdded}`;
     
-    // Add processing time and API calls on one line below the summary
+    // Add processing time, API calls, and cache info
+    // Count unique mods that were cached vs fresh (include both success and warning results)
+    const allCards = document.querySelectorAll('#results-found .result-card, #results-warning .result-card');
+    let cachedModCount = 0;
+    let freshModCount = 0;
+    
+    allCards.forEach(card => {
+      const hasCacheIcon = card.querySelector('.cache-icon');
+      if (hasCacheIcon) {
+        cachedModCount++;
+      } else {
+        freshModCount++;
+      }
+    });
+    
     summaryText += `<br>Processing time: ${processingTime}s, API calls used: ${apiCallCount}`;
+    if (cachedModCount + freshModCount > 0) {
+      summaryText += `, Cached lookups: ${cachedModCount}, Fresh lookups: ${freshModCount}`;
+    }
     
     // Store the summary for the finally block
     window.finalSummaryText = summaryText;
@@ -3028,7 +3126,26 @@ async function handleUpdate() {
     } else if (apiCallCount > 0) {
       // If we have API calls but no final summary, at least show the API count
       const fallbackTime = ((Date.now() - processingStartTime) / 1000).toFixed(1);
-      statusMessage.innerHTML = `Processing completed<br>Processing time: ${fallbackTime}s, API calls used: ${apiCallCount}`;
+      
+      // Count unique mods that were cached vs fresh (include both success and warning results)
+      const allCards = document.querySelectorAll('#results-found .result-card, #results-warning .result-card');
+      let cachedModCount = 0;
+      let freshModCount = 0;
+      
+      allCards.forEach(card => {
+        const hasCacheIcon = card.querySelector('.cache-icon');
+        if (hasCacheIcon) {
+          cachedModCount++;
+        } else {
+          freshModCount++;
+        }
+      });
+      
+      let fallbackSummary = `Processing completed<br>Processing time: ${fallbackTime}s, API calls used: ${apiCallCount}`;
+      if (cachedModCount + freshModCount > 0) {
+        fallbackSummary += `, Cached: ${cachedModCount}, Fresh lookups: ${freshModCount}`;
+      }
+      statusMessage.innerHTML = fallbackSummary;
       statusMessage.classList.add("visible");
     }
   }
@@ -3094,12 +3211,85 @@ async function processBatch(jobs) {
   const loader = modLoaderSelect.value;
   const gameVersion = mcVersionSelect.value;
   
+  // Step 0: Check cache for complete results first
+  const cachedResults = [];
+  const uncachedJobs = [];
+  const processedCacheKeys = new Set(); // Prevent double-counting
+  
+  // Pre-calculate all hashes in parallel for uploaded files
+  const fileHashPromises = jobs
+    .filter(job => job.type === "file")
+    .map(async job => {
+      const hash = await calculateFileHash(job.data);
+      return { job, hash };
+    });
+  
+  const fileHashes = await Promise.all(fileHashPromises);
+  const hashMap = new Map(fileHashes.map(fh => [fh.job, fh.hash]));
+  
+  for (const job of jobs) {
+    let cacheKey;
+    if (job.type === "file") {
+      const hash = hashMap.get(job);
+      if (hash) {
+        cacheKey = getCacheKey(hash, loader, gameVersion, 'hash');
+      }
+    } else if (job.type === "hash") {
+      cacheKey = getCacheKey(job.data, loader, gameVersion, 'hash');
+    } else if (job.type === "id") {
+      cacheKey = getCacheKey(job.data, loader, gameVersion, 'id');
+    }
+    
+    if (cacheKey && !processedCacheKeys.has(cacheKey)) {
+      processedCacheKeys.add(cacheKey);
+      const cachedResult = getCachedResult(cacheKey);
+      if (cachedResult) {
+        // Add cache indicator to result
+        cachedResult.fromCache = true;
+        cachedResults.push(cachedResult);
+        continue;
+      }
+    }
+    
+    uncachedJobs.push(job);
+  }
+  
+  // If all results were cached, return them immediately
+  if (uncachedJobs.length === 0) {
+    return cachedResults;
+  }
+  
+  // Process uncached jobs through normal pipeline
+  const freshResults = await processBatchUncached(uncachedJobs, loader, gameVersion);
+  
+  // Cache the fresh results
+  for (const result of freshResults) {
+    let cacheKey;
+    if (result.hash) {
+      cacheKey = getCacheKey(result.hash, loader, gameVersion, 'hash');
+    } else if (result.projectId) {
+      cacheKey = getCacheKey(result.projectId, loader, gameVersion, 'id');
+    }
+    
+    if (cacheKey) {
+      // Don't cache the fromCache flag
+      const resultToCache = { ...result };
+      delete resultToCache.fromCache;
+      setCachedResult(cacheKey, resultToCache);
+    }
+  }
+  
+  // Combine cached and fresh results
+  return [...cachedResults, ...freshResults];
+}
+
+async function processBatchUncached(uncachedJobs, loader, gameVersion) {
   // Step 1: Collect all hashes and project IDs
   const hashJobs = [];
   const projectIdJobs = [];
   const fileJobs = [];
   
-  for (const job of jobs) {
+  for (const job of uncachedJobs) {
     if (job.type === "file") {
       const hash = await calculateFileHash(job.data);
       if (hash) {
@@ -3132,7 +3322,7 @@ async function processBatch(jobs) {
   const versionData = await batchVersionLookup(allProjectIds, loader, gameVersion);
   
   // Step 6: Combine results
-  return await combineResults(jobs, hashResults, projectsData, authorData, versionData);
+  return await combineResults(uncachedJobs, hashResults, projectsData, authorData, versionData);
 }
 
 // --- Batch Hash Lookup Function ---
@@ -3316,11 +3506,13 @@ async function combineResults(jobs, hashResults, projectsData, authorData, versi
       let originalModInfo = {};
       
       // Find project details based on job type
+      let fileHash = null; // Track hash for caching
       if (job.type === "hash" || job.type === "file") {
         const hashResult = hashResults.find(hr => hr.job === job);
         if (hashResult?.versionData) {
           projectDetails = projectsData[hashResult.versionData.project_id];
           versionDetails = hashResult.versionData;
+          fileHash = hashResult.hash; // Preserve hash for caching
         }
         
                  // Get original version from uploaded file if available
@@ -3382,6 +3574,8 @@ async function combineResults(jobs, hashResults, projectsData, authorData, versi
          results.push({
            status: "warning",
            title: projectDetails.title,
+           projectId: projectDetails.id,
+           hash: fileHash, // Add hash for caching
            author_name: author.name,
            author_url: author.url,
            description: projectDetails.description,
@@ -3436,6 +3630,7 @@ async function combineResults(jobs, hashResults, projectsData, authorData, versi
           status: "success",
           modId: projectDetails.slug,
           projectId: projectDetails.id, // Add project ID for dependency tracking
+          hash: fileHash, // Add hash for caching (null for dependency lookups)
           isUpToDate: isUpToDate,
           categories: projectDetails.categories,
           title: projectDetails.title,
@@ -4745,7 +4940,7 @@ function createSuccessCard(mod) {
           mod.icon_url
         }" alt="${
     mod.title
-  } icon" class="mod-icon" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGcgaWQ9Ik1pbmVjcmFmdCI+PHBhdGggZD0ibTIxIDFoLTE4YTIgMiAwIDAgMCAtMiAydjE4YTIgMiAwIDAgMCAyIDJoMThhMiAyIDAgMCAwIDItMnYtMThhMiAyIDAgMCAwIC0yLTJ6bS0xNSA4LjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYzYS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV6bTExIDhhLjUuNSAwIDAgMSAtLjUuNWgtMmEuNS41IDAgMCAxIC0uNS0uNXYtMS1aC00djEuNWEuNS41IDAgMCAxIC0uNS41aC0yYS41LjUgMCAwIDEgLS41LS41di01YS41LjUgMCAwIDEgLjUtLjVoMi41di0xLjVhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYxLjVoMi41YS41LjUgMCAwIDEgLjUuNXptMS04YS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXoiIGZpbGw9IiMzMDNjNDIiLz48L2c+PC9zdmc+'">
+  } icon" class="mod-icon" onerror="this.src=DEFAULT_MOD_ICON">
       </a>
       <div class="mod-details">
         <div class="mod-title">
@@ -4952,6 +5147,27 @@ if (mod.categories && mod.categories.length > 0) {
   categoryContainer.style.display = "flex";
 }
 
+// --- Add Cache Indicator if from cache ---
+if (mod.fromCache) {
+  const modTitleDiv = card.querySelector('.mod-title');
+  const cacheContainer = document.createElement('span');
+  cacheContainer.className = 'cache-indicator-container';
+  cacheContainer.innerHTML = `
+    <svg class="cache-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+    </svg>
+    <span class="cache-tooltip">Loaded from cache</span>
+  `;
+  
+  // Insert after any existing icons but before tags
+  const firstTag = modTitleDiv.querySelector('.mod-title-tag, .dependency-tooltip-container');
+  if (firstTag) {
+    modTitleDiv.insertBefore(cacheContainer, firstTag);
+  } else {
+    modTitleDiv.appendChild(cacheContainer);
+  }
+}
+
 return card;
 }
 
@@ -4969,7 +5185,7 @@ function createWarningCard(mod) {
   card.innerHTML = `
     <div class="result-card-main">
       <a href="${mod.project_url}" target="_blank" rel="noopener noreferrer" class="mod-icon-link">
-        <img src="${mod.icon_url}" alt="${mod.title} icon" class="mod-icon" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGcgaWQ9Ik1pbmVjcmFmdCI+PHBhdGggZD0ibTIxIDFoLTE4YTIgMiAwIDAgMCAtMiAydjE4YTIgMiAwIDAgMCAyIDJoMThhMiAyIDAgMCAwIDItMnYtMThhMiAyIDAgMCAwIC0yLTJ6bS0xNSA4LjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYzYS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV6bTExIDhhLjUuNSAwIDAgMSAtLjUuNWgtMmEuNS41IDAgMCAxIC0uNS0uNXYtMS1aC00djEuNWEuNS41IDAgMCAxIC0uNS41aC0yYS41LjUgMCAwIDEgLS41LS41di01YS41LjUgMCAwIDEgLjUtLjVoMi41di0xLjVhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYxLjVoMi41YS41LjUgMCAwIDEgLjUuNXptMS04YS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXoiIGZpbGw9IiMzMDNjNDIiLz48L2c+PC9zdmc+'">
+        <img src="${mod.icon_url}" alt="${mod.title} icon" class="mod-icon" onerror="this.src=DEFAULT_MOD_ICON">
       </a>
       <div class="mod-details">
         <div class="mod-title">
@@ -5044,6 +5260,27 @@ function createWarningCard(mod) {
     categoryContainer.style.display = "flex";
   }
 
+  // --- Add Cache Indicator if from cache ---
+  if (mod.fromCache) {
+    const modTitleDiv = card.querySelector('.mod-title');
+    const cacheContainer = document.createElement('span');
+    cacheContainer.className = 'cache-indicator-container';
+    cacheContainer.innerHTML = `
+      <svg class="cache-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+      </svg>
+      <span class="cache-tooltip">Loaded from cache</span>
+    `;
+    
+    // Insert after any existing icons but before tags
+    const firstTag = modTitleDiv.querySelector('.mod-title-tag, .dependency-tooltip-container');
+    if (firstTag) {
+      modTitleDiv.insertBefore(cacheContainer, firstTag);
+    } else {
+      modTitleDiv.appendChild(cacheContainer);
+    }
+  }
+
   return card;
 }
 
@@ -5063,8 +5300,18 @@ function createFailureCard(mod) {
 
 
 
-      // --- File Hash Calculation ---
+      // --- File Hash Calculation with Caching ---
+      const fileHashCache = new Map();
+      
       async function calculateFileHash(file) {
+        // Create a cache key based on file name, size, and last modified
+        const cacheKey = `${file.name}-${file.size}-${file.lastModified}`;
+        
+        // Check if we already calculated this hash
+        if (fileHashCache.has(cacheKey)) {
+          return fileHashCache.get(cacheKey);
+        }
+        
         return new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = (event) => {
@@ -5072,6 +5319,9 @@ function createFailureCard(mod) {
               const binary = event.target.result;
               const wordArray = CryptoJS.lib.WordArray.create(binary);
               const hash = CryptoJS.SHA1(wordArray).toString(CryptoJS.enc.Hex);
+              
+              // Cache the result
+              fileHashCache.set(cacheKey, hash);
               resolve(hash);
             } catch (error) {
               reject(error);
@@ -5308,7 +5558,201 @@ function createFailureCard(mod) {
         const i = Math.floor(Math.log(bytes) / Math.log(k));
 
         return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
-              }
+      }
+
+      // --- Session-Based Mod Caching System ---
+      const MOD_CACHE_KEY = 'mcModUpdaterCache';
+      const CACHE_VERSION = '1.0';
+      const CACHE_EXPIRY_HOURS = 2; // Short session-based expiry
+      const MAX_CACHE_ENTRIES = 500; // Reasonable limit
+      
+      let cacheStats = {
+        hits: 0,
+        misses: 0,
+        stores: 0
+      };
+
+      // Initialize cache on page load
+      function initializeCache() {
+        try {
+          // Clear any existing cache on page load to ensure fresh sessions
+          sessionStorage.removeItem(MOD_CACHE_KEY);
+          cleanupExpiredCache();
+        } catch (error) {
+          console.warn('Cache initialization failed, clearing cache:', error);
+          clearCache();
+        }
+      }
+
+      // Generate cache key for a mod lookup
+      function getCacheKey(identifier, loader, gameVersion, type = 'file') {
+        return `${type}:${identifier}:${loader}:${gameVersion}`;
+      }
+
+      // Get cached result if valid
+      function getCachedResult(cacheKey) {
+        try {
+          const cache = getCache();
+          const entry = cache.entries[cacheKey];
+          
+          if (!entry) {
+            cacheStats.misses++;
+            return null;
+          }
+
+          // Check if entry is expired
+          const now = Date.now();
+          const expiry = CACHE_EXPIRY_HOURS * 60 * 60 * 1000;
+          if (now - entry.timestamp > expiry) {
+            // Remove expired entry
+            delete cache.entries[cacheKey];
+            saveCache(cache);
+            cacheStats.misses++;
+            return null;
+          }
+
+          cacheStats.hits++;
+          return entry.result;
+        } catch (error) {
+          console.warn('Cache read error:', error);
+          cacheStats.misses++;
+          return null;
+        }
+      }
+
+      // Store result in cache
+      function setCachedResult(cacheKey, result) {
+        try {
+          const cache = getCache();
+          
+          // Check cache size limit
+          const entries = Object.keys(cache.entries);
+          if (entries.length >= MAX_CACHE_ENTRIES) {
+            // Remove oldest entries (simple LRU)
+            const sortedEntries = entries
+              .map(key => ({ key, timestamp: cache.entries[key].timestamp }))
+              .sort((a, b) => a.timestamp - b.timestamp);
+            
+            // Remove oldest 20% of entries
+            const toRemove = Math.floor(entries.length * 0.2);
+            for (let i = 0; i < toRemove; i++) {
+              delete cache.entries[sortedEntries[i].key];
+            }
+          }
+
+          // Store new entry
+          cache.entries[cacheKey] = {
+            timestamp: Date.now(),
+            result: result
+          };
+          
+          saveCache(cache);
+          cacheStats.stores++;
+        } catch (error) {
+          console.warn('Cache write error:', error);
+        }
+      }
+
+      // Get cache from sessionStorage (clears on browser refresh)
+      function getCache() {
+        try {
+          const cached = sessionStorage.getItem(MOD_CACHE_KEY);
+          if (!cached) {
+            return createEmptyCache();
+          }
+          
+          const cache = JSON.parse(cached);
+          if (cache.version !== CACHE_VERSION) {
+            console.log('Cache version mismatch, clearing cache');
+            return createEmptyCache();
+          }
+          
+          return cache;
+        } catch (error) {
+          console.warn('Cache parse error:', error);
+          return createEmptyCache();
+        }
+      }
+
+      // Save cache to sessionStorage (clears on browser refresh)
+      function saveCache(cache) {
+        try {
+          cache.metadata.lastUpdated = Date.now();
+          cache.metadata.totalEntries = Object.keys(cache.entries).length;
+          sessionStorage.setItem(MOD_CACHE_KEY, JSON.stringify(cache));
+        } catch (error) {
+          if (error.name === 'QuotaExceededError') {
+            console.warn('sessionStorage quota exceeded, clearing cache');
+            clearCache();
+          } else {
+            console.warn('Cache save error:', error);
+          }
+        }
+      }
+
+      // Create empty cache structure
+      function createEmptyCache() {
+        return {
+          version: CACHE_VERSION,
+          entries: {},
+          metadata: {
+            created: Date.now(),
+            lastUpdated: Date.now(),
+            totalEntries: 0
+          }
+        };
+      }
+
+      // Clean up expired cache entries
+      function cleanupExpiredCache() {
+        const cache = getCache();
+        const now = Date.now();
+        const expiry = CACHE_EXPIRY_HOURS * 60 * 60 * 1000;
+        let removedCount = 0;
+
+        for (const [key, entry] of Object.entries(cache.entries)) {
+          if (now - entry.timestamp > expiry) {
+            delete cache.entries[key];
+            removedCount++;
+          }
+        }
+
+        if (removedCount > 0) {
+          saveCache(cache);
+        }
+      }
+
+      // Clear entire cache
+      function clearCache() {
+        try {
+          sessionStorage.removeItem(MOD_CACHE_KEY);
+          cacheStats = { hits: 0, misses: 0, stores: 0 };
+        } catch (error) {
+          console.warn('Cache clear error:', error);
+        }
+      }
+
+      // Get cache statistics
+      function getCacheStats() {
+        const cache = getCache();
+        const totalRequests = cacheStats.hits + cacheStats.misses;
+        const hitRate = totalRequests > 0 ? (cacheStats.hits / totalRequests * 100).toFixed(1) : 0;
+        
+        return {
+          ...cacheStats,
+          totalRequests,
+          hitRate: `${hitRate}%`,
+          cacheSize: cache.metadata.totalEntries,
+          cacheAge: cache.metadata.created ? Math.round((Date.now() - cache.metadata.created) / 1000 / 60) : 0
+        };
+      }
+
+      // Initialize cache when page loads
+      document.addEventListener('DOMContentLoaded', () => {
+        // Clear the in-memory file hash cache on page load
+        fileHashCache.clear();
+        initializeCache();
+      });
     </script>
   </body>
 </html>
