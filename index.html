@@ -3787,6 +3787,30 @@ function setupResultSections() {
             <div id="sort-found-dropdown" class="sort-dropdown">
               <div class="sort-option active" data-sort="default">Default</div>
               <div class="sort-option has-submenu">
+                Categories <span class="submenu-arrow">▶</span>
+                <div class="sort-submenu">
+                  <div class="sort-option" data-sort="category" data-filter="adventure">Adventure</div>
+                  <div class="sort-option" data-sort="category" data-filter="cursed">Cursed</div>
+                  <div class="sort-option" data-sort="category" data-filter="decoration">Decoration</div>
+                  <div class="sort-option" data-sort="category" data-filter="economy">Economy</div>
+                  <div class="sort-option" data-sort="category" data-filter="equipment">Equipment</div>
+                  <div class="sort-option" data-sort="category" data-filter="food">Food</div>
+                  <div class="sort-option" data-sort="category" data-filter="game-mechanics">Mechanics</div>
+                  <div class="sort-option" data-sort="category" data-filter="library">Library</div>
+                  <div class="sort-option" data-sort="category" data-filter="magic">Magic</div>
+                  <div class="sort-option" data-sort="category" data-filter="management">Management</div>
+                  <div class="sort-option" data-sort="category" data-filter="minigame">Minigame</div>
+                  <div class="sort-option" data-sort="category" data-filter="mobs">Mobs</div>
+                  <div class="sort-option" data-sort="category" data-filter="optimization">Optimization</div>
+                  <div class="sort-option" data-sort="category" data-filter="social">Social</div>
+                  <div class="sort-option" data-sort="category" data-filter="storage">Storage</div>
+                  <div class="sort-option" data-sort="category" data-filter="technology">Technology</div>
+                  <div class="sort-option" data-sort="category" data-filter="transportation">Transportation</div>
+                  <div class="sort-option" data-sort="category" data-filter="utility">Utility</div>
+                  <div class="sort-option" data-sort="category" data-filter="worldgen">Worldgen</div>
+                </div>
+              </div>
+              <div class="sort-option has-submenu">
                 Name <span class="submenu-arrow">▶</span>
                 <div class="sort-submenu">
                   <div class="sort-option" data-sort="name" data-direction="false">A-Z</div>
@@ -3849,6 +3873,30 @@ function setupResultSections() {
             <button id="sort-warning-btn" class="layout-toggle" title="Sort Results">${sortIcon}</button>
             <div id="sort-warning-dropdown" class="sort-dropdown">
               <div class="sort-option active" data-sort="default">Default</div>
+              <div class="sort-option has-submenu">
+                Categories <span class="submenu-arrow">▶</span>
+                <div class="sort-submenu">
+                  <div class="sort-option" data-sort="category" data-filter="adventure">Adventure</div>
+                  <div class="sort-option" data-sort="category" data-filter="cursed">Cursed</div>
+                  <div class="sort-option" data-sort="category" data-filter="decoration">Decoration</div>
+                  <div class="sort-option" data-sort="category" data-filter="economy">Economy</div>
+                  <div class="sort-option" data-sort="category" data-filter="equipment">Equipment</div>
+                  <div class="sort-option" data-sort="category" data-filter="food">Food</div>
+                  <div class="sort-option" data-sort="category" data-filter="game-mechanics">Mechanics</div>
+                  <div class="sort-option" data-sort="category" data-filter="library">Library</div>
+                  <div class="sort-option" data-sort="category" data-filter="magic">Magic</div>
+                  <div class="sort-option" data-sort="category" data-filter="management">Management</div>
+                  <div class="sort-option" data-sort="category" data-filter="minigame">Minigame</div>
+                  <div class="sort-option" data-sort="category" data-filter="mobs">Mobs</div>
+                  <div class="sort-option" data-sort="category" data-filter="optimization">Optimization</div>
+                  <div class="sort-option" data-sort="category" data-filter="social">Social</div>
+                  <div class="sort-option" data-sort="category" data-filter="storage">Storage</div>
+                  <div class="sort-option" data-sort="category" data-filter="technology">Technology</div>
+                  <div class="sort-option" data-sort="category" data-filter="transportation">Transportation</div>
+                  <div class="sort-option" data-sort="category" data-filter="utility">Utility</div>
+                  <div class="sort-option" data-sort="category" data-filter="worldgen">Worldgen</div>
+                </div>
+              </div>
               <div class="sort-option has-submenu">
                 Name <span class="submenu-arrow">▶</span>
                 <div class="sort-submenu">
@@ -4429,6 +4477,9 @@ function toggleIgnoreMode() {
       } else if (filterType === 'channel') {
         const cardChannel = extractChannel(card);
         shouldShow = cardChannel === filterValue;
+      } else if (filterType === 'category') {
+        const cardCategories = extractCategories(card);
+        shouldShow = cardCategories.includes(filterValue);
       }
 
       if (shouldShow) {
@@ -4563,6 +4614,43 @@ function toggleIgnoreMode() {
     if (releaseLink && releaseLink.style.display === 'inline') return 'release';
     
     return 'release'; // Default to release if no visible channel found
+  }
+
+  function extractCategories(card) {
+    // Look for the category tooltip which contains all categories for this mod
+    const categoryTooltip = card.querySelector('.category-tooltip');
+    if (categoryTooltip && categoryTooltip.textContent) {
+      const categoriesText = categoryTooltip.textContent.trim();
+      // Split by comma and clean up each category
+      const categories = categoriesText.split(',').map(cat => {
+        const trimmed = cat.trim().toLowerCase();
+        // Convert display names back to filter values
+        const categoryMap = {
+          'adventure': 'adventure',
+          'cursed': 'cursed', 
+          'decoration': 'decoration',
+          'economy': 'economy',
+          'equipment': 'equipment',
+          'food': 'food',
+          'game mechanics': 'game-mechanics',
+          'library': 'library',
+          'magic': 'magic',
+          'management': 'management',
+          'minigame': 'minigame',
+          'mobs': 'mobs',
+          'optimization': 'optimization',
+          'social': 'social',
+          'storage': 'storage',
+          'technology': 'technology',
+          'transportation': 'transportation',
+          'utility': 'utility',
+          'world generation': 'worldgen'
+        };
+        return categoryMap[trimmed] || trimmed;
+      });
+      return categories;
+    }
+    return [];
   }
 
 
