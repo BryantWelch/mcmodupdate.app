@@ -1,3 +1,6 @@
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+     License, v. 2.0. If a copy of the MPL was not distributed with this
+     file, You can obtain one at https://mozilla.org/MPL/2.0/. -->
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -32,6 +35,13 @@
     <meta name="twitter:title" content="MC Mod Updater | Update Your Minecraft Mods">
     <meta name="twitter:description" content="Easily update your Minecraft mods or build a new modpack from scratch. Upload your .jar files or search for mods on Modrinth.">
     <meta name="twitter:image" content="https://mcmodupdate.app/social-preview.png">
+
+    <!-- Rybbit Analytics -->
+    <script
+        src="https://app.rybbit.io/api/script.js"
+        data-site-id="1392"
+        defer
+    ></script>
 
     <!-- Structured Data for SEO -->
     <script type="application/ld+json">
@@ -515,7 +525,7 @@
       }
       .status-message.visible {
         margin-top: 0.5rem; /* Add margin when visible */
-        max-height: 4em; /* Animate to a height large enough for 2-line text */
+        max-height: 6em; /* Increased to accommodate more lines of text */
         opacity: 1; /* Animate to be fully visible */
       }
       #results-area {
@@ -1974,8 +1984,8 @@
       </div>
       <div class="footer-bottom">
         <p>
-          &copy; <span id="current-year">2024</span> Bryant Welch. Open source under 
-          <a href="https://github.com/BryantWelch/mcmodupdate.app/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a>.
+                      &copy; <span id="current-year">2025</span> Bryant Welch. Open source under 
+          <a href="https://github.com/BryantWelch/mcmodupdate.app/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">License</a>.
         </p>
         <a
           href="https://ko-fi.com/bryantwelch"
@@ -3154,7 +3164,7 @@ async function handleUpdate() {
     
     summaryText += `<br>Processing time: ${processingTime}s, API calls used: ${apiCallCount}`;
     if (cachedModCount + freshModCount > 0) {
-      summaryText += `, Cached lookups: ${cachedModCount}, Fresh lookups: ${freshModCount}`;
+      summaryText += `<br>Cached lookups: ${cachedModCount}, Fresh lookups: ${freshModCount}`;
     }
     
     // Store the summary for the finally block
@@ -3220,7 +3230,7 @@ async function handleUpdate() {
       
       let fallbackSummary = `Processing completed<br>Processing time: ${fallbackTime}s, API calls used: ${apiCallCount}`;
       if (cachedModCount + freshModCount > 0) {
-        fallbackSummary += `, Cached: ${cachedModCount}, Fresh lookups: ${freshModCount}`;
+        fallbackSummary += `<br>Cached lookups: ${cachedModCount}, Fresh lookups: ${freshModCount}`;
       }
       statusMessage.innerHTML = fallbackSummary;
       statusMessage.classList.add("visible");
