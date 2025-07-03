@@ -1,23 +1,20 @@
 # Minecraft Mod Updater & Builder
 
-[![License](https://img.shields.io/github/license/BryantWelch/mcmodupdate.app?style=for-the-badge)](https://github.com/BryantWelch/mcmodupdate.app/blob/main/LICENSE)
-[![Issues](https://img.shields.io/github/issues/BryantWelch/mcmodupdate.app?style=for-the-badge)](https://github.com/BryantWelch/mcmodupdate.app/issues)
-[![Forks](https://img.shields.io/github/forks/BryantWelch/mcmodupdate.app?style=for-the-badge)](https://github.com/BryantWelch/mcmodupdate.app/network/members)
-[![Stars](https://img.shields.io/github/stars/BryantWelch/mcmodupdate.app?style=for-the-badge)](https://github.com/BryantWelch/mcmodupdate.app/stargazers)
-
 A powerful web-based tool to update your Minecraft mods, discover new ones, and build modpacks with ease, all using the official Modrinth API.
 
 ### **[🚀 Live Site: mcmodupdate.app](https://mcmodupdate.app/)**
 
 ---
 
-![MC Mod Updater Demo](https://github.com/user-attachments/assets/aeb3e94e-068e-4fa4-a960-1b221ab5bc9a)
+![MC Mod Updater Demo](https://github.com/user-attachments/assets/72112d0d-b0f6-46a5-b195-66e1f1fb4b3a)
+
+
 
 ## 🎯 About The Project
 
 This tool was built to solve two common problems for Minecraft players: the tedious process of manually updating dozens of mods, and the challenge of building a new mod list with all the correct dependencies.
 
-MC Mod Updater provides a simple, elegant solution by allowing you to either drag-and-drop your existing `.jar` files or search for new mods directly. It then uses a powerful, hash-based search to accurately identify your mods on Modrinth and find the latest compatible versions for your chosen Minecraft version and mod loader.
+MC Mod Updater provides a simple, elegant solution by allowing you to either drag-and-drop your existing `.jar` files, your current `.mrpack`, or search for new mods directly. It then uses a powerful, hash-based search to accurately identify your mods on Modrinth and find the latest compatible versions for your chosen Minecraft version and mod loader.
 
 ## ✨ Key Features
 
@@ -55,7 +52,7 @@ MC Mod Updater provides a simple, elegant solution by allowing you to either dra
     *   **To Update:** Drag and drop existing `.jar` files or your `.mrpack` into the upload area
     *   **To Discover:** Use the search bar to find new mods from Modrinth
 3.  **⚙️ Process Your List:** Click the "Update" button and watch the magic happen
-4.  **📥 Review & Download:** Get latest compatible versions plus dependencies - download individually, as a `.zip`, or as a complete `.mrpack`
+4.  **📥 Review & Download:** Get latest compatible versions plus dependencies that you can download individually, as a `.zip`, or as a complete `.mrpack`
 
 ## 🛠️ Tech Stack
 
