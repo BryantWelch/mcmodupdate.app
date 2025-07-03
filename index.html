@@ -2418,7 +2418,7 @@
         card.innerHTML = `
           <div class="result-card-main">
             <a href="${projectUrl}" target="_blank" rel="noopener noreferrer" class="mod-icon-link">
-              <img src="${mod.icon_url}" alt="${mod.title} icon" class="mod-icon" onerror="this.src=DEFAULT_MOD_ICON">
+              <img src="${mod.icon_url || DEFAULT_MOD_ICON}" alt="${mod.title} icon" class="mod-icon" onerror="this.src=DEFAULT_MOD_ICON">
             </a>
             <div class="mod-details">
               <div class="mod-title">
@@ -5358,7 +5358,7 @@ function createWarningCard(mod) {
   card.innerHTML = `
     <div class="result-card-main">
       <a href="${mod.project_url}" target="_blank" rel="noopener noreferrer" class="mod-icon-link">
-        <img src="${mod.icon_url}" alt="${mod.title} icon" class="mod-icon" onerror="this.src=DEFAULT_MOD_ICON">
+        <img src="${mod.icon_url || DEFAULT_MOD_ICON}" alt="${mod.title} icon" class="mod-icon" onerror="this.src=DEFAULT_MOD_ICON">
       </a>
       <div class="mod-details">
         <div class="mod-title">
