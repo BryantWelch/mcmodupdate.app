@@ -1,0 +1,103 @@
+name: ❓ Question / Support
+description: Ask a question or get help using MC Mod Updater
+title: "[Question]: "
+labels: ["question", "needs-triage"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have a question about MC Mod Updater? We're here to help! 
+        
+        Before asking, please check if your question is already answered in the [README](https://github.com/mcmodupdate/mcmodupdate.app/blob/main/README.md).
+
+  - type: checkboxes
+    id: preliminary-checks
+    attributes:
+      label: Preliminary Checks
+      description: Please confirm the following before proceeding
+      options:
+        - label: I have read the README and didn't find an answer to my question
+          required: true
+        - label: I have searched existing issues to see if this question was already asked
+          required: true
+
+  - type: dropdown
+    id: question-category
+    attributes:
+      label: Question Category
+      description: What type of question is this?
+      options:
+        - How to use a specific feature
+        - Compatibility question (Minecraft/mod versions)
+        - File format support
+        - Troubleshooting (not a bug)
+        - Best practices / workflow advice
+        - Privacy / security question
+        - Technical / development question
+        - Other (please specify in your question)
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Your Question
+      description: What would you like to know?
+      placeholder: Please ask your question clearly and provide as much context as possible
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Provide any relevant context that might help us answer your question
+      placeholder: |
+        - What you're trying to accomplish
+        - What you've already tried
+        - Specific versions or configurations you're working with
+        - Any error messages (if applicable)
+
+  - type: dropdown
+    id: experience-level
+    attributes:
+      label: Experience Level
+      description: How familiar are you with Minecraft modding?
+      options:
+        - New to modding - just getting started
+        - Casual user - basic modding experience
+        - Experienced - comfortable with mods and modpacks
+        - Advanced user - experienced with mod development or server management
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform (if relevant)
+      description: Which mod platform is your question about?
+      options:
+        - Not applicable
+        - Fabric
+        - Forge
+        - NeoForge
+        - Quilt
+        - Multiple platforms
+        - Not sure / other
+
+  - type: input
+    id: minecraft-version
+    attributes:
+      label: Minecraft Version (if relevant)
+      description: What Minecraft version are you working with?
+      placeholder: e.g., 1.20.1, 1.19.4, or "latest"
+
+  - type: textarea
+    id: examples
+    attributes:
+      label: Examples or Screenshots
+      description: If helpful, provide examples or screenshots (Optional)
+      placeholder: |
+        You can drag and drop images here, or paste links to examples.
+        This can help us understand your question better. 
