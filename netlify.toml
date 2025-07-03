@@ -13,7 +13,7 @@
     X-Content-Type-Options = "nosniff"
     X-XSS-Protection = "1; mode=block"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://app.rybbit.io; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: https://storage.ko-fi.com; connect-src 'self' https://api.modrinth.com https://cdn.modrinth.com https://app.rybbit.io; font-src 'self' data:; frame-src 'none'; object-src 'none'; base-uri 'self';"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://app.rybbit.io; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: https://storage.ko-fi.com; media-src 'self' https://github.com https://raw.githubusercontent.com https://cdn.modrinth.com; connect-src 'self' https://api.modrinth.com https://cdn.modrinth.com https://app.rybbit.io; font-src 'self' data:; frame-src 'none'; object-src 'none'; base-uri 'self';"
 
 # Cache static assets
 [[headers]]
