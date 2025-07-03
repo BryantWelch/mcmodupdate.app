@@ -5110,7 +5110,7 @@ function createSuccessCard(mod) {
         mod.project_url
       }" target="_blank" rel="noopener noreferrer" class="mod-icon-link">
         <img src="${
-          mod.icon_url
+          mod.icon_url || DEFAULT_MOD_ICON
         }" alt="${
     mod.title
   } icon" class="mod-icon" onerror="this.src=DEFAULT_MOD_ICON">
