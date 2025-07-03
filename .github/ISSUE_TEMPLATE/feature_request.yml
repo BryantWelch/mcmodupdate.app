@@ -1,0 +1,159 @@
+name: ✨ Feature Request
+description: Suggest a new feature or enhancement for MC Mod Updater
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for suggesting a new feature! Please fill out this form to help us understand your request.
+        
+        Before submitting, please check if a similar feature request already exists.
+
+  - type: checkboxes
+    id: preliminary-checks
+    attributes:
+      label: Preliminary Checks
+      description: Please confirm the following before proceeding
+      options:
+        - label: I have searched for existing feature requests that might be similar
+          required: true
+        - label: This feature would benefit multiple users, not just my specific use case
+          required: true
+        - label: This feature aligns with the project's goal of mod updating and management
+          required: true
+
+  - type: textarea
+    id: feature-summary
+    attributes:
+      label: Feature Summary
+      description: A brief, clear summary of the feature you'd like to see
+      placeholder: In one or two sentences, describe the feature you're requesting
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem-statement
+    attributes:
+      label: Problem Statement
+      description: What problem does this feature solve?
+      placeholder: |
+        Describe the problem or limitation you're experiencing that this feature would address.
+        Example: "Currently, I have to manually check each mod's compatibility..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed Solution
+      description: Describe how you envision this feature working
+      placeholder: |
+        Provide a detailed description of how this feature should work.
+        Include:
+        - User interface changes
+        - New functionality
+        - How users would interact with it
+    validations:
+      required: true
+
+  - type: dropdown
+    id: feature-category
+    attributes:
+      label: Feature Category
+      description: What category does this feature fall into?
+      options:
+        - User Interface / UX
+        - Mod Compatibility
+        - File Processing
+        - Performance / Speed
+        - Integration (APIs, external services)
+        - Export / Download Options
+        - Analytics / Statistics
+        - Accessibility
+        - Mobile Experience
+        - Other (please specify in additional details)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: user-type
+    attributes:
+      label: Primary User Type
+      description: Who would primarily benefit from this feature?
+      options:
+        - Casual mod users
+        - Modpack creators
+        - Server administrators
+        - Mod developers
+        - All users
+        - Other (please specify in additional details)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority-level
+    attributes:
+      label: Priority Level
+      description: How important is this feature to you?
+      options:
+        - Nice to have - would be a small improvement
+        - Useful - would noticeably improve my workflow
+        - Important - would significantly help my use case
+        - Critical - currently prevents me from using the tool effectively
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-cases
+    attributes:
+      label: Use Cases & Examples
+      description: Provide specific examples of how this feature would be used
+      placeholder: |
+        Describe 2-3 specific scenarios where this feature would be helpful:
+        1. When a user...
+        2. If someone wants to...
+        3. For example, when...
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternative Solutions
+      description: Have you considered any alternative approaches?
+      placeholder: |
+        - Other ways this problem could be solved
+        - Workarounds you currently use
+        - Similar features in other tools
+
+  - type: textarea
+    id: technical-considerations
+    attributes:
+      label: Technical Considerations
+      description: Any technical aspects to consider? (Optional)
+      placeholder: |
+        If you have technical knowledge, mention:
+        - API limitations or requirements
+        - Performance implications
+        - Browser compatibility concerns
+        - Privacy/security considerations
+
+  - type: textarea
+    id: mockups-references
+    attributes:
+      label: Mockups or References
+      description: Any visual examples or references? (Optional)
+      placeholder: |
+        - Links to similar features in other applications
+        - Rough sketches or mockups (you can drag and drop images)
+        - Screenshots of existing UI that could be modified
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Anything else you'd like to add?
+      placeholder: |
+        - How this relates to your workflow
+        - Impact on other users
+        - Any other relevant information 

@@ -1,0 +1,17 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🌐 Visit MC Mod Updater
+    url: https://mcmodupdate.app
+    about: Try the tool online - no installation required!
+  
+  - name: 📖 Documentation & FAQ
+    url: https://github.com/mcmodupdate/mcmodupdate.app/blob/main/README.md
+    about: Check the README for common questions and detailed information
+  
+  - name: 💬 Community Discussions
+    url: https://github.com/mcmodupdate/mcmodupdate.app/discussions
+    about: Join community discussions, share tips, and connect with other users
+  
+  - name: ☕ Support the Project
+    url: https://ko-fi.com/mcmodupdate
+    about: Buy us a coffee to support ongoing development and hosting costs 
