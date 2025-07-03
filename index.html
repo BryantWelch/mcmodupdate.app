@@ -2967,7 +2967,6 @@ async function handleUpdate() {
         }
 
         if (result.status === "success" && renderedModIds.has(result.modId)) {
-          console.log(`Skipping duplicate render for: ${result.title}`);
         } else {
           renderSingleResult(result);
           if (result.status === "success") {
@@ -3101,7 +3100,7 @@ async function handleUpdate() {
           processedIds.add(key);
 
           if (result.status === "success" && renderedModIds.has(result.modId)) {
-            console.log(`Skipping duplicate render for dependency: ${result.title}`);
+    
           } else {
             renderSingleResult(result);
             if (result.status === "success") {
@@ -4176,7 +4175,7 @@ window.updateDownloadCounters = function() {
       
 
     } else {
-      console.log('successfulDownloads not available, skipping counter update');
+
     }
   } catch (error) {
     console.error('Error updating download counters:', error);
@@ -4801,7 +4800,6 @@ async function copyToClipboard(text, button, listType) {
 
         // First, check for duplicates.
         if (result.status === "success" && renderedModIds.has(result.modId)) {
-          console.log(`Skipping duplicate render for: ${result.title}`);
           // If it's a duplicate, we do nothing else.
         } else {
           // If it's NOT a duplicate (or it's a warning/failure), then we render it.
@@ -5578,7 +5576,6 @@ function createFailureCard(mod) {
         const downloadsToProcess = successfulDownloads.filter(dl => {
           return !window.ignoredMods || !window.ignoredMods.has(dl.projectId);
         });
-
         
         if (downloadsToProcess.length === 0) {
           alert('No mods to download. All mods are currently ignored.');
@@ -5610,7 +5607,7 @@ function createFailureCard(mod) {
                 const blob = await response.blob();
                 modsFolder.file(dl.filename, blob);
               } else {
-                console.warn(`Failed to download ${dl.filename}`);
+                console.warn(`Failed to download ${dl.filename}`, response.status, response.statusText);
               }
             } catch (error) {
               console.warn(`Error downloading ${dl.filename}:`, error);
