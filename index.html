@@ -2066,6 +2066,7 @@
       let sectionCounts = {};
       let renderedModIds = new Set();
       let searchedMods = new Map();
+      let mrpackMods = new Map(); // For mods from .mrpack files
       let isCurrentlySearching = false;
       let welcomeMessageSnapshot = null; // Store the welcome message snapshot
       let apiCallCount = 0; // Track total API calls made
@@ -2219,6 +2220,7 @@
         uploadedFiles.clear();
 
         searchedMods.clear();
+        mrpackMods.clear();
 
         // Clear the visual file pills from the UI
         fileListContainer.innerHTML = "";
@@ -2780,8 +2782,8 @@
 
               if (sha1Hash && filename) {
                 // Use the hash as the unique key and store the filename for display.
-                // This reuses your existing `searchedMods` map perfectly.
-                searchedMods.set(sha1Hash, { title: filename });
+                // This uses the new `mrpackMods` map to keep them separate.
+                mrpackMods.set(sha1Hash, { title: filename });
                 createFilePill({ name: filename });
               }
             }
@@ -3004,6 +3006,7 @@ async function handleUpdate() {
           totalFiles: uploadedFiles.size,
           jarFileCount: jarFiles.length,
           mrpackFileCount: mrpackFiles.length,
+          mrpackModsCount: mrpackMods.size, // Added for .mrpack mods
           searchedModsCount: searchedMods.size,
           selectedLoader: modLoaderSelect.value,
           selectedMcVersion: mcVersionSelect.value
@@ -3027,7 +3030,13 @@ async function handleUpdate() {
       };
     }
   );
-  const jobs = [...fileJobs, ...searchJobs];
+  const mrpackJobs = Array.from(mrpackMods.entries()).map(([key, modInfo]) => ({
+    type: "hash", // .mrpack mods are always identified by hash
+    data: key,
+    title: modInfo.title,
+  }));
+
+  const jobs = [...fileJobs, ...searchJobs, ...mrpackJobs];
 
   // Check if there's anything to do.
   if (jobs.length === 0) {
