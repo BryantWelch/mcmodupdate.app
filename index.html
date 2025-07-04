@@ -1554,6 +1554,11 @@
       border-radius: 12px !important;
     }
     
+    /* --- Mobile search header layout --- */
+    .modal-search-header .search-container {
+      max-width: none !important;
+    }
+    
     /* Position the search modal overlay differently on mobile */
     #search-modal {
       align-items: center !important;
@@ -1857,7 +1862,17 @@
       <div class="modal-content">
         <button id="search-x-close-button" class="modal-close-button">&times;</button>
         
-        <h2 id="search-title">Search for Mods</h2>
+        <!-- Search header section with centered layout -->
+        <div class="modal-search-header" style="text-align: center; margin-bottom: 2rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border-color);">
+          <h2 id="search-title" style="margin: 0 0 1.25rem 0; font-size: 1.75rem;">Search for Mods</h2>
+          
+          <!-- Duplicate search box inside modal -->
+          <div class="search-container" style="max-width: 300px; margin: 0 auto;">
+            <input type="text" id="modal-search-input" placeholder="Find mods by name..." style="width: 100%; margin-left: 0;">
+            <button id="modal-search-clear-button" class="search-clear-button">&times;</button>
+          </div>
+        </div>
+        
         <div id="search-results-container">
           <p>Start typing in the search bar to find mods.</p>
         </div>
@@ -2061,11 +2076,13 @@
       const scrollToTopBtn = document.getElementById("scroll-to-top-btn");
       const scrollToBottomBtn = document.getElementById("scroll-to-bottom-btn");
       const searchInput = document.getElementById("mod-search");
+      const modalSearchInput = document.getElementById("modal-search-input");
       const searchModal = document.getElementById("search-modal");
       const searchResultsContainer = document.getElementById("search-results-container");
       const searchCloseButton = document.getElementById("search-close-button");
       const searchXCloseButton = document.getElementById("search-x-close-button");
       const searchClearButton = document.getElementById("search-clear-button");
+      const modalSearchClearButton = document.getElementById("modal-search-clear-button");
       const clearResultsButton = document.getElementById("clear-results-button");
 
       // --- UI LOGIC ---
@@ -2318,14 +2335,23 @@
         }
       }
 
-      searchInput.addEventListener("input", (e) => {
-        const query = e.target.value.trim();
+      // Function to handle search input changes (used by both inputs)
+      function handleSearchInput(query, sourceInput) {
+        // Sync both inputs
+        if (sourceInput !== searchInput) {
+          searchInput.value = query;
+        }
+        if (sourceInput !== modalSearchInput) {
+          modalSearchInput.value = query;
+        }
         
-        // Show or hide the clear button
+        // Show or hide clear buttons for both inputs
         if (query.length > 0) {
           searchClearButton.classList.add("show");
+          modalSearchClearButton.classList.add("show");
         } else {
           searchClearButton.classList.remove("show");
+          modalSearchClearButton.classList.remove("show");
         }
 
         // Perform search
@@ -2336,25 +2362,58 @@
         } else {
           searchResultsContainer.innerHTML = "<p>Start typing to find mods.</p>";
         }
-      });
-      // Add click listener for the new clear button
-      searchClearButton.addEventListener("click", () => {
-        // Clear the input field
+      }
+
+      // Function to clear search (used by both clear buttons)
+      function clearSearch(focusInput) {
+        // Clear both input fields
         searchInput.value = "";
-        // Hide the clear button itself
+        modalSearchInput.value = "";
+        // Hide both clear buttons
         searchClearButton.classList.remove("show");
+        modalSearchClearButton.classList.remove("show");
         // Reset the search results in the modal
         searchResultsContainer.innerHTML = "<p>Start typing to find mods.</p>";
         // Reset search state
         currentSearchQuery = "";
         currentSearchOffset = 0;
         totalSearchResults = 0;
-        // Give focus back to the input field so the user can type a new query
-        searchInput.focus();
+        // Focus the specified input
+        if (focusInput) {
+          focusInput.focus();
+        }
+      }
+
+      // Event listeners for both search inputs
+      searchInput.addEventListener("input", (e) => {
+        const query = e.target.value.trim();
+        handleSearchInput(query, searchInput);
+      });
+
+      modalSearchInput.addEventListener("input", (e) => {
+        const query = e.target.value.trim();
+        handleSearchInput(query, modalSearchInput);
+      });
+
+      // Event listeners for both clear buttons
+      searchClearButton.addEventListener("click", () => {
+        clearSearch(searchInput);
+      });
+
+      modalSearchClearButton.addEventListener("click", () => {
+        clearSearch(modalSearchInput);
       });
       
+      // Focus event listeners for both search inputs
       searchInput.addEventListener("focus", () => {
         if(searchInput.value.trim().length > 1) {
+            positionSearchModal();
+            searchModal.classList.add("visible");
+        }
+      });
+
+      modalSearchInput.addEventListener("focus", () => {
+        if(modalSearchInput.value.trim().length > 1) {
             positionSearchModal();
             searchModal.classList.add("visible");
         }
@@ -2822,8 +2881,9 @@ document.addEventListener("DOMContentLoaded", () => {
   populateMcVersions();
   handleScrollButtons(); // This runs our check once on load
   
-  // Clear the search input on page load/refresh
+  // Clear both search inputs on page load/refresh
   searchInput.value = "";
+  modalSearchInput.value = "";
   
   // Capture the welcome message snapshot
   welcomeMessageSnapshot = resultsArea.innerHTML;
@@ -3073,7 +3133,8 @@ async function handleUpdate() {
       const dependencyJobs = unprocessedDependencies.map(depId => ({
         type: "id",
         data: depId,
-        title: `Dependency: ${depId}`
+        title: `Dependency: ${depId}`,
+        isDependencyJob: true  // Flag to distinguish from original search jobs
       }));
       
       let depCompletedJobs = 0;
@@ -3731,7 +3792,7 @@ async function combineResults(jobs, hashResults, projectsData, authorData, versi
         downloads: projectDetails.downloads,
         all_versions: versions,
         dependencies: latestVersion.dependencies,
-        isDependency: job.type === "id"
+        isDependency: job.isDependencyJob === true
       });
       
     } catch (error) {
