@@ -2359,7 +2359,7 @@
         }
       }
 
-      const debouncedSearch = debounce(performSearch, 500);
+      const debouncedSearch = debounce(performSearch, 600);
 
       // --- Position Search Modal Function ---
       function positionSearchModal() {
@@ -2602,8 +2602,6 @@
               window.rybbit.event('Search Interaction', {
                 action: 'add_from_results',
                 modTitle: title,
-                modSlug: slug,
-                modProjectId: projectId,
                 selectedLoader: modLoaderSelect.value,
                 selectedMcVersion: mcVersionSelect.value
               });
