@@ -2251,6 +2251,20 @@
       }
 
       async function performSearch(query, isLoadMore = false) {
+        // --- Rybbit Analytics Event ---
+        try {
+          if (window.rybbit && query) { // Only track if there's a query
+            window.rybbit.event('Search Interaction', {
+              action: 'query',
+              query: query,
+              isLoadMore: isLoadMore,
+              selectedLoader: modLoaderSelect.value,
+              selectedMcVersion: mcVersionSelect.value
+            });
+          }
+        } catch (e) {
+          console.error('Rybbit analytics error:', e);
+        }
         if (!query) {
           searchResultsContainer.innerHTML = "<p>Start typing to find mods.</p>";
           currentSearchQuery = "";
@@ -2581,6 +2595,22 @@
           const slug = e.target.dataset.slug;
           const projectId = e.target.dataset.projectId;
           const title = e.target.dataset.title;
+
+          // --- Rybbit Analytics Event ---
+          try {
+            if (window.rybbit) {
+              window.rybbit.event('Search Interaction', {
+                action: 'add_from_results',
+                modTitle: title,
+                modSlug: slug,
+                modProjectId: projectId,
+                selectedLoader: modLoaderSelect.value,
+                selectedMcVersion: mcVersionSelect.value
+              });
+            }
+          } catch (err) {
+            console.error('Rybbit analytics error:', err);
+          }
 
           if (!searchedMods.has(projectId)) {
             searchedMods.set(projectId, { title: title });
