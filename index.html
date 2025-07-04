@@ -2966,6 +2966,24 @@ function resetResults() {
 updateButton.addEventListener("click", handleUpdate);
 
 async function handleUpdate() {
+    // --- Rybbit Analytics Event ---
+    try {
+      if (window.rybbit) {
+        const jarFiles = Array.from(uploadedFiles.values()).filter(f => f.name.endsWith('.jar'));
+        const mrpackFiles = Array.from(uploadedFiles.values()).filter(f => f.name.endsWith('.mrpack'));
+
+        window.rybbit.event('Update Mods Clicked', {
+          totalFiles: uploadedFiles.size,
+          jarFileCount: jarFiles.length,
+          mrpackFileCount: mrpackFiles.length,
+          searchedModsCount: searchedMods.size,
+          selectedLoader: modLoaderSelect.value,
+          selectedMcVersion: mcVersionSelect.value
+        });
+      }
+    } catch (e) {
+      console.error('Rybbit analytics error:', e);
+    }
   // Combine jobs from both sources first.
   const fileJobs = Array.from(uploadedFiles.values()).map((file) => ({
     type: "file",
