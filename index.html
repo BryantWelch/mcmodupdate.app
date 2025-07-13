@@ -1748,9 +1748,13 @@
         <p id="dropzone-prompt" class="dropzone-prompt">
           Upload your mod files (.jar),
           <br />
-          Upload a modpack (.mrpack)
+          resource packs/shaders (.zip),
           <br />
-          or use the search
+          modpacks (.mrpack),
+          <br />
+          or 
+          <br />
+          use the search
         </p>
       </div>
       <div class="action-buttons-container">
@@ -1799,10 +1803,7 @@
           </p>
           <h3 style="text-align: center; margin-top: 2rem">Ready to Start?</h3>
           <p style="text-align: left; line-height: 1.6">
-            To get started, you can upload an entire modpack
-            <code>.mrpack</code> to update it, drag and drop your individual
-            <code>.jar</code> files, or use the search bar to find new mods. Then,
-            click the "Update" button to see the magic happen!
+            To get started, you can upload an entire modpack (<code>.mrpack</code>), individual mods (<code>.jar</code>), resource packs/shaders (<code>.zip</code>), or use the search bar to find new content. Then, click the "Update" button to see the magic happen!
           </p>
           <p
             style="
@@ -1819,13 +1820,7 @@
         </div>
       </div>
     </div>
-    <input
-      type="file"
-      id="file-input"
-      multiple
-      style="display: none"
-      accept=".jar,.mrpack"
-    />
+    <input type="file" id="file-input" multiple style="display: none" accept=".jar,.mrpack,.zip" />
 
     <!-- Info Modal -->
     <div id="info-modal" class="modal-overlay">
@@ -1840,8 +1835,7 @@
         <h3>How to Use:</h3>
         <ul>
           <li><b>Loader / Version:</b> Select your desired mod loader (Fabric, Forge, NeoForge, Quilt) and target Minecraft version.</li>
-          <li><b>Upload a Modpack:</b> Drop a <code>.mrpack</code> file to load its entire mod list for updating.</li>
-          <li><b>Upload Individual Mods:</b> Drag and drop your local <code>.jar</code> files into the upload area.</li>
+          <li><b>Upload Files:</b> Drop a <code>.mrpack</code> file to load a modpack, or drag and drop your local <code>.jar</code> (mods) and <code>.zip</code> (resource packs, shaders) files into the upload area.</li>
           <li><b>Search for New Mods:</b> Use the search bar to find and add mods directly from Modrinth.</li>
           <li><b>Process Your List:</b> Click "Update" to find the latest compatible versions and dependencies.</li>
         </ul>
@@ -2525,6 +2519,7 @@
             <div class="mod-details">
               <div class="mod-title">
                 <a href="${projectUrl}" target="_blank" rel="noopener noreferrer">${mod.title}</a>
+                ${mod.project_type ? `<span class="mod-title-tag">(${mod.project_type.charAt(0).toUpperCase() + mod.project_type.slice(1)})</span>` : ''}
               </div>
               <div class="mod-author">
                 by <a href="${authorUrl}" target="_blank" rel="noopener noreferrer">${mod.author}</a>
@@ -2678,21 +2673,23 @@
         if (mrpackFile) {
           // If a modpack is found, clear everything and process only the pack.
           clearDropzone();
+          // Add the .mrpack file itself to uploadedFiles so it can be updated as a whole package
+          uploadedFiles.set(mrpackFile.name, mrpackFile);
           processMrpack(mrpackFile);
         } else {
           // Separate validation for better error messages
-          const jarFiles = Array.from(files).filter((file) => file.name.endsWith(".jar"));
-          const duplicateFiles = jarFiles.filter((file) => uploadedFiles.has(file.name));
-          const validJarFiles = jarFiles.filter((file) => !uploadedFiles.has(file.name));
-          const invalidFiles = Array.from(files).filter((file) => !file.name.endsWith(".jar"));
-          
-          if (validJarFiles.length > 0) {
+          const acceptedFiles = Array.from(files).filter(file => file.name.endsWith('.jar') || file.name.endsWith('.zip'));
+          const duplicateFiles = acceptedFiles.filter(file => uploadedFiles.has(file.name));
+          const validFiles = acceptedFiles.filter(file => !uploadedFiles.has(file.name));
+          const invalidFiles = Array.from(files).filter(file => !file.name.endsWith('.jar') && !file.name.endsWith('.zip'));
+
+          if (validFiles.length > 0) {
             // Only update UI if we have valid files
             dropzonePrompt.style.display = "none";
             dropzone.classList.add("dropzone-expanded");
             clearAllButton.style.display = "inline-flex";
-            
-            for (const file of validJarFiles) {
+
+            for (const file of validFiles) {
               uploadedFiles.set(file.name, file);
               createFilePill(file);
             }
@@ -2702,7 +2699,7 @@
               // Only duplicates
               const fileNames = duplicateFiles.map(f => f.name).join(", ");
               showCustomAlert(
-                `The following mod file(s) are already uploaded: ${fileNames}`,
+                `The following file(s) are already uploaded: ${fileNames}`,
                 "notice",
                 "Duplicate Files"
               );
@@ -2710,14 +2707,14 @@
               // Both duplicates and invalid files
               const duplicateNames = duplicateFiles.map(f => f.name).join(", ");
               showCustomAlert(
-                `Some files are already uploaded (${duplicateNames}) and others are not valid mod files. Please upload valid Minecraft mod files (.jar) or a Modrinth modpack (.mrpack).`,
+                `Some files are already uploaded (${duplicateNames}) and others are not valid. Please upload .jar, .zip, or .mrpack files.`,
                 "notice",
                 "Mixed File Issues"
               );
             } else {
               // Only invalid file types
               showCustomAlert(
-                "Please upload valid Minecraft mod files (.jar) or a Modrinth modpack (.mrpack).",
+                "Please upload valid files (.jar, .zip) or a Modrinth modpack (.mrpack).",
                 "notice",
                 "Invalid File Type"
               );
@@ -2733,6 +2730,9 @@
           dropzonePrompt.style.display = "none";
           dropzone.classList.add("dropzone-expanded");
           clearAllButton.style.display = "inline-flex";
+          // Create a pill for the .mrpack file itself (to be updated as a whole)
+          createFilePill(packFile);
+          // Also create a temporary processing pill
           createFilePill({ name: `Processing: ${packFile.name}...` }); // Temporary pill
 
           const zip = await JSZip.loadAsync(packFile);
@@ -2750,8 +2750,12 @@
           const content = await manifestFile.async("string");
           const manifest = JSON.parse(content);
 
-          // Clear the temporary "Processing..." pill
-          fileListContainer.innerHTML = "";
+          // Clear only the temporary "Processing..." pill but keep the .mrpack pill
+          const processingPill = Array.from(fileListContainer.children).find(pill => 
+            pill.querySelector('span').textContent.startsWith('Processing:'));
+          if (processingPill) {
+            processingPill.remove();
+          }
 
           // --- Informational Message: Get Source Version and Loader ---
           let sourceVersion = "unknown";
@@ -3019,10 +3023,20 @@ async function handleUpdate() {
       console.error('Rybbit analytics error:', e);
     }
   // Combine jobs from both sources first.
-  const fileJobs = Array.from(uploadedFiles.values()).map((file) => ({
-    type: "file",
-    data: file,
-  }));
+  const fileJobs = Array.from(uploadedFiles.values()).map((file) => {
+    // Create a special job type for .mrpack files to handle them as modpacks
+    if (file.name.endsWith(".mrpack")) {
+      return {
+        type: "mrpack",
+        data: file,
+        isMrpackFile: true, // Flag to identify it's the actual .mrpack file
+      };
+    }
+    return {
+      type: "file",
+      data: file,
+    };
+  });
   const searchJobs = Array.from(searchedMods.entries()).map(
     ([key, modInfo]) => {
       const isHash = /^[a-f0-9]{40}$/.test(key);
@@ -3163,112 +3177,81 @@ async function handleUpdate() {
       }
     }
 
-        // Phase 2: Process dependencies
-    // Filter out dependencies that are already processed
-    const unprocessedDependencies = Array.from(allDependencies).filter(depId => !processedIds.has(depId));
-    let actualDependenciesAdded = 0; // Track dependencies that are actually added
-    
-    // Handle cached dependencies that need their download info added
-    // Check each dependency to see if it's already rendered but missing from successfulDownloads
-    for (const depId of allDependencies) {
-      // Check if this dependency is already in successfulDownloads
-      const alreadyInDownloads = successfulDownloads.some(dl => dl.projectId === depId);
-      
-      if (!alreadyInDownloads) {
-        // Get cached dependency from cache
-        const loader = modLoaderSelect.value;
-        const gameVersion = mcVersionSelect.value;
-        const cacheKey = getCacheKey(depId, loader, gameVersion, "id");
-        const cachedResult = getCachedResult(cacheKey);
-        
-        if (cachedResult && cachedResult.status === "success") {
-          // Add cached dependency to successfulDownloads
-          if (cachedResult.all_versions && cachedResult.all_versions.length > 0) {
-            const latestVersion = cachedResult.all_versions.find(v => v.version_type === "release") || 
-                                 cachedResult.all_versions.find(v => v.version_type === "beta") || 
-                                 cachedResult.all_versions.find(v => v.version_type === "alpha");
-            
-            if (latestVersion) {
-              const primaryFile = latestVersion.files.find(f => f.primary);
-              if (primaryFile) {
-                const downloadInfo = {
-                  url: primaryFile.url,
-                  filename: primaryFile.filename,
-                  hashes: primaryFile.hashes,
-                  path: `mods/${primaryFile.filename}`,
-                  fileSize: primaryFile.size,
-                  client_side: cachedResult.client_side,
-                  server_side: cachedResult.server_side,
-                  projectId: cachedResult.projectId,
-                };
-                
-                successfulDownloads.push(downloadInfo);
+        // Phase 2: Recursively process dependencies
+    let dependencyQueue = Array.from(allDependencies).filter(depId => !processedIds.has(depId));
+    let actualDependenciesAdded = 0;
+    const totalInitialDependencies = dependencyQueue.length;
+    let dependenciesProcessed = 0;
+
+    while (dependencyQueue.length > 0) {
+      const currentBatchIds = dependencyQueue.splice(0, 25); // Process in batches
+      statusMessage.textContent = `Resolving dependencies... (${dependenciesProcessed}/${totalInitialDependencies} initial, ${dependencyQueue.length} in queue)`;
+
+      const dependencyJobs = currentBatchIds.map(depId => ({
+        type: 'id',
+        data: depId,
+        title: `Dependency: ${depId}`,
+        isDependencyJob: true,
+      }));
+
+      const results = await getModUpdateInfoBatch(dependencyJobs, dependencyJobs.length);
+
+      for (const result of results) {
+        const key = result.modId || result.projectId || (result.title + result.reason);
+
+        if (processedIds.has(key)) {
+          if (result.status === "success" && result.projectId) {
+            updateDependencyChainTooltip(result.projectId, result.title);
+          }
+          continue;
+        }
+        processedIds.add(key);
+        dependenciesProcessed++;
+
+        // Render the dependency card
+        renderSingleResult(result);
+
+        if (result.status === "success") {
+          actualDependenciesAdded++;
+          renderedModIds.add(result.modId);
+          modIdToNameMap.set(result.projectId, result.title);
+          updateDependencyChainTooltip(result.projectId, result.title);
+
+          // Check for nested dependencies
+          if (result.dependencies) {
+            for (const dep of result.dependencies) {
+              if (dep.dependency_type === "required") {
+                const depKey = dep.project_id;
+                if (!processedIds.has(depKey) && !dependencyQueue.includes(depKey)) {
+                  dependencyQueue.push(depKey); // Add new dependency to the queue
+                  allDependencies.add(depKey); // Keep track of all unique dependencies
+                  dependencyMap.set(depKey, result.title); // Track who requires this
+
+                  // A new dependency relationship was found, so we might need to update the parent's card
+                  const parentProjectId = result.projectId;
+                  if (parentProjectId) {
+                     // Update the reverse map before calling the card update
+                    if (!reverseDependencyMap.has(parentProjectId)) {
+                      reverseDependencyMap.set(parentProjectId, []);
+                    }
+                    reverseDependencyMap.get(parentProjectId).push(depKey);
+                    updateDependencyChainOnCard(parentProjectId);
+                  }
+                }
               }
             }
           }
         }
       }
-    }
-    
-    if (unprocessedDependencies.length > 0) {
-      statusMessage.textContent = `Searching dependencies for ${jobs.length} mods...`;
-      
-      // Create dependency jobs
-      const dependencyJobs = unprocessedDependencies.map(depId => ({
-        type: "id",
-        data: depId,
-        title: `Dependency: ${depId}`,
-        isDependencyJob: true  // Flag to distinguish from original search jobs
-      }));
-      
-      let depCompletedJobs = 0;
-      
-      // Process dependencies in batches of 25
-      while (dependencyJobs.length > 0) {
-        const batchSize = 25;
-        const currentBatch = dependencyJobs.splice(0, batchSize);
-        
-        const results = await getModUpdateInfoBatch(currentBatch, batchSize);
-        
-        // Process and render dependency results
-        for (const result of results) {
-          const key = result.modId || (result.title + result.reason);
-          
-          if (processedIds.has(key)) {
-            // Even if already processed, we still need to update dependency tooltips
-            if (result.status === "success" && result.projectId) {
-              updateDependencyChainTooltip(result.projectId, result.title);
-            }
-            depCompletedJobs++;
-            continue;
-          }
-          processedIds.add(key);
 
-          if (result.status === "success" && renderedModIds.has(result.modId)) {
-    
-          } else {
-            renderSingleResult(result);
-            if (result.status === "success") {
-              renderedModIds.add(result.modId);
-              actualDependenciesAdded++; // Only count successfully added dependencies
-              // Store mod ID to name mapping for dependency tooltips
-              modIdToNameMap.set(result.projectId, result.title);
-              // Update any cards that were waiting for this dependency name
-              updateDependencyChainTooltip(result.projectId, result.title);
-            }
-          }
-          
-          depCompletedJobs++;
-        }
-        
-        // Update progress bar for dependency processing (50% + remaining 50%)
-        const depProgressPercentage = 50 + ((depCompletedJobs / unprocessedDependencies.length) * 50);
-        progressBar.style.width = `${Math.min(depProgressPercentage, 95)}%`;
-        
-        // Add a small delay to let the UI update
-        if (dependencyJobs.length > 0) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
+      // Update progress bar (from 50% to 95% during dependency phase)
+      const totalDependencies = allDependencies.size;
+      const processedDependencyCount = Array.from(allDependencies).filter(id => processedIds.has(id)).length;
+      const depProgressPercentage = 50 + (Math.min(processedDependencyCount / (totalDependencies || 1), 1) * 45);
+      progressBar.style.width = `${depProgressPercentage}%`;
+
+      if (dependencyQueue.length > 0) {
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
     }
 
@@ -3447,9 +3430,9 @@ async function processBatch(jobs) {
   const uncachedJobs = [];
   const processedCacheKeys = new Set(); // Prevent double-counting
   
-  // Pre-calculate all hashes in parallel for uploaded files
+  // Pre-calculate all hashes in parallel for uploaded files and mrpack files
   const fileHashPromises = jobs
-    .filter(job => job.type === "file")
+    .filter(job => job.type === "file" || job.type === "mrpack")
     .map(async job => {
       const hash = await calculateFileHash(job.data);
       return { job, hash };
@@ -3463,6 +3446,13 @@ async function processBatch(jobs) {
     if (job.type === "file") {
       const hash = hashMap.get(job);
       if (hash) {
+        cacheKey = getCacheKey(hash, loader, gameVersion, 'hash');
+      }
+    } else if (job.type === "mrpack") {
+      // For .mrpack files, we want to look up the modpack itself as a project
+      const hash = hashMap.get(job);
+      if (hash) {
+        // Use the hash to look up the modpack
         cacheKey = getCacheKey(hash, loader, gameVersion, 'hash');
       }
     } else if (job.type === "hash") {
@@ -3528,6 +3518,14 @@ async function processBatchUncached(uncachedJobs, loader, gameVersion) {
       } else {
         fileJobs.push(job);
       }
+    } else if (job.type === "mrpack") {
+      // For .mrpack files, we want to look up the modpack itself as a project
+      const hash = await calculateFileHash(job.data);
+      if (hash) {
+        hashJobs.push({ job, hash });
+      } else {
+        fileJobs.push(job);
+      }
     } else if (job.type === "hash") {
       hashJobs.push({ job, hash: job.data });
     } else if (job.type === "id") {
@@ -3550,7 +3548,7 @@ async function processBatchUncached(uncachedJobs, loader, gameVersion) {
   const authorData = await batchAuthorLookup(projectsData);
   
   // Step 5: Batch version lookups for compatible versions
-  const versionData = await batchVersionLookup(allProjectIds, loader, gameVersion);
+  const versionData = await batchVersionLookup(projectsData, loader, gameVersion);
   
   // Step 6: Combine results
   return await combineResults(uncachedJobs, hashResults, projectsData, authorData, versionData);
@@ -3669,61 +3667,65 @@ async function batchOrganizationLookup(orgIds) {
 }
 
 // --- Batch Version Lookup Function ---
-async function batchVersionLookup(projectIds, loader, gameVersion) {
-  if (projectIds.length === 0) return {};
-  
-  // Fetch ALL versions for each project in a single API call
-  // Then analyze client-side for both compatibility and precise error messages
-  const versionPromises = projectIds.map(async (projectId) => {
-    const allVersionsUrl = `https://api.modrinth.com/v2/project/${projectId}/version`;
-    const response = await fetchWithRetry(allVersionsUrl);
-    
-    let allVersions = [];
-    if (response.ok) {
-      allVersions = await response.json();
-    }
-    
-    // Filter for compatible versions (both loader and game version match)
-    const compatibleVersions = allVersions.filter(v => 
-      v.loaders.includes(loader) && v.game_versions.includes(gameVersion)
-    );
-    
-    // Analyze what's available for precise error messages
-    const hasGameVersion = allVersions.some(v => v.game_versions.includes(gameVersion));
-    const hasLoader = allVersions.some(v => v.loaders.includes(loader));
-    
-    let compatibilityStatus = 'compatible';
-    if (compatibleVersions.length === 0) {
-      if (hasGameVersion && !hasLoader) {
-        compatibilityStatus = 'wrong-loader';
-      } else if (!hasGameVersion && hasLoader) {
-        compatibilityStatus = 'wrong-version';
-      } else if (!hasGameVersion && !hasLoader) {
-        compatibilityStatus = 'no-versions';
-      } else if (hasGameVersion && hasLoader) {
-        // Both exist separately, but no version supports both
-        compatibilityStatus = 'separate-versions';
-      } else {
-        compatibilityStatus = 'incompatible';
-      }
-    }
-    
-    return { 
-      projectId, 
-      versions: compatibleVersions,
-      allVersions,
-      compatibilityStatus,
-      hasGameVersion,
-      hasLoader
-    };
-  });
-  
-  const results = await Promise.all(versionPromises);
-  
-  return results.reduce((acc, result) => {
-    acc[result.projectId] = result;
-    return acc;
-  }, {});
+async function batchVersionLookup(projectsData, loader, gameVersion) {
+      const projectIds = Object.keys(projectsData);
+      if (projectIds.length === 0) return {};
+
+      const versionPromises = projectIds.map(async (projectId) => {
+        const project = projectsData[projectId];
+        const isMod = project.project_type === 'mod';
+
+        const allVersionsUrl = `https://api.modrinth.com/v2/project/${projectId}/version`;
+        const response = await fetchWithRetry(allVersionsUrl);
+
+        let allVersions = [];
+        if (response.ok) {
+          allVersions = await response.json();
+        }
+
+        // Filter for compatible versions based on project type
+        const compatibleVersions = allVersions.filter(v => {
+          const gameVersionMatch = v.game_versions.includes(gameVersion);
+          return isMod ? (v.loaders.includes(loader) && gameVersionMatch) : gameVersionMatch;
+        });
+
+        // Analyze what's available for precise error messages
+        const hasGameVersion = allVersions.some(v => v.game_versions.includes(gameVersion));
+        // For non-mods, we can pretend the loader is always compatible to avoid wrong errors.
+        const hasLoader = !isMod || allVersions.some(v => v.loaders.includes(loader));
+
+        let compatibilityStatus = 'compatible';
+        if (compatibleVersions.length === 0) {
+            if (hasGameVersion && !hasLoader) {
+                compatibilityStatus = 'wrong-loader';
+            } else if (!hasGameVersion && hasLoader) {
+                compatibilityStatus = 'wrong-version';
+            } else if (!hasGameVersion && !hasLoader) {
+                compatibilityStatus = 'no-versions';
+            } else if (hasGameVersion && hasLoader) {
+                // This case now correctly handles mods where versions for the loader and game exist, but not together.
+                compatibilityStatus = 'separate-versions';
+            } else {
+                compatibilityStatus = 'incompatible';
+            }
+        }
+
+        return {
+          projectId,
+          versions: compatibleVersions,
+          allVersions,
+          compatibilityStatus,
+          hasGameVersion,
+          hasLoader
+        };
+      });
+
+      const results = await Promise.all(versionPromises);
+
+      return results.reduce((acc, result) => {
+        acc[result.projectId] = result;
+        return acc;
+      }, {});
 }
 
 // --- Results Combination Function ---
@@ -3738,7 +3740,7 @@ async function combineResults(jobs, hashResults, projectsData, authorData, versi
       
       // Find project details based on job type
       let fileHash = null; // Track hash for caching
-      if (job.type === "hash" || job.type === "file") {
+      if (job.type === "hash" || job.type === "file" || job.type === "mrpack") {
         const hashResult = hashResults.find(hr => hr.job === job);
         if (hashResult?.versionData) {
           projectDetails = projectsData[hashResult.versionData.project_id];
@@ -3747,7 +3749,7 @@ async function combineResults(jobs, hashResults, projectsData, authorData, versi
         }
         
                  // Get original version from uploaded file if available
-         if (job.type === "file") {
+         if (job.type === "file" || job.type === "mrpack") {
            try {
              originalModInfo = await getModIdFromJar(job.data);
            } catch (e) {
@@ -3817,6 +3819,7 @@ async function combineResults(jobs, hashResults, projectsData, authorData, versi
            downloads: projectDetails.downloads,
            followers: projectDetails.followers,
            categories: projectDetails.categories,
+           project_type: projectDetails.project_type,
            reason: reason
          });
          continue;
@@ -3840,15 +3843,24 @@ async function combineResults(jobs, hashResults, projectsData, authorData, versi
         originalModInfo.version === latestVersion.version_number;
       
       // Gather download info for .mrpack file
+      // Define the folder path based on project type
+      let folderPath = "mods/";
+      if (projectDetails.project_type === "resourcepack") {
+        folderPath = "resourcepacks/";
+      } else if (projectDetails.project_type === "shader") {
+        folderPath = "shaderpacks/";
+      }
+
       const downloadInfo = {
         url: primaryFile.url,
         filename: primaryFile.filename,
         hashes: primaryFile.hashes,
-        path: `mods/${primaryFile.filename}`,
+        path: `${folderPath}${primaryFile.filename}`,
         fileSize: primaryFile.size,
         client_side: projectDetails.client_side,
         server_side: projectDetails.server_side,
         projectId: projectDetails.id, // Add project ID for ignore functionality
+        isMrpackFile: job.type === "mrpack" || job.isMrpackFile === true // Transfer the mrpack flag
       };
       
       // Add to successful downloads if not already tracked
@@ -3874,9 +3886,12 @@ async function combineResults(jobs, hashResults, projectsData, authorData, versi
         server_side: projectDetails.server_side,
         followers: projectDetails.followers,
         downloads: projectDetails.downloads,
+        project_type: projectDetails.project_type,
         all_versions: versions,
         dependencies: latestVersion.dependencies,
-        isDependency: job.isDependencyJob === true
+        isDependency: job.isDependencyJob === true,
+        // Flag if this is the actual .mrpack file (not the extracted mods)
+        isMrpackFile: job.type === "mrpack" || job.isMrpackFile === true
       });
       
     } catch (error) {
@@ -4280,7 +4295,10 @@ window.updateDownloadCounters = function() {
     // Check if successfulDownloads exists and is accessible
     if (typeof successfulDownloads !== 'undefined' && successfulDownloads) {
       const nonIgnoredDownloads = successfulDownloads.filter(dl => {
-        return !window.ignoredMods.has(dl.projectId);
+        // Exclude both ignored mods and .mrpack files from bulk downloads
+        const isIgnored = window.ignoredMods && window.ignoredMods.has(dl.projectId);
+        const isMrpackFile = dl.isMrpackFile === true;
+        return !isIgnored && !isMrpackFile;
       });
       
       // Update Download All button text more reliably
@@ -5026,8 +5044,13 @@ async function copyToClipboard(text, button, listType) {
 
         const foundSection = document.getElementById("results-found");
         if (foundSection && successfulDownloads.length > 0) {
-          // Calculate non-ignored downloads first
-          const nonIgnoredDownloads = successfulDownloads.filter(dl => !window.ignoredMods || !window.ignoredMods.has(dl.projectId));
+          // Calculate non-ignored downloads and exclude .mrpack files from bulk downloads
+          const nonIgnoredDownloads = successfulDownloads.filter(dl => {
+            // Exclude both ignored mods and .mrpack files from bulk downloads
+            const isIgnored = window.ignoredMods && window.ignoredMods.has(dl.projectId);
+            const isMrpackFile = dl.isMrpackFile === true;
+            return !isIgnored && !isMrpackFile;
+          });
           
           const actionsContainer = document.createElement("div");
           actionsContainer.className = "results-actions";
@@ -5056,10 +5079,11 @@ async function copyToClipboard(text, button, listType) {
             <line x1="12" y1="15" x2="12" y2="3"></line>
           </svg>`;
           downloadAllBtn.onclick = () => {
-            // Filter out ignored mods using the global ignoredMods set
+            // Filter out ignored mods and .mrpack files using the global ignoredMods set
             const downloadsToProcess = successfulDownloads.filter(dl => {
               const isIgnored = window.ignoredMods && window.ignoredMods.has(dl.projectId);
-              return !isIgnored;
+              const isMrpackFile = dl.isMrpackFile === true;
+              return !isIgnored && !isMrpackFile;
             });
             
             if (downloadsToProcess.length === 0) {
@@ -5173,9 +5197,16 @@ async function copyToClipboard(text, button, listType) {
               },
               files: nonIgnoredDownloads.map((dl) => ({
                 path: dl.path,
-                hashes: dl.hashes,
-                downloads: [dl.url],
-                fileSize: dl.fileSize,
+                files: successfulDownloads.map(file => ({
+                  path: file.path,
+                  hashes: file.hashes,
+                  env: {
+                    client: file.client_side,
+                    server: file.server_side,
+                  },
+                  downloads: [file.url],
+                  fileSize: file.fileSize,
+                })),
                 env: {}
               })),
             };
@@ -5220,7 +5251,46 @@ async function copyToClipboard(text, button, listType) {
           `;
       }
 
-      // --- Create Success Card ---
+      // --- Update Dependency Chain on Existing Card ---
+function updateDependencyChainOnCard(projectId) {
+  const card = document.querySelector(`.result-card[data-project-id="${projectId}"]`);
+  if (!card || !reverseDependencyMap.has(projectId)) return;
+
+  const modTitleDiv = card.querySelector('.mod-title');
+  let chainContainer = card.querySelector('.dependency-chain-tooltip-container');
+
+  const dependencyIds = reverseDependencyMap.get(projectId);
+  const dependencyNames = dependencyIds.map(id => modIdToNameMap.get(id) || 'Loading...');
+  const tooltipText = `Depends on: ${dependencyNames.join(", ")}`;
+
+  if (chainContainer) {
+    // If the icon already exists, just update its tooltip
+    const tooltip = chainContainer.querySelector('.dependency-chain-tooltip');
+    if (tooltip) {
+      tooltip.textContent = tooltipText;
+    }
+  } else {
+    // If the icon doesn't exist, create and add it
+    chainContainer = document.createElement('span');
+    chainContainer.className = 'dependency-chain-tooltip-container';
+    chainContainer.innerHTML = `
+      <svg class="dependency-chain-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+      </svg>
+      <span class="dependency-chain-tooltip">${tooltipText}</span>
+    `;
+    
+    const firstTag = modTitleDiv.querySelector('.mod-title-tag, .dependency-tooltip-container');
+    if (firstTag) {
+      modTitleDiv.insertBefore(chainContainer, firstTag);
+    } else {
+      modTitleDiv.appendChild(chainContainer);
+    }
+  }
+}
+
+// --- Create Success Card ---
 function createSuccessCard(mod) {
   const card = document.createElement("div");
   let cardClasses = "result-card";
@@ -5364,9 +5434,39 @@ function createSuccessCard(mod) {
     if (!selectedVersion) return;
 
     const primaryFile = selectedVersion.files.find((f) => f.primary);
+
+    // Remove previous version from downloads list if it exists
+    const existingDownloadIndex = successfulDownloads.findIndex(dl => dl.projectId === mod.projectId);
+    if (existingDownloadIndex > -1) {
+        successfulDownloads.splice(existingDownloadIndex, 1);
+    }
+
     if (primaryFile) {
       downloadLink.href = primaryFile.url;
       downloadLink.setAttribute("download", primaryFile.filename);
+
+      // Define the folder path based on project type
+      let folderPath = "mods/";
+      if (mod.project_type === "resourcepack") {
+        folderPath = "resourcepacks/";
+      } else if (mod.project_type === "shader") {
+        folderPath = "shaderpacks/";
+      }
+
+      // --- Add new version to the list for bulk downloads ---
+      successfulDownloads.push({
+          projectId: mod.projectId,
+          url: primaryFile.url,
+          filename: primaryFile.filename,
+          projectType: mod.project_type,
+          fileSize: primaryFile.size,
+          isMrpackFile: mod.isMrpackFile,
+          // --- Data for .mrpack manifest ---
+          path: `${folderPath}${primaryFile.filename}`,
+          hashes: primaryFile.hashes,
+          client_side: mod.client_side,
+          server_side: mod.server_side,
+      });
     }
     dateSpan.textContent = formatTimeAgo(selectedVersion.date_published);
     changelogContent.innerHTML = marked.parse(
@@ -5434,6 +5534,33 @@ function createSuccessCard(mod) {
       modTitleDiv.appendChild(chainContainer);
     }
   }
+
+// --- Add project_type tag if available ---
+if (mod.project_type) {
+  const titleElement = card.querySelector(".mod-title");
+  const tag = document.createElement("span");
+  tag.className = "mod-title-tag";
+  tag.textContent = `(${mod.project_type.charAt(0).toUpperCase() + mod.project_type.slice(1)})`;
+  
+  // Insert after any chain icon but before other tags
+  const chainContainer = titleElement.querySelector('.dependency-chain-tooltip-container');
+  if (chainContainer) {
+    // Insert after chain icon
+    if (chainContainer.nextSibling) {
+      titleElement.insertBefore(tag, chainContainer.nextSibling);
+    } else {
+      titleElement.appendChild(tag);
+    }
+  } else {
+    // No chain icon, insert as first tag
+    const firstTag = titleElement.querySelector('.mod-title-tag, .dependency-tooltip-container');
+    if (firstTag) {
+      titleElement.insertBefore(tag, firstTag);
+    } else {
+      titleElement.appendChild(tag);
+    }
+  }
+}
 
 // --- Handle the "Already Up-to-Date" state ---
 if (mod.isUpToDate) {
@@ -5556,6 +5683,15 @@ function createWarningCard(mod) {
 
   // Set the reason content (but keep it hidden initially)
   reasonContent.innerHTML = `<p style="color: var(--warning-color); font-weight: bold; margin: 0;">${mod.reason}</p>`;
+
+  // --- Add project_type tag if available ---
+  if (mod.project_type) {
+    const titleElement = card.querySelector(".mod-title");
+    const tag = document.createElement("span");
+    tag.className = "mod-title-tag";
+    tag.textContent = `(${mod.project_type.charAt(0).toUpperCase() + mod.project_type.slice(1)})`;
+    titleElement.appendChild(tag);
+  }
 
   // --- Populate Category Tooltip ---
   if (mod.categories && mod.categories.length > 0) {
@@ -5715,42 +5851,42 @@ function createFailureCard(mod) {
       // --- Download All as ZIP ---
       async function downloadAllAsZip() {
         const zip = new JSZip();
-        const modsFolder = zip.folder("mods");
-        
-        // Filter out ignored mods using the global ignoredMods set
+
         const downloadsToProcess = successfulDownloads.filter(dl => {
-          return !window.ignoredMods || !window.ignoredMods.has(dl.projectId);
+          const isIgnored = window.ignoredMods && window.ignoredMods.has(dl.projectId);
+          const isMrpackFile = dl.isMrpackFile === true;
+          return !isIgnored && !isMrpackFile;
         });
-        
+
         if (downloadsToProcess.length === 0) {
-          alert('No mods to download. All mods are currently ignored.');
+          showCustomAlert('No files to download. All items are currently ignored or not downloadable.', 'notice');
           return;
         }
-        
-        // Use default filename
+
         const filename = "MC-Mod-Updater.zip";
-        
-        // Show progress (we'll update the button text)
-        const originalButtons = document.querySelectorAll('.action-button');
-        const zipButton = Array.from(originalButtons).find(btn => btn.textContent.includes('Download .zip'));
+        const zipButton = Array.from(document.querySelectorAll('.action-button')).find(btn => btn.textContent.includes('Download .zip'));
         const originalText = zipButton.innerHTML;
-        
+
         try {
           zipButton.innerHTML = 'Creating ZIP...';
           zipButton.disabled = true;
-          
-          // Fetch all mod files and add them to the ZIP
+
+          const folderMap = {
+            'mod': 'mods',
+            'resourcepack': 'resourcepacks',
+            'shader': 'shaderpacks'
+          };
+
           for (let i = 0; i < downloadsToProcess.length; i++) {
             const dl = downloadsToProcess[i];
-            
-            // Update progress
             zipButton.innerHTML = `Adding ${i + 1}/${downloadsToProcess.length}...`;
-            
+
             try {
               const response = await fetch(dl.url);
               if (response.ok) {
                 const blob = await response.blob();
-                modsFolder.file(dl.filename, blob);
+                const folderName = folderMap[dl.projectType] || 'mods'; // Default to 'mods'
+                zip.file(`${folderName}/${dl.filename}`, blob);
               } else {
                 console.warn(`Failed to download ${dl.filename}`, response.status, response.statusText);
               }
@@ -5758,29 +5894,27 @@ function createFailureCard(mod) {
               console.warn(`Error downloading ${dl.filename}:`, error);
             }
           }
-          
-          // Generate and download the ZIP
+
           zipButton.innerHTML = 'Generating ZIP...';
           const content = await zip.generateAsync({ type: "blob" });
-          
+
           const link = document.createElement("a");
           link.href = URL.createObjectURL(content);
           link.download = filename;
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
-          
+
         } catch (error) {
           console.error("Error creating ZIP:", error);
-          alert("Error creating ZIP file. Please try again.");
+          showCustomAlert("Error creating ZIP file. Please check the console for details.", 'error');
         } finally {
-          // Restore button
-          zipButton.innerHTML = originalText;
-          zipButton.disabled = false;
+          if (zipButton) {
+            zipButton.innerHTML = originalText;
+            zipButton.disabled = false;
+          }
         }
-      }
-
-      // --- Create Modpack ---
+      } // --- Create Modpack ---
       function createModpack() {
         // Get custom modpack name and version from user
         const packName = prompt("Enter modpack name:", "My Awesome Pack");
@@ -5803,9 +5937,11 @@ function createFailureCard(mod) {
         const selectedLoader = modLoaderSelect.value;
         const officialLoaderName = loaderNameMap[selectedLoader] || selectedLoader;
 
-        // Filter out ignored mods using the global ignoredMods set
+        // Filter out ignored mods and .mrpack files using the global ignoredMods set
         const filteredDownloads = successfulDownloads.filter(dl => {
-          return !window.ignoredMods || !window.ignoredMods.has(dl.projectId);
+          const isIgnored = window.ignoredMods && window.ignoredMods.has(dl.projectId);
+          const isMrpackFile = dl.isMrpackFile === true;
+          return !isIgnored && !isMrpackFile;
         });
 
         
@@ -5824,31 +5960,16 @@ function createFailureCard(mod) {
             minecraft: mcVersionSelect.value,
             [officialLoaderName]: "*",
           },
-          // --- BUILD THE FULL FILE ENTRY ---
-          files: filteredDownloads.map((dl) => {
-            const fileEntry = {
-              path: dl.path,
-              hashes: dl.hashes,
-              downloads: [dl.url],
-              fileSize: dl.fileSize, // Add the fileSize
-            };
-
-            // Conditionally build the env object
-            const env = {};
-            if (dl.client_side === "required") {
-              env.client = "required";
-            }
-            if (dl.server_side === "required") {
-              env.server = "required";
-            }
-
-            // Add the env object only if it has keys
-            if (Object.keys(env).length > 0) {
-              fileEntry.env = env;
-            }
-
-            return fileEntry;
-          }),
+          files: filteredDownloads.map(dl => ({
+            path: dl.path,
+            hashes: dl.hashes,
+            env: {
+              client: dl.client_side,
+              server: dl.server_side,
+            },
+            downloads: [dl.url],
+            fileSize: dl.fileSize,
+          })),
         };
 
         const zip = new JSZip();
