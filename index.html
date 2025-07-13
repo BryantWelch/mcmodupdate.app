@@ -1222,12 +1222,18 @@
   color: var(--primary-text);
 }
 
-/* Tags styling in grid view - make them appear on new line */
-.results-list.grid-view .mod-title-tag,
-.results-list.grid-view .dependency-tooltip-container {
+/* Tags styling in grid view - only text tags appear on new line */
+.results-list.grid-view .mod-title-tag:not(.dependency-tag) {
   display: block;
   margin-left: 0; /* Remove left margin since they're on their own line */
   margin-top: 0.25rem;
+  text-align: center;
+}
+
+/* Keep dependency tooltip container inline in grid view */
+.results-list.grid-view .dependency-tooltip-container {
+  display: inline-flex;
+  align-items: center;
   text-align: center;
 }
 
@@ -1269,6 +1275,13 @@
   vertical-align: middle;
   color: var(--secondary-text);
   margin-right: 2px;
+}
+
+/* Grid view specific styling for dependency icon */
+.results-list.grid-view .puzzle-dependency-icon {
+  position: relative;
+  top: -1px; /* Fine-tune vertical alignment with other icons */
+  margin-right: 4px;
 }
 
 
