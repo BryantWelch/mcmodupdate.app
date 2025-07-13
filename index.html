@@ -1259,6 +1259,16 @@
   font-style: italic;
   white-space: nowrap;
   cursor: help;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Puzzle dependency icon styling */
+.puzzle-dependency-icon {
+  display: inline-block;
+  vertical-align: middle;
+  color: var(--secondary-text);
+  margin-right: 2px;
 }
 
 
@@ -5339,7 +5349,7 @@ function createSuccessCard(mod) {
           ${
             mod.isDependency
               ? `<span class="dependency-tooltip-container">
-                   <span class="mod-title-tag dependency-tag">(Dependency)</span>
+                   <span class="mod-title-tag dependency-tag"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="puzzle-dependency-icon"><path d="M15.39 4.39a1 1 0 0 0 1.68-.474 2.5 2.5 0 1 1 3.014 3.015 1 1 0 0 0-.474 1.68l1.683 1.682a2.414 2.414 0 0 1 0 3.414L19.61 15.39a1 1 0 0 1-1.68-.474 2.5 2.5 0 1 0-3.014 3.015 1 1 0 0 1 .474 1.68l-1.683 1.682a2.414 2.414 0 0 1-3.414 0L8.61 19.61a1 1 0 0 0-1.68.474 2.5 2.5 0 1 1-3.014-3.015 1 1 0 0 0 .474-1.68l-1.683-1.682a2.414 2.414 0 0 1 0-3.414L4.39 8.61a1 1 0 0 1 1.68.474 2.5 2.5 0 1 0 3.014-3.015 1 1 0 0 1-.474-1.68l1.683-1.682a2.414 2.414 0 0 1 3.414 0z"/></svg></span>
                    <span class="dependency-tooltip">Required by: ${(() => {
                      // Look up which mod requires this dependency
                      return dependencyMap.get(mod.projectId) || 'Unknown';
@@ -5542,8 +5552,10 @@ if (mod.project_type) {
   tag.className = "mod-title-tag";
   tag.textContent = `(${mod.project_type.charAt(0).toUpperCase() + mod.project_type.slice(1)})`;
   
-  // Insert after any chain icon but before other tags
+  // Insert after any chain icon but ensure dependency tag remains first
   const chainContainer = titleElement.querySelector('.dependency-chain-tooltip-container');
+  const dependencyContainer = titleElement.querySelector('.dependency-tooltip-container');
+  
   if (chainContainer) {
     // Insert after chain icon
     if (chainContainer.nextSibling) {
@@ -5551,9 +5563,16 @@ if (mod.project_type) {
     } else {
       titleElement.appendChild(tag);
     }
+  } else if (dependencyContainer) {
+    // Insert after dependency container
+    if (dependencyContainer.nextSibling) {
+      titleElement.insertBefore(tag, dependencyContainer.nextSibling);
+    } else {
+      titleElement.appendChild(tag);
+    }
   } else {
-    // No chain icon, insert as first tag
-    const firstTag = titleElement.querySelector('.mod-title-tag, .dependency-tooltip-container');
+    // No special containers, insert as first tag
+    const firstTag = titleElement.querySelector('.mod-title-tag');
     if (firstTag) {
       titleElement.insertBefore(tag, firstTag);
     } else {
@@ -5568,7 +5587,26 @@ if (mod.isUpToDate) {
   const tag = document.createElement("span");
   tag.className = "mod-title-tag"; // Use the new shared class
   tag.textContent = "(Already Up-to-Date)";
-  titleElement.appendChild(tag);
+  
+  // Insert after dependency container and chain container if they exist
+  const dependencyContainer = titleElement.querySelector('.dependency-tooltip-container');
+  const chainContainer = titleElement.querySelector('.dependency-chain-tooltip-container');
+  const projectTypeTag = titleElement.querySelector('.mod-title-tag');
+  
+  if (dependencyContainer && dependencyContainer.nextSibling) {
+    titleElement.insertBefore(tag, dependencyContainer.nextSibling);
+  } else if (chainContainer && chainContainer.nextSibling) {
+    titleElement.insertBefore(tag, chainContainer.nextSibling);
+  } else if (projectTypeTag) {
+    // If we already have another tag (likely project type), insert after it
+    if (projectTypeTag.nextSibling) {
+      titleElement.insertBefore(tag, projectTypeTag.nextSibling);
+    } else {
+      titleElement.appendChild(tag);
+    }
+  } else {
+    titleElement.appendChild(tag);
+  }
 }
 
 // --- Populate Category Tooltip ---
