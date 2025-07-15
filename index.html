@@ -2438,6 +2438,8 @@
         currentSearchQuery = "";
         currentSearchOffset = 0;
         totalSearchResults = 0;
+        // Clear the searchedMods Map to reset added mod states
+        searchedMods.clear();
         // Focus the specified input
         if (focusInput) {
           focusInput.focus();
@@ -2458,6 +2460,8 @@
       // Event listeners for both clear buttons
       searchClearButton.addEventListener("click", () => {
         clearSearch(searchInput);
+        // Close the search modal when clearing from the main search box
+        searchModal.classList.remove("visible");
       });
 
       modalSearchClearButton.addEventListener("click", () => {
@@ -2466,17 +2470,17 @@
       
       // Focus event listeners for both search inputs
       searchInput.addEventListener("focus", () => {
-        if(searchInput.value.trim().length > 1) {
-            positionSearchModal();
-            searchModal.classList.add("visible");
-        }
+        // Show the search modal whenever user clicks in the main search box
+        positionSearchModal();
+        searchModal.classList.add("visible");
+        // Focus the modal search input for immediate typing
+        modalSearchInput.focus();
       });
 
       modalSearchInput.addEventListener("focus", () => {
-        if(modalSearchInput.value.trim().length > 1) {
-            positionSearchModal();
-            searchModal.classList.add("visible");
-        }
+        // Already in modal, just make sure modal is visible
+        positionSearchModal();
+        searchModal.classList.add("visible");
       });
 
       // --- Search Modal Close Logic ---
@@ -2649,7 +2653,10 @@
         return card;
       }
 
-      clearAllButton.addEventListener("click", clearDropzone);
+      clearAllButton.addEventListener("click", () => {
+        clearDropzone();
+        clearSearch(); // Also clear the search box when Clear Input button is clicked
+      });
 
       ["dragenter", "dragover", "dragleave", "drop"].forEach((eventName) => {
         dropzone.addEventListener(eventName, (e) => {
