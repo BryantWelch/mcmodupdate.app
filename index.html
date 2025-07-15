@@ -2875,10 +2875,10 @@
 // --- Dynamic Minecraft Version Loading with Hierarchical Layout ---
 async function populateMcVersions() {
   try {
-    const response = await fetch(
+    const response = await fetchWithRetry(
       "https://api.modrinth.com/v2/tag/game_version"
     );
-    if (!response.ok) throw new Error("Failed to fetch MC versions");
+    if (!response.ok) throw new Error("Failed to fetch MC versions after retries");
     const versions = await response.json();
 
     // Filter for release versions and sort them numerically descending
@@ -2958,7 +2958,7 @@ async function populateMcVersions() {
       mcVersionSelect.options[0].selected = true;
     }
   } catch (error) {
-    console.error("A real error occurred:", error); // Changed for better debugging
+    console.error("Failed to fetch MC versions after multiple attempts:", error);
     // Fallback or show an error
     mcVersionSelect.innerHTML =
       '<option value="1.21">Error loading versions</option>';
