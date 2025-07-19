@@ -31,3 +31,4 @@ out/
 .env.local
 .env.*.local
 ideas.md
+/.kiro
