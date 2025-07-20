@@ -4574,6 +4574,23 @@
                   <div class="sort-option" data-sort="channel" data-filter="alpha">Alpha</div>
                 </div>
               </div>
+              <div class="sort-option has-submenu">
+                Project Type <span class="submenu-arrow">▶</span>
+                <div class="sort-submenu">
+                  <div class="sort-option" data-sort="project_type" data-filter="mod">Mods</div>
+                  <div class="sort-option" data-sort="project_type" data-filter="modpack">Modpacks</div>
+                  <div class="sort-option" data-sort="project_type" data-filter="resourcepack">Resource Packs</div>
+                  <div class="sort-option" data-sort="project_type" data-filter="shader">Shaders</div>
+                </div>
+              </div>
+              <div class="sort-option has-submenu">
+                Dependencies <span class="submenu-arrow">▶</span>
+                <div class="sort-submenu">
+                  <div class="sort-option" data-sort="dependency_status" data-filter="has_dependencies">Requires Mods</div>
+                  <div class="sort-option" data-sort="dependency_status" data-filter="no_dependencies">Standalone</div>
+                  <div class="sort-option" data-sort="dependency_status" data-filter="is_dependency">Is Dependency</div>
+                </div>
+              </div>
             </div>
           </div>
           <button id="copy-found-btn" class="layout-toggle" title="Copy Mod List">${copyIcon}</button>
@@ -4644,6 +4661,15 @@
                   <div class="sort-option" data-sort="clientserver" data-filter="client">Client Only</div>
                   <div class="sort-option" data-sort="clientserver" data-filter="server">Server Only</div>
                   <div class="sort-option" data-sort="clientserver" data-filter="both">Client & Server</div>
+                </div>
+              </div>
+              <div class="sort-option has-submenu">
+                Project Type <span class="submenu-arrow">▶</span>
+                <div class="sort-submenu">
+                  <div class="sort-option" data-sort="project_type" data-filter="mod">Mods</div>
+                  <div class="sort-option" data-sort="project_type" data-filter="modpack">Modpacks</div>
+                  <div class="sort-option" data-sort="project_type" data-filter="resourcepack">Resource Packs</div>
+                  <div class="sort-option" data-sort="project_type" data-filter="shader">Shaders</div>
                 </div>
               </div>
             </div>
@@ -5203,6 +5229,12 @@
           } else if (filterType === 'category') {
             const cardCategories = extractCategories(card);
             shouldShow = cardCategories.includes(filterValue);
+          } else if (filterType === 'project_type') {
+            const cardProjectType = extractProjectType(card);
+            shouldShow = cardProjectType === filterValue;
+          } else if (filterType === 'dependency_status') {
+            const cardDependencyStatus = extractDependencyStatus(card);
+            shouldShow = cardDependencyStatus === filterValue;
           }
 
           if (shouldShow) {
@@ -5376,7 +5408,46 @@
         return [];
       }
 
+      function extractProjectType(card) {
+        // Look for the project type icon container which indicates the project type
+        const projectTypeIcon = card.querySelector('.project-type-icon-container');
+        if (projectTypeIcon) {
+          // Check the tooltip to determine the project type
+          const tooltip = projectTypeIcon.querySelector('.project-type-tooltip');
+          if (tooltip) {
+            const tooltipText = tooltip.textContent.toLowerCase().trim();
+            // Map tooltip text to project type values
+            const typeMap = {
+              'mod': 'mod',
+              'modpack': 'modpack',
+              'resource pack': 'resourcepack',
+              'shader': 'shader',
+              'data pack': 'datapack',
+              'plugin': 'plugin'
+            };
+            return typeMap[tooltipText] || 'mod';
+          }
+        }
+        // Default to 'mod' if no project type icon found
+        return 'mod';
+      }
 
+      function extractDependencyStatus(card) {
+        // Check if this mod is a dependency (has dependency tag)
+        const dependencyTag = card.querySelector('.dependency-tag');
+        if (dependencyTag) {
+          return 'is_dependency';
+        }
+
+        // Check if this mod has dependencies (has dependency chain icon)
+        const dependencyChainIcon = card.querySelector('.dependency-chain-icon');
+        if (dependencyChainIcon) {
+          return 'has_dependencies';
+        }
+
+        // Default to no dependencies
+        return 'no_dependencies';
+      }
 
       // Reset sort states when results are cleared
       window.resetSortStates = function () {
