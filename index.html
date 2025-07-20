@@ -4591,6 +4591,13 @@
                   <div class="sort-option" data-sort="dependency_status" data-filter="is_dependency">Is Dependency</div>
                 </div>
               </div>
+              <div class="sort-option has-submenu">
+                Updates <span class="submenu-arrow">▶</span>
+                <div class="sort-submenu">
+                  <div class="sort-option" data-sort="update_status" data-filter="updated">Updated</div>
+                  <div class="sort-option" data-sort="update_status" data-filter="available">Available</div>
+                </div>
+              </div>
             </div>
           </div>
           <button id="copy-found-btn" class="layout-toggle" title="Copy Mod List">${copyIcon}</button>
@@ -5235,6 +5242,9 @@
           } else if (filterType === 'dependency_status') {
             const cardDependencyStatus = extractDependencyStatus(card);
             shouldShow = cardDependencyStatus === filterValue;
+          } else if (filterType === 'update_status') {
+            const cardUpdateStatus = extractUpdateStatus(card);
+            shouldShow = cardUpdateStatus === filterValue;
           }
 
           if (shouldShow) {
@@ -5447,6 +5457,16 @@
 
         // Default to no dependencies
         return 'no_dependencies';
+      }
+
+      function extractUpdateStatus(card) {
+        // Check if this mod is already up-to-date (has already-up-to-date class or up-to-date icon)
+        if (card.classList.contains('already-up-to-date') || card.querySelector('.up-to-date-icon-container')) {
+          return 'updated';
+        }
+
+        // Default to having updates available
+        return 'available';
       }
 
       // Reset sort states when results are cleared
