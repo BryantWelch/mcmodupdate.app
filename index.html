@@ -4461,7 +4461,6 @@
 
     // --- Analyze Conflicts Function ---
     function analyzeConflicts() {
-      console.log('🔍 Starting conflict analysis...');
       const conflictResults = {
         conflictPairs: [],
         affectedMods: new Set(),
@@ -4489,19 +4488,14 @@
         }
       });
 
-      console.log(`📊 Found ${uploadedModIds.size} uploaded mods:`, Array.from(uploadedModIds));
-      console.log(`🚫 Incompatible map has ${incompatibleMap.size} entries:`, incompatibleMap);
-
       // Cross-reference incompatible dependencies with uploaded mods
       for (const [modId, incompatibleSet] of incompatibleMap.entries()) {
         // Check if this mod is in our uploaded collection
         if (uploadedModIds.has(modId)) {
-          console.log(`🔍 Checking mod ${modId} for conflicts with:`, Array.from(incompatibleSet));
           // Check each incompatible dependency
           for (const incompatibleModId of incompatibleSet) {
             // If the incompatible mod is also in our uploaded collection, we have a conflict
             if (uploadedModIds.has(incompatibleModId)) {
-              console.log(`⚠️ CONFLICT DETECTED: ${modId} conflicts with ${incompatibleModId}`);
               const mod1Name = modIdToNameMap.get(modId) || modId;
               const mod2Name = modIdToNameMap.get(incompatibleModId) || incompatibleModId;
 
@@ -4523,33 +4517,24 @@
         }
       }
 
-      console.log(`✅ Conflict analysis complete: ${conflictResults.totalConflicts} conflicts found`);
-      console.log('Conflict pairs:', conflictResults.conflictPairs);
-      console.log('Affected mods:', Array.from(conflictResults.affectedMods));
-
       return conflictResults;
     }
 
     // --- Add Conflict Indicators to Existing Cards ---
     function addConflictIndicatorsToCards() {
       if (!conflictResults || conflictResults.totalConflicts === 0) {
-        console.log('No conflicts to display on cards');
         return;
       }
-
-      console.log('Adding conflict indicators to cards...');
 
       // Iterate through all affected mods
       for (const modId of conflictResults.affectedMods) {
         const card = document.querySelector(`.result-card[data-project-id="${modId}"]`);
         if (!card) {
-          console.log(`Card not found for mod ${modId}`);
           continue;
         }
 
         // Check if conflict indicator already exists
         if (card.querySelector('.conflict-tooltip-container')) {
-          console.log(`Conflict indicator already exists for mod ${modId}`);
           continue;
         }
 
@@ -4580,12 +4565,9 @@
             }
 
             if (!modName) {
-              console.log(`Could not resolve name for mod ID: ${otherModId}`);
             }
             return modName || 'Unknown mod';
           }).join(', ');
-
-          console.log(`Conflict tooltip for ${modId}: "${conflictingMods}"`);
 
           // Create conflict indicator HTML
           const conflictIndicator = document.createElement('span');
@@ -4609,7 +4591,6 @@
             } else {
               modTitleDiv.appendChild(conflictIndicator);
             }
-            console.log(`Added conflict indicator to mod ${modId}`);
           }
         }
       }
@@ -6920,7 +6901,6 @@
 
         const cache = JSON.parse(cached);
         if (cache.version !== CACHE_VERSION) {
-          console.log('Cache version mismatch, clearing cache');
           return createEmptyCache();
         }
 
