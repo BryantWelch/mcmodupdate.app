@@ -968,6 +968,91 @@
       filter: grayscale(50%);
     }
 
+    /* Skeleton Loading Styles */
+    .skeleton-card {
+      background-color: var(--card-bg);
+      border-radius: 8px;
+      padding: 1rem;
+      display: flex;
+      gap: 1rem;
+      text-align: left;
+      border-left: 4px solid var(--border-color);
+      animation: skeleton-pulse 1.5s ease-in-out infinite alternate;
+    }
+
+    @keyframes skeleton-pulse {
+      0% {
+        opacity: 0.6;
+      }
+
+      100% {
+        opacity: 1;
+      }
+    }
+
+    .skeleton-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 8px;
+      background-color: var(--border-color);
+      flex-shrink: 0;
+    }
+
+    .skeleton-content {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .skeleton-line {
+      background-color: var(--border-color);
+      border-radius: 4px;
+      height: 1rem;
+    }
+
+    .skeleton-line.title {
+      width: 60%;
+      height: 1.2rem;
+    }
+
+    .skeleton-line.author {
+      width: 40%;
+      height: 0.9rem;
+    }
+
+    .skeleton-line.description {
+      width: 80%;
+      height: 0.9rem;
+    }
+
+    .skeleton-line.meta {
+      width: 50%;
+      height: 0.8rem;
+    }
+
+    .skeleton-actions {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 1rem;
+      flex-shrink: 0;
+    }
+
+    .skeleton-select {
+      width: 120px;
+      height: 2rem;
+      background-color: var(--border-color);
+      border-radius: 6px;
+    }
+
+    .skeleton-button {
+      width: 80px;
+      height: 2rem;
+      background-color: var(--border-color);
+      border-radius: 6px;
+    }
+
 
     .results-actions {
       display: flex;
@@ -2381,6 +2466,7 @@
     let welcomeMessageSnapshot = null; // Store the welcome message snapshot
     let apiCallCount = 0; // Track total API calls made
     let processingStartTime = 0; // Track when processing started
+    let resultsSectionsSetup = false; // Track if result sections have been set up
     let dependencyMap = new Map(); // Track which mod requires each dependency
     let reverseDependencyMap = new Map(); // Track what dependencies each mod has
     let incompatibleMap = new Map(); // Track incompatible relationships between mods
@@ -3333,6 +3419,43 @@
     </svg>`;
     }
 
+    // --- Skeleton Loading Functions ---
+    function createSkeletonCard() {
+      const skeletonCard = document.createElement("div");
+      skeletonCard.className = "skeleton-card";
+
+      skeletonCard.innerHTML = `
+        <div class="skeleton-icon"></div>
+        <div class="skeleton-content">
+          <div class="skeleton-line title"></div>
+          <div class="skeleton-line author"></div>
+          <div class="skeleton-line description"></div>
+          <div class="skeleton-line meta"></div>
+        </div>
+        <div class="skeleton-actions">
+          <div class="skeleton-select"></div>
+          <div class="skeleton-button"></div>
+        </div>
+      `;
+
+      return skeletonCard;
+    }
+
+    function showSkeletonLoading(count = 8) {
+      resultsArea.innerHTML = `
+        <div id="skeleton-loading" class="results-section visible">
+          <h2>Searching for Updates...</h2>
+          <div class="results-list"></div>
+        </div>
+      `;
+
+      const skeletonList = document.querySelector("#skeleton-loading .results-list");
+
+      for (let i = 0; i < count; i++) {
+        skeletonList.appendChild(createSkeletonCard());
+      }
+    }
+
     // --- Main Update Logic with Live Rendering and Dependency Resolution ---
     updateButton.addEventListener("click", handleUpdate);
 
@@ -3401,7 +3524,6 @@
         // --- END of new logic ---
 
         // Reset the UI and state for a new run.
-        resetResults();
         renderedModIds.clear();
         dependencyMap.clear(); // Reset dependency tracking
         reverseDependencyMap.clear(); // Reset reverse dependency tracking
@@ -3411,12 +3533,20 @@
         apiCallCount = 0; // Reset API call counter
         processingStartTime = Date.now(); // Start timing
         cacheStats = { hits: 0, misses: 0, stores: 0 }; // Reset cache stats for this run
+        resultsSectionsSetup = false; // Reset flag for new search
         updateButton.disabled = true;
         updateButton.innerHTML = "Searching...";
         statusMessage.textContent = "Searching for updates and dependencies...";
         statusMessage.classList.add("visible");
-        setupResultSections();
+
+        // Show skeleton loading with estimated number of cards
+        const estimatedCards = Math.min(jobs.length + 3, 10); // Add a few for potential dependencies, cap at 10
+        showSkeletonLoading(estimatedCards);
+
+        // Reset other UI state after showing skeleton
         progressBarContainer.style.display = "block";
+        successfulDownloads = [];
+        sectionCounts = { found: 0, warning: 0, failure: 0 };
 
         const processedIds = new Set();
         let allJobs = [...jobs];
@@ -5542,6 +5672,12 @@
     }
 
     function renderSingleResult(result) {
+      // Set up result sections before rendering the first result (replaces skeleton loading)
+      if (!resultsSectionsSetup) {
+        setupResultSections();
+        resultsSectionsSetup = true;
+      }
+
       let sectionId, card, countType;
 
       switch (result.status) {
