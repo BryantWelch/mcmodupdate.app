@@ -98,6 +98,7 @@
     body {
       width: 100%;
       overflow-x: hidden;
+      max-width: 100vw;
     }
 
     body {
@@ -396,6 +397,7 @@
       /* Start transparent */
       pointer-events: none;
       /* Prevent interaction when hidden */
+      overflow: hidden;
     }
 
     #search-modal {
@@ -411,12 +413,14 @@
       position: absolute;
       top: 280px;
       /* Position directly below the controls - adjust this value as needed */
-      max-width: 800px;
-      /* Match the main container width */
-      width: calc(100% - 2rem);
-      /* Account for some margin */
-      margin: 0 1rem;
-      /* Side margins */
+      max-width: 750px;
+      /* Slightly smaller to ensure no overflow */
+      width: calc(100% - 3rem);
+      /* More conservative margin */
+      margin: 0 1.5rem;
+      /* Larger side margins */
+      box-sizing: border-box;
+      overflow-x: hidden;
     }
 
     .modal-overlay.visible {
@@ -673,6 +677,62 @@
       border-left: 4px solid #ffffff;
       /* White color for already up-to-date */
     }
+
+    .result-card.search {
+      border-left: 4px solid var(--gradient-start);
+      /* Purple gradient color for search results */
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    .result-card.search {
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-left: 4px solid var(--gradient-start);
+      /* Purple gradient color for search results */
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    .result-card.search:hover {
+      border-left-color: var(--gradient-end);
+      border-color: rgba(163, 85, 247, 0.3);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(163, 85, 247, 0.15);
+    }
+
+    .result-card.search .add-mod-button {
+      background-color: var(--success-color);
+      transition: all 0.2s ease;
+    }
+
+    .result-card.search .add-mod-button:hover:not(:disabled) {
+      transform: scale(1.05);
+      box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+    }
+
+    .result-card.search .add-mod-button:disabled {
+      background: var(--border-color);
+      color: var(--secondary-text);
+      transform: none;
+      box-shadow: none;
+    }
+
+    /* Ensure search cards fit within container */
+    .result-card.search {
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+
+    .result-card.search .mod-details {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .result-card.search .mod-description {
+      word-break: break-word;
+    }
+
+
 
     .mod-icon-link {
       flex-shrink: 0;
@@ -1146,8 +1206,15 @@
       margin-top: 1.5rem;
       max-height: 60vh;
       overflow-y: auto;
+      overflow-x: hidden;
       padding-right: 0.5rem;
       /* For scrollbar spacing */
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      /* Match the spacing used in main results sections */
+      width: 100%;
+      box-sizing: border-box;
     }
 
     /* Style for the "Add" button on search result cards */
@@ -1766,6 +1833,21 @@
       opacity: 1;
     }
 
+    /* Fix tooltip positioning for search cards - especially the first one */
+    .result-card.search .project-type-tooltip {
+      z-index: 1001;
+      /* Higher than modal z-index (1000) to show above modal boundaries */
+    }
+
+    /* For the first search card, position tooltip to the right instead of above */
+    .result-card.search:first-child .project-type-tooltip {
+      bottom: auto;
+      top: 50%;
+      left: 125%;
+      transform: translateY(-50%);
+      /* Position to the right of the icon instead of above */
+    }
+
     /* Up-to-date icon styling */
     .up-to-date-icon-container {
       position: relative;
@@ -2132,6 +2214,22 @@
         top: 50% !important;
         transform: translateY(-50%) !important;
       }
+
+      /* Stack featured controls vertically on mobile */
+      .featured-controls {
+        flex-direction: column !important;
+        align-items: center !important;
+        gap: 1rem !important;
+      }
+
+      .featured-controls>div {
+        width: 100% !important;
+        max-width: 200px !important;
+      }
+
+      .featured-controls select {
+        width: 100% !important;
+      }
     }
 
     /* --- End of Mobile Responsive Styles --- */
@@ -2349,6 +2447,35 @@
             style="width: 100%; margin-left: 0;">
           <button id="modal-search-clear-button" class="search-clear-button">&times;</button>
         </div>
+
+        <!-- Featured content controls -->
+        <div class="featured-controls"
+          style="display: flex; gap: 1rem; justify-content: center; margin-top: 1rem; flex-wrap: wrap;">
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
+            <label for="sort-select" style="font-size: 0.9rem; color: var(--secondary-text);">Sort by</label>
+            <select id="sort-select"
+              style="background-color: var(--bg-color); color: var(--primary-text); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.4rem 0.6rem; font-size: 0.9rem; max-width: 160px;">
+              <option value="follows">Most Popular</option>
+              <option value="downloads">Most Downloaded</option>
+              <option value="updated">Recently Updated</option>
+              <option value="newest">Newest</option>
+            </select>
+          </div>
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
+            <label for="project-type-select" style="font-size: 0.9rem; color: var(--secondary-text);">Project
+              Type</label>
+            <select id="project-type-select"
+              style="background-color: var(--bg-color); color: var(--primary-text); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.4rem 0.6rem; font-size: 0.9rem; max-width: 160px;">
+              <option value="">All Projects</option>
+              <option value="mod">Mods</option>
+              <option value="modpack">Modpacks</option>
+              <option value="shader">Shaders</option>
+              <option value="resourcepack">Resource Packs</option>
+              <option value="datapack">Data Packs</option>
+              <option value="plugin">Plugins</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       <div id="search-results-container">
@@ -2508,6 +2635,8 @@
     const searchXCloseButton = document.getElementById("search-x-close-button");
     const searchClearButton = document.getElementById("search-clear-button");
     const modalSearchClearButton = document.getElementById("modal-search-clear-button");
+    const sortSelect = document.getElementById("sort-select");
+    const projectTypeSelect = document.getElementById("project-type-select");
     const clearResultsButton = document.getElementById("clear-results-button");
 
     // --- UI LOGIC ---
@@ -2640,6 +2769,10 @@
     let currentSearchQuery = "";
     let currentSearchOffset = 0;
     let totalSearchResults = 0;
+    let isShowingFeatured = false;
+    let currentFeaturedSort = "";
+    let currentFeaturedProjectType = "";
+    const searchResultsPerPage = 20;
 
     function debounce(func, delay) {
       let timeout;
@@ -2708,9 +2841,78 @@
       }
     }
 
-    async function loadMoreResults() {
-      if (!currentSearchQuery) return;
+    // --- Featured Content Functionality ---
+    async function loadFeaturedContent(sortBy = null, projectType = "", isLoadMore = false) {
+      try {
+        // If this is a new featured load (not load more), reset everything
+        if (!isLoadMore) {
+          currentSearchOffset = 0;
+          searchResultsContainer.innerHTML = "<p>Loading featured content...</p>";
+          isShowingFeatured = true;
+          currentFeaturedSort = sortBy;
+          currentFeaturedProjectType = projectType;
+        }
 
+        // Build the API URL
+        let searchUrl = `https://api.modrinth.com/v2/search?limit=${searchResultsPerPage}&offset=${currentSearchOffset}`;
+
+        // Add sorting
+        if (sortBy) {
+          searchUrl += `&index=${sortBy}`;
+        }
+
+        // Add project type filter if specified
+        if (projectType) {
+          searchUrl += `&facets=[["project_type:${projectType}"]]`;
+        }
+
+        const response = await fetchWithRetry(searchUrl);
+        const data = await response.json();
+
+        // Store total results count
+        totalSearchResults = data.total_hits;
+
+        if (isLoadMore) {
+          appendSearchResults(data.hits);
+        } else {
+          renderSearchResults(data.hits);
+        }
+
+        // Update offset for next load
+        currentSearchOffset += searchResultsPerPage;
+
+        // Show/hide load more button
+        updateLoadMoreButton();
+
+      } catch (error) {
+        if (!isLoadMore) {
+          searchResultsContainer.innerHTML = "<p>Error loading featured content.</p>";
+        }
+        console.error("Featured content loading failed:", error);
+      }
+    }
+
+    // Function to randomly select initial featured content
+    function getRandomSortOption() {
+      const sortOptions = ['follows', 'downloads', 'updated', 'newest'];
+      return sortOptions[Math.floor(Math.random() * sortOptions.length)];
+    }
+
+    // Function to randomly select project type (weighted toward "All Projects")
+    function getRandomProjectType() {
+      const projectTypes = ['', '', '', 'mod', 'modpack', 'shader']; // Empty string appears 3x for higher probability
+      return projectTypes[Math.floor(Math.random() * projectTypes.length)];
+    }
+
+    // Function to show/hide featured controls
+    function toggleFeaturedControls(show) {
+      const featuredControls = document.querySelector('.featured-controls');
+      if (featuredControls) {
+        featuredControls.style.display = show ? 'flex' : 'none';
+      }
+    }
+
+    async function loadMoreResults() {
       // Show loading state on the button
       const loadMoreBtn = document.getElementById("load-more-btn");
       if (loadMoreBtn) {
@@ -2718,7 +2920,11 @@
         loadMoreBtn.disabled = true;
       }
 
-      await performSearch(currentSearchQuery, true);
+      if (isShowingFeatured) {
+        await loadFeaturedContent(currentFeaturedSort, currentFeaturedProjectType, true);
+      } else if (currentSearchQuery) {
+        await performSearch(currentSearchQuery, true);
+      }
 
       // Reset button state
       if (loadMoreBtn) {
@@ -2733,7 +2939,7 @@
       // Check if there are more results to load
       const hasMoreResults = currentSearchOffset < totalSearchResults;
 
-      if (hasMoreResults && currentSearchQuery) {
+      if (hasMoreResults && (currentSearchQuery || isShowingFeatured)) {
         // Create button if it doesn't exist
         if (!loadMoreBtn) {
           loadMoreBtn = document.createElement("button");
@@ -2750,7 +2956,7 @@
 
         // Update button text with remaining count
         const remainingResults = totalSearchResults - currentSearchOffset;
-        const showCount = Math.min(10, remainingResults);
+        const showCount = Math.min(searchResultsPerPage, remainingResults);
         loadMoreBtn.textContent = `Show ${showCount} more`;
 
       } else if (loadMoreBtn) {
@@ -2794,13 +3000,23 @@
         modalSearchClearButton.classList.remove("show");
       }
 
-      // Perform search
+      // Perform search or show featured content
       if (query.length > 1) {
+        isShowingFeatured = false;
+        toggleFeaturedControls(false); // Hide controls during manual search
         positionSearchModal();
         searchModal.classList.add("visible");
         debouncedSearch(query);
       } else {
-        searchResultsContainer.innerHTML = "<p>Start typing to find mods.</p>";
+        // Show featured content when search is empty
+        toggleFeaturedControls(true); // Show controls for featured content
+        if (!isShowingFeatured) {
+          const randomSort = getRandomSortOption();
+          const randomProjectType = getRandomProjectType();
+          sortSelect.value = randomSort;
+          projectTypeSelect.value = randomProjectType;
+          loadFeaturedContent(randomSort, randomProjectType);
+        }
       }
     }
 
@@ -2812,12 +3028,18 @@
       // Hide both clear buttons
       searchClearButton.classList.remove("show");
       modalSearchClearButton.classList.remove("show");
-      // Reset the search results in the modal
-      searchResultsContainer.innerHTML = "<p>Start typing to find mods.</p>";
       // Reset search state
       currentSearchQuery = "";
       currentSearchOffset = 0;
       totalSearchResults = 0;
+      isShowingFeatured = false;
+      // Show featured content when cleared
+      toggleFeaturedControls(true);
+      const randomSort = getRandomSortOption();
+      const randomProjectType = getRandomProjectType();
+      sortSelect.value = randomSort;
+      projectTypeSelect.value = randomProjectType;
+      loadFeaturedContent(randomSort, randomProjectType);
       // Clear the searchedMods Map to reset added mod states
       searchedMods.clear();
       // Focus the specified input
@@ -2855,12 +3077,35 @@
       searchModal.classList.add("visible");
       // Focus the modal search input for immediate typing
       modalSearchInput.focus();
+
+      // If no search query, show featured content
+      if (!currentSearchQuery && !isShowingFeatured) {
+        toggleFeaturedControls(true);
+        const randomSort = getRandomSortOption();
+        const randomProjectType = getRandomProjectType();
+        sortSelect.value = randomSort;
+        projectTypeSelect.value = randomProjectType;
+        loadFeaturedContent(randomSort, randomProjectType);
+      }
     });
 
     modalSearchInput.addEventListener("focus", () => {
       // Already in modal, just make sure modal is visible
       positionSearchModal();
       searchModal.classList.add("visible");
+    });
+
+    // Event listeners for featured content dropdowns
+    sortSelect.addEventListener("change", () => {
+      if (isShowingFeatured || !currentSearchQuery) {
+        loadFeaturedContent(sortSelect.value, projectTypeSelect.value);
+      }
+    });
+
+    projectTypeSelect.addEventListener("change", () => {
+      if (isShowingFeatured || !currentSearchQuery) {
+        loadFeaturedContent(sortSelect.value, projectTypeSelect.value);
+      }
     });
 
     // --- Search Modal Close Logic ---
@@ -2909,7 +3154,7 @@
     // --- Search Modal Results Card Logic ---
     function createSearchResultCard(mod) {
       const card = document.createElement("div");
-      card.className = "result-card";
+      card.className = "result-card search";
 
       // The project URL is consistent for all links
       const projectUrl = `https://modrinth.com/project/${mod.slug}`;
@@ -2981,20 +3226,34 @@
         const categoryContainer = card.querySelector(".category-tooltip-container");
         const categoryTooltip = card.querySelector(".category-tooltip");
 
-        // Format category names (turn "world-gen" into "World Gen")
-        function formatCategoryName(slug) {
-          return slug
-            .split("-")
-            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-            .join(" ");
+        // Platform/loader categories to filter out
+        const platformCategories = [
+          'bukkit', 'spigot', 'paper', 'purpur', 'folia',
+          'fabric', 'quilt', 'forge', 'neoforge', 'liteloader',
+          'rift', 'modloader', 'vanilla', 'datapack',
+          'bungeecord', 'waterfall', 'velocity', 'iris', 'optifine', 'minecraft'
+        ];
+
+        // Filter out platform categories, keeping only content categories
+        const contentCategories = categoriesToShow.filter(category =>
+          !platformCategories.includes(category.toLowerCase())
+        );
+
+        if (contentCategories.length > 0) {
+          // Format category names (turn "world-gen" into "World Gen")
+          function formatCategoryName(slug) {
+            return slug
+              .split("-")
+              .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+              .join(" ");
+          }
+
+          const formattedCategories = contentCategories.map(formatCategoryName);
+          categoryTooltip.textContent = formattedCategories.join(", ");
+
+          // Make the category icon visible
+          categoryContainer.style.display = "flex";
         }
-
-        // Use the same simple approach as success/warning cards
-        const formattedCategories = categoriesToShow.map(formatCategoryName);
-        categoryTooltip.textContent = formattedCategories.join(", ");
-
-        // Make the category icon visible
-        categoryContainer.style.display = "flex";
       }
 
       const addButton = card.querySelector(".add-mod-button");
