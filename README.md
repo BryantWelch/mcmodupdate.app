@@ -6,7 +6,7 @@ A powerful web-based tool to update your Minecraft mods, discover new ones, and 
 
 ---
 
-![MC Mod Updater Demo](https://github.com/user-attachments/assets/72112d0d-b0f6-46a5-b195-66e1f1fb4b3a)
+![MC Mod Updater Demo](https://github.com/user-attachments/assets/32c54e61-990e-486a-8ea4-63364ff43911)
 
 
 
