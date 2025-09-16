@@ -85,8 +85,8 @@
       --dropzone-bg: rgba(255, 255, 255, 0.05);
       --dropzone-hover-bg: rgba(255, 255, 255, 0.1);
       --pill-bg: #2a2a3a;
-      --gradient-start: #a855f7;
-      --gradient-end: #6366f1;
+      --gradient-start: #4ade80;
+      --gradient-end: #047857;
       --success-color: #4caf50;
       --error-color: #f44336;
       --warning-color: #ffc107;
@@ -360,25 +360,8 @@
       border-color: var(--gradient-start);
     }
 
-    .info-button {
-      position: absolute;
-      top: 0;
-      right: 0;
-      width: 60px;
-      height: 60px;
-      background: var(--gradient-end);
-      border: none;
-      padding: 0;
-      cursor: pointer;
-      clip-path: polygon(0% 0%, 100% 0%, 100% 100%);
-      border-radius: 0;
-    }
-
-    .info-button svg {
-      position: absolute;
-      top: 8px;
-      right: 8px;
-      stroke: white;
+    #help-link:hover {
+      color: var(--gradient-end);
     }
 
     .modal-overlay {
@@ -2026,6 +2009,28 @@
         /* Add some space above it */
       }
 
+
+
+      .modal-content h2 {
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+      }
+
+      .modal-content h3 {
+        font-size: 1.2rem;
+        margin-top: 1.5rem;
+        margin-bottom: 0.75rem;
+      }
+
+      .modal-content ul {
+        padding-left: 1.25rem;
+      }
+
+      .modal-content li {
+        margin-bottom: 0.5rem;
+        line-height: 1.4;
+      }
+
       /* --- Mobile-friendly Info Modal --- */
       .modal-content {
         width: 95%;
@@ -2264,21 +2269,16 @@
 </head>
 
 <body>
-  <button id="info-button" class="info-button" aria-label="Show info">
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="12" cy="12" r="10"></circle>
-      <line x1="12" y1="16" x2="12" y2="12"></line>
-      <line x1="12" y1="8" x2="12.01" y2="8"></line>
-    </svg>
-  </button>
+
   <div class="main-container">
     <header>
       <h1>Minecraft Mod Updater</h1>
       <p class="subtitle">
-        Easily find updates for your Minecraft Mods using the Modrinth API
+        Manage Minecraft mods, Resource Packs, Shaders, and Modpacks - all powered by Modrinth
       </p>
     </header>
+
+
     <div class="controls">
       <div class="control-group">
         <label for="mod-loader">Loader:</label>
@@ -2357,13 +2357,23 @@
               font-size: 0.9rem;
               color: var(--secondary-text);
             ">
-          For more detailed instructions, click the info icon in the top-right
-          corner.
+          Need more help? <button id="help-link" style="
+            background: none;
+            border: none;
+            color: var(--gradient-start);
+            cursor: pointer;
+            text-decoration: underline;
+            font-size: 0.9rem;
+            font-style: italic;
+            padding: 0;
+          ">View detailed instructions</button>
         </p>
       </div>
     </div>
   </div>
   <input type="file" id="file-input" multiple style="display: none" accept=".jar,.mrpack,.zip" />
+
+
 
   <!-- Info Modal -->
   <div id="info-modal" class="modal-overlay">
@@ -2608,7 +2618,7 @@
     const dropzonePrompt = document.getElementById("dropzone-prompt");
     const fileListContainer = document.getElementById("file-list-container");
     const fileInput = document.getElementById("file-input");
-    const infoButton = document.getElementById("info-button");
+    const helpLink = document.getElementById("help-link");
     const infoModal = document.getElementById("info-modal");
     const modalCloseButton = document.getElementById("modal-close-button");
     const mcVersionSelect = document.getElementById("mc-version");
@@ -2640,7 +2650,7 @@
     const clearResultsButton = document.getElementById("clear-results-button");
 
     // --- UI LOGIC ---
-    infoButton.addEventListener("click", () => {
+    helpLink.addEventListener("click", () => {
       infoModal.classList.add("visible");
     });
     modalCloseButton.addEventListener("click", () => {
@@ -3632,6 +3642,14 @@
       // Restore the welcome message from snapshot
       if (welcomeMessageSnapshot) {
         resultsArea.innerHTML = welcomeMessageSnapshot;
+        
+        // Re-attach event listener to the restored help link
+        const restoredHelpLink = document.getElementById("help-link");
+        if (restoredHelpLink) {
+          restoredHelpLink.addEventListener("click", () => {
+            infoModal.classList.add("visible");
+          });
+        }
       } else {
         // Fallback if snapshot isn't available
         resultsArea.innerHTML = "";
