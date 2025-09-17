@@ -2282,7 +2282,7 @@
     <div class="controls">
       <div class="control-group">
         <label for="mod-loader">Loader:</label>
-        <select id="mod-loader" autocomplete="off">
+        <select id="mod-loader" autocomplete="off" title="Choose your mod loader - this determines which mods are compatible with your setup">
           <option value="fabric">Fabric</option>
           <option value="forge">Forge</option>
           <option value="neoforge">NeoForge</option>
@@ -2291,15 +2291,15 @@
       </div>
       <div class="control-group">
         <label for="mc-version">Version:</label>
-        <select id="mc-version"></select>
+        <select id="mc-version" title="Select your target Minecraft version - only mods compatible with this version will be shown"></select>
       </div>
       <div class="control-group search-container">
         <label for="mod-search">Search:</label>
-        <input type="text" id="mod-search" placeholder="Find mods by name...">
-        <button id="search-clear-button" class="search-clear-button">&times;</button>
+        <input type="text" id="mod-search" placeholder="Find mods by name..." title="Search for mods on Modrinth to add to your collection">
+        <button id="search-clear-button" class="search-clear-button" title="Clear search input">&times;</button>
       </div>
     </div>
-    <div id="dropzone" class="dropzone">
+    <div id="dropzone" class="dropzone" title="Drag and drop your files here or click to browse. Supports .jar (mods), .zip (resource packs/shaders), and .mrpack (modpacks)">
       <div id="file-list-container" class="file-list"></div>
       <p id="dropzone-prompt" class="dropzone-prompt">
         Upload your mod files (.jar),
@@ -2314,7 +2314,7 @@
       </p>
     </div>
     <div class="action-buttons-container">
-      <button id="update-button" class="update-button">
+      <button id="update-button" class="update-button" title="Process your uploaded files and search for compatible versions on Modrinth">
         Update
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -2323,10 +2323,10 @@
           <line x1="12" y1="3" x2="12" y2="15"></line>
         </svg>
       </button>
-      <button id="clear-all-button" class="clear-all-button">
+      <button id="clear-all-button" class="clear-all-button" title="Remove all uploaded files from the input area">
         Clear Input
       </button>
-      <button id="clear-results-button" class="clear-all-button" style="display: none">
+      <button id="clear-results-button" class="clear-all-button" style="display: none" title="Clear all search results and start over">
         Clear Results
       </button>
     </div>
@@ -2366,7 +2366,7 @@
             font-size: 0.9rem;
             font-style: italic;
             padding: 0;
-          ">View detailed instructions</button>
+          " title="Open detailed help guide with usage instructions and feature explanations">View detailed instructions</button>
         </p>
       </div>
     </div>
@@ -2378,7 +2378,7 @@
   <!-- Info Modal -->
   <div id="info-modal" class="modal-overlay">
     <div class="modal-content">
-      <button id="modal-close-button" class="modal-close-button">&times;</button>
+      <button id="modal-close-button" class="modal-close-button" title="Close help dialog">&times;</button>
 
       <h2>MC Mod Updater &amp; Builder</h2>
       <p>
@@ -2444,7 +2444,7 @@
   <!-- SEARCH MODAL BLOCK -->
   <div id="search-modal" class="modal-overlay">
     <div class="modal-content">
-      <button id="search-x-close-button" class="modal-close-button">&times;</button>
+      <button id="search-x-close-button" class="modal-close-button" title="Close search dialog">&times;</button>
 
       <!-- Search header section with centered layout -->
       <div class="modal-search-header"
@@ -2454,8 +2454,8 @@
         <!-- Duplicate search box inside modal -->
         <div class="search-container" style="max-width: 300px; margin: 0 auto;">
           <input type="text" id="modal-search-input" placeholder="Find mods by name..."
-            style="width: 100%; margin-left: 0;">
-          <button id="modal-search-clear-button" class="search-clear-button">&times;</button>
+            style="width: 100%; margin-left: 0;" title="Search Modrinth for mods, resource packs, shaders, and modpacks">
+          <button id="modal-search-clear-button" class="search-clear-button" title="Clear search input">&times;</button>
         </div>
 
         <!-- Featured content controls -->
@@ -2463,7 +2463,7 @@
           style="display: flex; gap: 1rem; justify-content: center; margin-top: 1rem; flex-wrap: wrap;">
           <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
             <label for="sort-select" style="font-size: 0.9rem; color: var(--secondary-text);">Sort by</label>
-            <select id="sort-select"
+            <select id="sort-select" title="Sort search results by popularity, downloads, update date, or creation date"
               style="background-color: var(--bg-color); color: var(--primary-text); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.4rem 0.6rem; font-size: 0.9rem; max-width: 160px;">
               <option value="follows">Most Popular</option>
               <option value="downloads">Most Downloaded</option>
@@ -2474,7 +2474,7 @@
           <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
             <label for="project-type-select" style="font-size: 0.9rem; color: var(--secondary-text);">Project
               Type</label>
-            <select id="project-type-select"
+            <select id="project-type-select" title="Filter search results by project type - mods, resource packs, shaders, modpacks, data packs, or plugins"
               style="background-color: var(--bg-color); color: var(--primary-text); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.4rem 0.6rem; font-size: 0.9rem; max-width: 160px;">
               <option value="">All Projects</option>
               <option value="mod">Mods</option>
@@ -2492,7 +2492,7 @@
         <p>Start typing in the search bar to find mods.</p>
       </div>
       <div class="modal-actions">
-        <button id="search-close-button" class="clear-all-button">Close</button>
+        <button id="search-close-button" class="clear-all-button" title="Close search dialog">Close</button>
       </div>
     </div>
   </div>
@@ -2574,14 +2574,14 @@
 
   <!-- SCROLL BUTTONS -->
   <div id="scroll-buttons-container">
-    <button id="scroll-to-top-btn" class="scroll-btn" title="Scroll to top"> <!-- "Scroll to Top" button is first -->
+    <button id="scroll-to-top-btn" class="scroll-btn" title="Scroll to top of page"> <!-- "Scroll to Top" button is first -->
       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="17 11 12 6 7 11"></polyline>
         <polyline points="17 18 12 13 7 18"></polyline>
       </svg>
     </button>
-    <button id="scroll-to-bottom-btn" class="scroll-btn" title="Scroll to bottom">
+    <button id="scroll-to-bottom-btn" class="scroll-btn" title="Scroll to bottom of results">
       <!-- "Scroll to Bottom" button is second -->
       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -3226,7 +3226,7 @@
               </div>
             </div>
             <div class="mod-actions">
-              <button class="add-mod-button" data-slug="${mod.slug}" data-project-id="${mod.project_id}" data-title="${mod.title}">Add</button>
+              <button class="add-mod-button" data-slug="${mod.slug}" data-project-id="${mod.project_id}" data-title="${mod.title}" title="Add this mod to your collection">Add</button>
             </div>
           </div>`;
 
@@ -3502,6 +3502,7 @@
       removeButton.classList.add("file-pill-remove");
       removeButton.innerHTML = "&times;";
       removeButton.setAttribute("role", "button");
+      removeButton.setAttribute("title", "Remove this file from the list");
       removeButton.setAttribute("tabindex", "0");
       removeButton.setAttribute("aria-label", "Remove " + file.name);
       removeButton.onclick = function (event) {
@@ -4888,10 +4889,10 @@
       <div class="results-header-container">
         <h2 id="header-found">Updates Found</h2>
         <div class="header-buttons">
-          <input type="text" id="search-found" class="search-box" placeholder="Filter mods..." style="margin-right: 0.5rem;">
-          <button id="ignore-found-btn" class="layout-toggle header-button" title="Toggle ignore mode">${ignoreIcon}</button>
+          <input type="text" id="search-found" class="search-box" placeholder="Filter mods..." style="margin-right: 0.5rem;" title="Filter successful results by mod name">
+          <button id="ignore-found-btn" class="layout-toggle header-button" title="Toggle ignore mode - click to mark mods you don't want to download">${ignoreIcon}</button>
           <div class="sort-dropdown-container">
-            <button id="sort-found-btn" class="layout-toggle" title="Sort Results">${sortIcon}</button>
+            <button id="sort-found-btn" class="layout-toggle" title="Sort and filter results by name, downloads, followers, or environment">${sortIcon}</button>
             <div id="sort-found-dropdown" class="sort-dropdown">
               <div class="sort-option active" data-sort="default">Default</div>
               <div class="sort-option has-submenu">
@@ -4988,8 +4989,8 @@
               </div>
             </div>
           </div>
-          <button id="copy-found-btn" class="layout-toggle" title="Copy Mod List">${copyIcon}</button>
-          <button id="layout-toggle-btn" class="layout-toggle" title="Toggle Layout">${gridIcon}</button>
+          <button id="copy-found-btn" class="layout-toggle" title="Copy list of successful mod names to clipboard">${copyIcon}</button>
+          <button id="layout-toggle-btn" class="layout-toggle" title="Switch between detailed list view and compact grid view">${gridIcon}</button>
         </div>
       </div>
       <div class="results-list"></div>
@@ -4999,10 +5000,10 @@
       <div class="results-header-container">
         <h2 id="header-warning">Not Compatible</h2>
         <div class="header-buttons">
-          <input type="text" id="search-warning" class="search-box" placeholder="Filter mods..." style="margin-right: 0.5rem;">
+          <input type="text" id="search-warning" class="search-box" placeholder="Filter mods..." style="margin-right: 0.5rem;" title="Filter incompatible results by mod name">
 
           <div class="sort-dropdown-container">
-            <button id="sort-warning-btn" class="layout-toggle" title="Sort Results">${sortIcon}</button>
+            <button id="sort-warning-btn" class="layout-toggle" title="Sort and filter incompatible mods by name, downloads, or followers">${sortIcon}</button>
             <div id="sort-warning-dropdown" class="sort-dropdown">
               <div class="sort-option active" data-sort="default">Default</div>
               <div class="sort-option has-submenu">
@@ -5069,8 +5070,8 @@
               </div>
             </div>
           </div>
-          <button id="copy-warning-btn" class="layout-toggle" title="Copy Mod List">${copyIcon}</button>
-          <button id="warning-layout-toggle-btn" class="layout-toggle" title="Toggle Layout">${gridIcon}</button>
+          <button id="copy-warning-btn" class="layout-toggle" title="Copy list of incompatible mod names to clipboard">${copyIcon}</button>
+          <button id="warning-layout-toggle-btn" class="layout-toggle" title="Switch between detailed list view and compact grid view for incompatible mods">${gridIcon}</button>
         </div>
       </div>
       <div class="results-list"></div>
@@ -6063,6 +6064,7 @@
         // Create and add the "Download All" button to its group
         const downloadAllBtn = document.createElement("button");
         downloadAllBtn.className = "action-button";
+        downloadAllBtn.setAttribute("title", "Download all compatible mod files as individual .jar files");
         downloadAllBtn.innerHTML = `Download All (${nonIgnoredDownloads.length})
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -6117,6 +6119,7 @@
         // Create the .zip button
         const downloadZipBtn = document.createElement("button");
         downloadZipBtn.className = "action-button";
+        downloadZipBtn.setAttribute("title", "Download all compatible mods packaged in a single .zip file");
         downloadZipBtn.innerHTML = `Download .zip
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -6143,6 +6146,7 @@
         // Create the .mrpack button
         const downloadPackBtn = document.createElement("button");
         downloadPackBtn.className = "action-button";
+        downloadPackBtn.setAttribute("title", "Download as Modrinth modpack (.mrpack) - compatible with most launchers");
         downloadPackBtn.innerHTML = `Download as .mrpack`;
         downloadPackBtn.onclick = () => createModpack();
         downloadPackGroup.appendChild(downloadPackBtn);
@@ -6381,23 +6385,23 @@
             </svg>
             <span class="category-tooltip"></span>
           </div>
-          <div class="mod-meta-item changelog-toggle">Changelog</div>
+          <div class="mod-meta-item changelog-toggle" title="Click to view changelog and version details">Changelog</div>
           <div class="mod-meta-item list-view-channels">
-            <a href="#" target="_blank" rel="noopener noreferrer" class="channel-link release" style="display: none;">Release</a>
-            <a href="#" target="_blank" rel="noopener noreferrer" class="channel-link beta" style="display: none;">Beta</a>
-            <a href="#" target="_blank" rel="noopener noreferrer" class="channel-link alpha" style="display: none;">Alpha</a>
+            <a href="#" target="_blank" rel="noopener noreferrer" class="channel-link release" style="display: none;" title="Stable release version">Release</a>
+            <a href="#" target="_blank" rel="noopener noreferrer" class="channel-link beta" style="display: none;" title="Beta testing version">Beta</a>
+            <a href="#" target="_blank" rel="noopener noreferrer" class="channel-link alpha" style="display: none;" title="Alpha testing version">Alpha</a>
           </div>
         </div>
       </div>
       <div class="mod-actions">
-        <select class="version-select">${versionOptions}</select>
+        <select class="version-select" title="Choose which version of this mod to download">${versionOptions}</select>
         <div class="grid-bottom-line">
           <div class="grid-view-channels">
-            <a href="#" target="_blank" rel="noopener noreferrer" class="channel-link release" style="display: none;">Release</a>
-            <a href="#" target="_blank" rel="noopener noreferrer" class="channel-link beta" style="display: none;">Beta</a>
-            <a href="#" target="_blank" rel="noopener noreferrer" class="channel-link alpha" style="display: none;">Alpha</a>
+            <a href="#" target="_blank" rel="noopener noreferrer" class="channel-link release" style="display: none;" title="Stable release version">Release</a>
+            <a href="#" target="_blank" rel="noopener noreferrer" class="channel-link beta" style="display: none;" title="Beta testing version">Beta</a>
+            <a href="#" target="_blank" rel="noopener noreferrer" class="channel-link alpha" style="display: none;" title="Alpha testing version">Alpha</a>
           </div>
-          <a href="#" class="download-link" data-project-id="${mod.projectId}">Download</a>
+          <a href="#" class="download-link" data-project-id="${mod.projectId}" title="Download this mod file">Download</a>
         </div>
       </div>
     </div>
@@ -6706,7 +6710,7 @@
             </svg>
             <span class="category-tooltip"></span>
           </div>
-          <div class="mod-meta-item changelog-toggle" style="color: var(--warning-color); font-weight: bold;">Reason</div>
+          <div class="mod-meta-item changelog-toggle" style="color: var(--warning-color); font-weight: bold;" title="Click to view why this mod is incompatible">Reason</div>
         </div>
       </div>
 
