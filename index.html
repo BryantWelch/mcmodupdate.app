@@ -404,6 +404,9 @@
       /* Larger side margins */
       box-sizing: border-box;
       overflow-x: hidden;
+      max-height: calc(100vh - 320px);
+      /* Ensure it doesn't go beyond viewport, accounting for top position */
+      overflow-y: auto;
     }
 
     .modal-overlay.visible {
@@ -417,12 +420,15 @@
       background-color: #1e1e2f;
       padding: 2rem;
       border-radius: 12px;
-      max-width: 600px;
+      max-width: 700px;
       width: 90%;
+      max-height: 80vh;
       position: relative;
       color: var(--secondary-text);
       transform: scale(0.95);
       transition: transform 0.3s ease-in-out;
+      overflow-y: auto;
+      overflow-x: hidden;
     }
 
     .modal-overlay.visible .modal-content {
@@ -1187,11 +1193,6 @@
 
     #search-results-container {
       margin-top: 1.5rem;
-      max-height: 60vh;
-      overflow-y: auto;
-      overflow-x: hidden;
-      padding-right: 0.5rem;
-      /* For scrollbar spacing */
       display: flex;
       flex-direction: column;
       gap: 1rem;
@@ -2100,7 +2101,7 @@
         max-width: none !important;
         margin: 1rem !important;
         padding: 1.5rem !important;
-        max-height: 85vh !important;
+        max-height: 80vh !important;
         overflow-y: auto !important;
         position: relative !important;
         top: auto !important;
@@ -2282,7 +2283,8 @@
     <div class="controls">
       <div class="control-group">
         <label for="mod-loader">Loader:</label>
-        <select id="mod-loader" autocomplete="off" title="Choose your mod loader - this determines which mods are compatible with your setup">
+        <select id="mod-loader" autocomplete="off"
+          title="Choose your mod loader - this determines which mods are compatible with your setup">
           <option value="fabric">Fabric</option>
           <option value="forge">Forge</option>
           <option value="neoforge">NeoForge</option>
@@ -2291,15 +2293,18 @@
       </div>
       <div class="control-group">
         <label for="mc-version">Version:</label>
-        <select id="mc-version" title="Select your target Minecraft version - only mods compatible with this version will be shown"></select>
+        <select id="mc-version"
+          title="Select your target Minecraft version - only mods compatible with this version will be shown"></select>
       </div>
       <div class="control-group search-container">
         <label for="mod-search">Search:</label>
-        <input type="text" id="mod-search" placeholder="Find mods by name..." title="Search for mods on Modrinth to add to your collection">
+        <input type="text" id="mod-search" placeholder="Find mods by name..."
+          title="Search for mods on Modrinth to add to your collection">
         <button id="search-clear-button" class="search-clear-button" title="Clear search input">&times;</button>
       </div>
     </div>
-    <div id="dropzone" class="dropzone" title="Drag and drop your files here or click to browse. Supports .jar (mods), .zip (resource packs/shaders), and .mrpack (modpacks)">
+    <div id="dropzone" class="dropzone"
+      title="Drag and drop your files here or click to browse. Supports .jar (mods), .zip (resource packs/shaders), and .mrpack (modpacks)">
       <div id="file-list-container" class="file-list"></div>
       <p id="dropzone-prompt" class="dropzone-prompt">
         Upload your mod files (.jar),
@@ -2314,7 +2319,8 @@
       </p>
     </div>
     <div class="action-buttons-container">
-      <button id="update-button" class="update-button" title="Process your uploaded files and search for compatible versions on Modrinth">
+      <button id="update-button" class="update-button"
+        title="Process your uploaded files and search for compatible versions on Modrinth">
         Update
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -2326,7 +2332,8 @@
       <button id="clear-all-button" class="clear-all-button" title="Remove all uploaded files from the input area">
         Clear Input
       </button>
-      <button id="clear-results-button" class="clear-all-button" style="display: none" title="Clear all search results and start over">
+      <button id="clear-results-button" class="clear-all-button" style="display: none"
+        title="Clear all search results and start over">
         Clear Results
       </button>
     </div>
@@ -2366,7 +2373,8 @@
             font-size: 0.9rem;
             font-style: italic;
             padding: 0;
-          " title="Open detailed help guide with usage instructions and feature explanations">View detailed instructions</button>
+          " title="Open detailed help guide with usage instructions and feature explanations">View detailed
+            instructions</button>
         </p>
       </div>
     </div>
@@ -2408,6 +2416,75 @@
         <li><b style="color: #ffc107;">Yellow border:</b> No compatible version found for your selected loader/version
         </li>
         <li><b style="color: #f44336;">Red border:</b> Mod not found on Modrinth or file could not be processed</li>
+      </ul>
+
+      <p><b>Icons Next to Mod Titles:</b></p>
+      <ul>
+        <li><b><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
+              <path
+                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
+              </path>
+              <polyline points="3.29 7 12 12 20.71 7"></polyline>
+              <line x1="12" y1="22" x2="12" y2="12"></line>
+            </svg> Box:</b> Standard mod</li>
+        <li><b><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
+              <path
+                d="M18.37 2.63 14 7l-1.59-1.59a2 2 0 0 0-2.82 0L8 7l9 9 1.59-1.59a2 2 0 0 0 0-2.82L17 10l4.37-4.37a2.12 2.12 0 1 0-3-3Z">
+              </path>
+              <path d="M9 8c-2 3-4 3.5-7 4l8 10c2-1 6-5 6-7"></path>
+              <path d="M14.5 17.5 4.5 15"></path>
+            </svg> Paintbrush:</b> Resource pack</li>
+        <li><b><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
+              <circle cx="6" cy="15" r="4" />
+              <circle cx="18" cy="15" r="4" />
+              <path d="M14 15a2 2 0 0 0-2-2 2 2 0 0 0-2 2" />
+              <path d="M2.5 13 5 7c.7-1.3 1.4-2 3-2" />
+              <path d="M21.5 13 19 7c-.7-1.3-1.5-2-3-2" />
+            </svg> Glasses:</b> Shader pack</li>
+        <li><b><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
+              <path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1" />
+              <path d="M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1" />
+            </svg> Brackets:</b> Data pack</li>
+        <li><b><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
+              <path d="M12 22v-9" />
+              <path
+                d="M15.17 2.21a1.67 1.67 0 0 1 1.63 0L21 4.57a1.93 1.93 0 0 1 0 3.36L8.82 14.79a1.655 1.655 0 0 1-1.64 0L3 12.43a1.93 1.93 0 0 1 0-3.36z" />
+              <path
+                d="M20 13v3.87a2.06 2.06 0 0 1-1.11 1.83l-6 3.08a1.93 1.93 0 0 1-1.78 0l-6-3.08A2.06 2.06 0 0 1 4 16.87V13" />
+              <path
+                d="M21 12.43a1.93 1.93 0 0 0 0-3.36L8.83 2.2a1.64 1.64 0 0 0-1.63 0L3 4.57a1.93 1.93 0 0 0 0 3.36l12.18 6.86a1.636 1.636 0 0 0 1.63 0z" />
+            </svg> Open Box:</b> Modpack</li>
+        <li><b><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
+              <path d="M12 22v-5" />
+              <path d="M9 8V2" />
+              <path d="M15 8V2" />
+              <path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z" />
+            </svg> Plug:</b> Plugin</li>
+        <li><b><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
+              <path
+                d="M15.39 4.39a1 1 0 0 0 1.68-.474 2.5 2.5 0 1 1 3.014 3.015 1 1 0 0 0-.474 1.68l1.683 1.682a2.414 2.414 0 0 1 0 3.414L19.61 15.39a1 1 0 0 1-1.68-.474 2.5 2.5 0 1 0-3.014 3.015 1 1 0 0 1 .474 1.68l-1.683 1.682a2.414 2.414 0 0 1-3.414 0L8.61 19.61a1 1 0 0 0-1.68.474 2.5 2.5 0 1 1-3.014-3.015 1 1 0 0 0 .474-1.68L3.707 13.707a2.414 2.414 0 0 1 0-3.414L4.39 8.61a1 1 0 0 1 1.68.474 2.5 2.5 0 1 0 3.014-3.015 1 1 0 0 1-.474-1.68L9.293 2.707a2.414 2.414 0 0 1 3.414 0L14.39 4.39z" />
+            </svg> Puzzle Piece:</b> This mod is required by another mod in your list</li>
+        <li><b><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+            </svg> Chain Link:</b> This mod has dependencies that were automatically added</li>
+        <li><b><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+            </svg> Lightning Bolt:</b> Data loaded from cache for faster performance</li>
+        <li><b><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
+              <path d="M18 6 7 17l-5-5" />
+              <path d="m22 10-7.5 7.5L13 16" />
+            </svg> Double Checkmark:</b> This mod is already up-to-date with the version selected</li>
       </ul>
 
       <h3>Features &amp; Tools:</h3>
@@ -2454,7 +2531,8 @@
         <!-- Duplicate search box inside modal -->
         <div class="search-container" style="max-width: 300px; margin: 0 auto;">
           <input type="text" id="modal-search-input" placeholder="Find mods by name..."
-            style="width: 100%; margin-left: 0;" title="Search Modrinth for mods, resource packs, shaders, and modpacks">
+            style="width: 100%; margin-left: 0;"
+            title="Search Modrinth for mods, resource packs, shaders, and modpacks">
           <button id="modal-search-clear-button" class="search-clear-button" title="Clear search input">&times;</button>
         </div>
 
@@ -2474,7 +2552,8 @@
           <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
             <label for="project-type-select" style="font-size: 0.9rem; color: var(--secondary-text);">Project
               Type</label>
-            <select id="project-type-select" title="Filter search results by project type - mods, resource packs, shaders, modpacks, data packs, or plugins"
+            <select id="project-type-select"
+              title="Filter search results by project type - mods, resource packs, shaders, modpacks, data packs, or plugins"
               style="background-color: var(--bg-color); color: var(--primary-text); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.4rem 0.6rem; font-size: 0.9rem; max-width: 160px;">
               <option value="">All Projects</option>
               <option value="mod">Mods</option>
@@ -2574,7 +2653,8 @@
 
   <!-- SCROLL BUTTONS -->
   <div id="scroll-buttons-container">
-    <button id="scroll-to-top-btn" class="scroll-btn" title="Scroll to top of page"> <!-- "Scroll to Top" button is first -->
+    <button id="scroll-to-top-btn" class="scroll-btn" title="Scroll to top of page">
+      <!-- "Scroll to Top" button is first -->
       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="17 11 12 6 7 11"></polyline>
@@ -2652,13 +2732,16 @@
     // --- UI LOGIC ---
     helpLink.addEventListener("click", () => {
       infoModal.classList.add("visible");
+      document.body.style.overflow = "hidden"; // Prevent background scrolling
     });
     modalCloseButton.addEventListener("click", () => {
       infoModal.classList.remove("visible");
+      document.body.style.overflow = ""; // Restore background scrolling
     });
     infoModal.addEventListener("click", (event) => {
       if (event.target === infoModal) {
         infoModal.classList.remove("visible");
+        document.body.style.overflow = ""; // Restore background scrolling
       }
     });
 
@@ -2685,10 +2768,12 @@
 
       alertMessage.textContent = message;
       alertModal.classList.add("visible");
+      document.body.style.overflow = "hidden"; // Prevent background scrolling
     }
 
     function hideCustomAlert() {
       alertModal.classList.remove("visible");
+      document.body.style.overflow = ""; // Restore background scrolling
     }
 
     alertOkButton.addEventListener("click", hideCustomAlert);
@@ -3016,6 +3101,7 @@
         toggleFeaturedControls(false); // Hide controls during manual search
         positionSearchModal();
         searchModal.classList.add("visible");
+        document.body.style.overflow = "hidden"; // Prevent background scrolling
         debouncedSearch(query);
       } else {
         // Show featured content when search is empty
@@ -3074,6 +3160,7 @@
       clearSearch(searchInput);
       // Close the search modal when clearing from the main search box
       searchModal.classList.remove("visible");
+      document.body.style.overflow = ""; // Restore background scrolling
     });
 
     modalSearchClearButton.addEventListener("click", () => {
@@ -3085,6 +3172,7 @@
       // Show the search modal whenever user clicks in the main search box
       positionSearchModal();
       searchModal.classList.add("visible");
+      document.body.style.overflow = "hidden"; // Prevent background scrolling
       // Focus the modal search input for immediate typing
       modalSearchInput.focus();
 
@@ -3103,6 +3191,7 @@
       // Already in modal, just make sure modal is visible
       positionSearchModal();
       searchModal.classList.add("visible");
+      document.body.style.overflow = "hidden"; // Prevent background scrolling
     });
 
     // Event listeners for featured content dropdowns
@@ -3121,16 +3210,19 @@
     // --- Search Modal Close Logic ---
     searchCloseButton.addEventListener("click", () => {
       searchModal.classList.remove("visible");
+      document.body.style.overflow = ""; // Restore background scrolling
     });
 
     searchXCloseButton.addEventListener("click", () => {
       searchModal.classList.remove("visible");
+      document.body.style.overflow = ""; // Restore background scrolling
     });
 
     searchModal.addEventListener("click", (event) => {
       // If the user clicks on the dark overlay itself, not the content
       if (event.target === searchModal) {
         searchModal.classList.remove("visible");
+        document.body.style.overflow = ""; // Restore background scrolling
       }
     });
 
@@ -3303,6 +3395,7 @@
         e.target.disabled = true;
         e.target.textContent = "Added";
         searchModal.classList.remove("visible");
+        document.body.style.overflow = ""; // Restore background scrolling
       });
 
       return card;
@@ -3643,7 +3736,7 @@
       // Restore the welcome message from snapshot
       if (welcomeMessageSnapshot) {
         resultsArea.innerHTML = welcomeMessageSnapshot;
-        
+
         // Re-attach event listener to the restored help link
         const restoredHelpLink = document.getElementById("help-link");
         if (restoredHelpLink) {
