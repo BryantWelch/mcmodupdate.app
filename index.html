@@ -163,8 +163,10 @@
       transition: background-color 0.2s ease, border-color 0.2s ease;
     }
 
-    select:hover {
-      border-color: var(--gradient-start);
+    select:hover,
+    #sort-select:hover,
+    #project-type-select:hover {
+      border-color: var(--gradient-start) !important;
     }
 
     .dropzone {
@@ -718,13 +720,13 @@
     }
 
     .result-card.search .mod-description {
-      word-break: break-word;
+      word-wrap: break-word;
     }
-
-
 
     .mod-icon-link {
       flex-shrink: 0;
+      display: block;
+      border-radius: 8px;
     }
 
     .mod-icon {
@@ -733,6 +735,12 @@
       border-radius: 8px;
       object-fit: cover;
       background-color: var(--bg-color);
+      box-shadow: 0 0 0 0 transparent;
+      transition: box-shadow 0.2s ease;
+    }
+
+    .mod-icon-link:hover .mod-icon {
+      box-shadow: 0 0 0 2px var(--gradient-start);
     }
 
     .mod-details {

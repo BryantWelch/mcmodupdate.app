@@ -6,6 +6,7 @@ Thumbs.db
 # IDE / Editor-specific files
 .vscode/
 .idea/
+.windsurf/
 *.suo
 *.ntvs*
 *.njsproj
