@@ -1410,6 +1410,95 @@
       background-color: var(--pill-bg);
     }
 
+    .layout-toggle.active {
+      background-color: var(--gradient-start);
+      color: white;
+      border-color: var(--gradient-start);
+    }
+
+    /* -- Bulk Actions Bar -- */
+    .bulk-actions-bar {
+      display: none;
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      margin-bottom: 1rem;
+      gap: 0.75rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .bulk-actions-bar.show {
+      display: flex;
+    }
+
+    .bulk-actions-bar button {
+      background-color: var(--pill-bg);
+      color: var(--primary-text);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: all 0.2s ease;
+    }
+
+    .bulk-actions-bar button:hover {
+      background-color: var(--dropzone-hover-bg);
+      border-color: var(--gradient-start);
+    }
+
+    .bulk-actions-bar button.primary {
+      background-color: var(--success-color);
+      color: white;
+      border-color: var(--success-color);
+    }
+
+    .bulk-actions-bar button.primary:hover {
+      background-color: var(--gradient-end);
+      border-color: var(--gradient-end);
+    }
+
+    .bulk-actions-bar button.danger {
+      background-color: var(--error-color);
+      color: white;
+      border-color: var(--error-color);
+    }
+
+    .bulk-actions-bar button.danger:hover {
+      background-color: #d32f2f;
+      border-color: #d32f2f;
+    }
+
+    /* -- Bulk Actions Mode Styling -- */
+    .result-card {
+      position: relative;
+    }
+
+    /* Download button becomes select button in bulk mode */
+    .download-link.bulk-select-mode {
+      background-color: var(--card-bg);
+      color: var(--text-color);
+      border: 2px solid var(--border-color);
+    }
+
+    .download-link.bulk-select-mode:hover {
+      border-color: var(--gradient-start);
+    }
+
+    /* Selected state */
+    .download-link.bulk-select-mode.selected {
+      background-color: var(--gradient-start);
+      color: white;
+      border-color: var(--gradient-start);
+    }
+
+    .download-link.bulk-select-mode.selected::before {
+      content: "✓ ";
+      font-weight: bold;
+    }
+
     /* -- Default Visibility: Hide grid-only elements -- */
     .grid-view-channels {
       display: none;
@@ -2526,6 +2615,19 @@
     </div>
   </div>
 
+  <!-- CONFIRM MODAL BLOCK -->
+  <div id="confirm-modal" class="modal-overlay">
+    <div class="modal-content">
+      <button id="confirm-x-close-button" class="modal-close-button" title="Close">&times;</button>
+      <h2 id="confirm-title"><span id="confirm-icon"></span>Confirm Action</h2>
+      <p id="confirm-message" style="margin: 1.5rem 0;"></p>
+      <div class="modal-actions">
+        <button id="confirm-cancel-button" class="clear-all-button">Cancel</button>
+        <button id="confirm-ok-button" class="action-button">OK</button>
+      </div>
+    </div>
+  </div>
+
   <!-- SEARCH MODAL BLOCK -->
   <div id="search-modal" class="modal-overlay">
     <div class="modal-content">
@@ -2810,6 +2912,54 @@
         hideCustomAlert();
       }
     });
+
+    // --- Custom Confirm Modal Logic ---
+    const confirmModal = document.getElementById("confirm-modal");
+    const confirmMessage = document.getElementById("confirm-message");
+    const confirmOkButton = document.getElementById("confirm-ok-button");
+    const confirmCancelButton = document.getElementById("confirm-cancel-button");
+    const confirmIcon = document.getElementById("confirm-icon");
+    const confirmTitle = document.getElementById("confirm-title");
+
+    let confirmResolve = null;
+
+    function showCustomConfirm(message, customTitle = "Confirm Action") {
+      return new Promise((resolve) => {
+        confirmResolve = resolve;
+        
+        // Set warning icon
+        const warningIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--warning-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`;
+        
+        confirmTitle.childNodes[1].nodeValue = customTitle;
+        confirmIcon.innerHTML = warningIcon;
+        confirmMessage.textContent = message;
+        confirmModal.classList.add("visible");
+        document.body.style.overflow = "hidden";
+      });
+    }
+
+    function hideCustomConfirm(result) {
+      confirmModal.classList.remove("visible");
+      document.body.style.overflow = "";
+      if (confirmResolve) {
+        confirmResolve(result);
+        confirmResolve = null;
+      }
+    }
+
+    const confirmXCloseButton = document.getElementById("confirm-x-close-button");
+
+    confirmOkButton.addEventListener("click", () => hideCustomConfirm(true));
+    confirmCancelButton.addEventListener("click", () => hideCustomConfirm(false));
+    confirmXCloseButton.addEventListener("click", () => hideCustomConfirm(false));
+    confirmModal.addEventListener("click", (event) => {
+      if (event.target === confirmModal) {
+        hideCustomConfirm(false);
+      }
+    });
+
+    // Make globally accessible
+    window.showCustomConfirm = showCustomConfirm;
 
     // --- Scroll to Top/Bottom Button Logic ---
     function handleScrollButtons() {
@@ -5159,6 +5309,7 @@
       const copyIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="m5 15-1 0c-1.1 0-2-.9-2-2l0-9c0-1.1.9-2 2-2l9 0c1.1 0 2 .9 2 2l0 1"></path></svg>`;
       const sortIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="7,10 12,5 17,10"></polyline><polyline points="7,14 12,19 17,14"></polyline></svg>`;
       const ignoreIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M4.93 4.93l14.14 14.14"></path></svg>`;
+      const checkboxIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><polyline points="9 11 12 14 16 10"></polyline></svg>`;
 
       resultsArea.innerHTML = `
     <div id="results-found" class="results-section">
@@ -5167,7 +5318,7 @@
         <h2 id="header-found">Updates Found</h2>
         <div class="header-buttons">
           <input type="text" id="search-found" class="search-box" placeholder="Filter mods..." style="margin-right: 0.5rem;" title="Filter successful results by mod name">
-          <button id="ignore-found-btn" class="layout-toggle header-button" title="Toggle ignore mode - click to mark mods you don't want to download">${ignoreIcon}</button>
+          <button id="bulk-actions-mode-btn" class="layout-toggle header-button" title="Toggle bulk actions mode - manage multiple mods at once">${checkboxIcon}</button>
           <div class="sort-dropdown-container">
             <button id="sort-found-btn" class="layout-toggle" title="Sort and filter results by name, downloads, followers, or environment">${sortIcon}</button>
             <div id="sort-found-dropdown" class="sort-dropdown">
@@ -5269,6 +5420,18 @@
           <button id="copy-found-btn" class="layout-toggle" title="Copy list of successful mod names to clipboard">${copyIcon}</button>
           <button id="layout-toggle-btn" class="layout-toggle" title="Switch between detailed list view and compact grid view">${gridIcon}</button>
         </div>
+      </div>
+      <!-- Bulk actions bar (hidden by default) -->
+      <div id="bulk-actions-bar" class="bulk-actions-bar">
+        <button id="toggle-select-all-bulk-btn">Select All</button>
+        <span id="bulk-selection-count" style="color: var(--text-color); margin: 0 0.75rem; font-weight: 500;">0 selected</span>
+        <span style="color: var(--border-color); margin: 0 0.5rem;">|</span>
+        <button id="download-selected-bulk-btn" class="primary">Download</button>
+        <button id="ignore-selected-bulk-btn">Ignore</button>
+        <button id="unignore-selected-bulk-btn">Unignore</button>
+        <button id="remove-selected-bulk-btn" class="danger">Remove</button>
+        <span style="color: var(--border-color); margin: 0 0.5rem;">|</span>
+        <button id="cancel-bulk-btn">Cancel</button>
       </div>
       <div class="results-list"></div>
     </div>
@@ -5491,14 +5654,14 @@
           // Un-ignore
           ignoredMods.delete(projectId);
           card.classList.remove('ignored');
-          btn.textContent = 'Ignore';
-          btn.classList.remove('ignored');
+          btn.textContent = 'Download';
+          btn.classList.remove('ignored-state');
         } else {
           // Ignore
           ignoredMods.add(projectId);
           card.classList.add('ignored');
-          btn.textContent = 'Un-ignore';
-          btn.classList.add('ignored');
+          btn.textContent = 'Ignored';
+          btn.classList.add('ignored-state');
         }
 
         window.updateDownloadCounters();
@@ -5616,11 +5779,285 @@
 
 
 
-      // Add event listener for ignore mode button
-      const ignoreFoundBtn = document.getElementById('ignore-found-btn');
+      // --- Unified Bulk Actions Mode ---
+      window.isBulkActionsMode = false;
+      window.selectedModsForBulk = new Set();
 
-      if (ignoreFoundBtn) {
-        ignoreFoundBtn.addEventListener('click', toggleIgnoreMode);
+      function toggleBulkActionsMode() {
+        window.isBulkActionsMode = !window.isBulkActionsMode;
+        const bulkModeBtn = document.getElementById('bulk-actions-mode-btn');
+        const bulkActionsBar = document.getElementById('bulk-actions-bar');
+
+        if (window.isBulkActionsMode) {
+          // Enable bulk actions mode
+          bulkModeBtn.classList.add('active');
+          bulkActionsBar.classList.add('show');
+          window.selectedModsForBulk.clear();
+          
+          // Transform all download buttons to select buttons
+          document.querySelectorAll('#results-found .download-link').forEach(btn => {
+            btn.classList.add('bulk-select-mode');
+            btn.textContent = 'Select';
+            btn.setAttribute('title', 'Select this mod for bulk actions');
+          });
+          
+          updateBulkSelectionCounts();
+        } else {
+          // Disable bulk actions mode
+          bulkModeBtn.classList.remove('active');
+          bulkActionsBar.classList.remove('show');
+          window.selectedModsForBulk.clear();
+          
+          // Reset all buttons to normal download buttons
+          document.querySelectorAll('.download-link').forEach(btn => {
+            btn.classList.remove('bulk-select-mode', 'selected');
+            // Check if this mod is ignored
+            if (btn.classList.contains('ignored-state')) {
+              btn.textContent = 'Ignored';
+            } else {
+              btn.textContent = 'Download';
+            }
+            btn.setAttribute('title', 'Download this mod file');
+          });
+        }
+      }
+
+      function updateBulkSelectionCounts() {
+        const count = window.selectedModsForBulk.size;
+        const toggleSelectBtn = document.getElementById('toggle-select-all-bulk-btn');
+        const countDisplay = document.getElementById('bulk-selection-count');
+        
+        // Update selection count display
+        if (countDisplay) {
+          countDisplay.textContent = `${count} selected`;
+        }
+        
+        // Update select all button text based on current state
+        if (toggleSelectBtn) {
+          const allCards = document.querySelectorAll('#results-found .result-card');
+          const allSelected = allCards.length > 0 && Array.from(allCards).every(card => 
+            window.selectedModsForBulk.has(card.dataset.projectId)
+          );
+          toggleSelectBtn.textContent = allSelected ? 'Clear All' : 'Select All';
+        }
+      }
+      
+      // Make globally accessible
+      window.updateBulkSelectionCounts = updateBulkSelectionCounts;
+
+      // Function to update Download All button count and file sizes
+      function updateDownloadAllCount() {
+        const downloadAllBtn = document.querySelector('.action-button');
+        if (downloadAllBtn) {
+          const nonIgnoredCards = document.querySelectorAll('#results-found .result-card:not(.ignored)');
+          const svgContent = downloadAllBtn.querySelector('svg');
+          const svgHTML = svgContent ? svgContent.outerHTML : '';
+          downloadAllBtn.innerHTML = `Download All (${nonIgnoredCards.length})\n          ${svgHTML}`;
+        }
+        
+        // Update file sizes for Download All and Download ZIP
+        if (typeof successfulDownloads !== 'undefined' && successfulDownloads.length > 0) {
+          const nonIgnoredDownloads = successfulDownloads.filter(dl => {
+            const isIgnored = window.ignoredMods && window.ignoredMods.has(dl.projectId);
+            const isMrpackFile = dl.isMrpackFile === true;
+            return !isIgnored && !isMrpackFile;
+          });
+          
+          const totalSizeBytes = nonIgnoredDownloads.reduce(
+            (sum, file) => sum + (file.fileSize || 0),
+            0
+          );
+          
+          const formattedSize = totalSizeBytes > 0 ? formatBytes(totalSizeBytes) : '0 Bytes';
+          
+          // Update size info for Download All and Download ZIP (first two size elements)
+          const sizeInfoElements = document.querySelectorAll('.download-size-info');
+          if (sizeInfoElements.length >= 2) {
+            sizeInfoElements[0].textContent = formattedSize; // Download All
+            sizeInfoElements[1].textContent = formattedSize; // Download ZIP
+          }
+        }
+      }
+      
+      // Make globally accessible
+      window.updateDownloadAllCount = updateDownloadAllCount;
+
+      // Bulk actions mode button
+      const bulkModeBtn = document.getElementById('bulk-actions-mode-btn');
+      if (bulkModeBtn) {
+        bulkModeBtn.addEventListener('click', toggleBulkActionsMode);
+      }
+
+      // Toggle select all button
+      const toggleSelectAllBulkBtn = document.getElementById('toggle-select-all-bulk-btn');
+      if (toggleSelectAllBulkBtn) {
+        toggleSelectAllBulkBtn.addEventListener('click', () => {
+          const allCards = document.querySelectorAll('#results-found .result-card');
+          const allSelected = Array.from(allCards).every(card => 
+            window.selectedModsForBulk.has(card.dataset.projectId)
+          );
+          
+          if (allSelected) {
+            // Deselect all
+            window.selectedModsForBulk.clear();
+            document.querySelectorAll('.download-link.selected').forEach(btn => {
+              btn.classList.remove('selected');
+              btn.textContent = 'Select';
+            });
+          } else {
+            // Select all
+            allCards.forEach(card => {
+              const projectId = card.dataset.projectId;
+              window.selectedModsForBulk.add(projectId);
+              const btn = card.querySelector('.download-link');
+              if (btn) {
+                btn.classList.add('selected');
+                btn.textContent = 'Selected';
+              }
+            });
+          }
+          updateBulkSelectionCounts();
+        });
+      }
+
+      // Download selected button
+      const downloadSelectedBulkBtn = document.getElementById('download-selected-bulk-btn');
+      if (downloadSelectedBulkBtn) {
+        downloadSelectedBulkBtn.addEventListener('click', async () => {
+          if (window.selectedModsForBulk.size === 0) {
+            showCustomAlert('No mods selected. Please select mods to download.', 'notice');
+            return;
+          }
+          
+          // Filter out ignored mods
+          const modsToDownload = Array.from(window.selectedModsForBulk).filter(projectId => {
+            return !window.ignoredMods || !window.ignoredMods.has(projectId);
+          });
+          
+          if (modsToDownload.length === 0) {
+            showCustomAlert('All selected mods are ignored. Please unignore them first or select different mods.', 'notice');
+            return;
+          }
+          
+          for (const projectId of modsToDownload) {
+            const card = document.querySelector(`.result-card[data-project-id="${projectId}"]`);
+            if (card) {
+              const downloadLink = card.querySelector('.download-link');
+              if (downloadLink && downloadLink.href && downloadLink.href !== '#') {
+                // Temporarily remove bulk mode to allow download
+                const wasBulkMode = window.isBulkActionsMode;
+                window.isBulkActionsMode = false;
+                downloadLink.click();
+                window.isBulkActionsMode = wasBulkMode;
+                await new Promise(resolve => setTimeout(resolve, 100));
+              }
+            }
+          }
+        });
+      }
+
+      // Ignore selected button
+      const ignoreSelectedBulkBtn = document.getElementById('ignore-selected-bulk-btn');
+      if (ignoreSelectedBulkBtn) {
+        ignoreSelectedBulkBtn.addEventListener('click', () => {
+          if (window.selectedModsForBulk.size === 0) {
+            showCustomAlert('No mods selected. Please select mods to ignore.', 'notice');
+            return;
+          }
+          
+          // Ensure ignoredMods set exists
+          if (!window.ignoredMods) {
+            window.ignoredMods = new Set();
+          }
+          
+          window.selectedModsForBulk.forEach(projectId => {
+            const card = document.querySelector(`.result-card[data-project-id="${projectId}"]`);
+            if (card) {
+              const downloadLink = card.querySelector('.download-link');
+              if (downloadLink) {
+                downloadLink.classList.add('ignored-state');
+                card.classList.add('ignored');
+                // Add to global ignoredMods set
+                window.ignoredMods.add(projectId);
+              }
+            }
+          });
+          
+          // Clear selection after ignoring
+          window.selectedModsForBulk.clear();
+          document.querySelectorAll('.download-link.selected').forEach(btn => {
+            btn.classList.remove('selected');
+            btn.textContent = 'Select';
+          });
+          updateBulkSelectionCounts();
+          window.updateDownloadAllCount();
+        });
+      }
+
+      // Unignore selected button
+      const unignoreSelectedBulkBtn = document.getElementById('unignore-selected-bulk-btn');
+      if (unignoreSelectedBulkBtn) {
+        unignoreSelectedBulkBtn.addEventListener('click', () => {
+          if (window.selectedModsForBulk.size === 0) {
+            showCustomAlert('No mods selected. Please select mods to unignore.', 'notice');
+            return;
+          }
+          
+          window.selectedModsForBulk.forEach(projectId => {
+            const card = document.querySelector(`.result-card[data-project-id="${projectId}"]`);
+            if (card) {
+              const downloadLink = card.querySelector('.download-link');
+              if (downloadLink) {
+                downloadLink.classList.remove('ignored-state');
+                card.classList.remove('ignored');
+                // Remove from global ignoredMods set
+                if (window.ignoredMods) {
+                  window.ignoredMods.delete(projectId);
+                }
+              }
+            }
+          });
+          
+          // Clear selection after unignoring
+          window.selectedModsForBulk.clear();
+          document.querySelectorAll('.download-link.selected').forEach(btn => {
+            btn.classList.remove('selected');
+            btn.textContent = 'Select';
+          });
+          updateBulkSelectionCounts();
+          window.updateDownloadAllCount();
+        });
+      }
+
+      // Remove selected button
+      const removeSelectedBulkBtn = document.getElementById('remove-selected-bulk-btn');
+      if (removeSelectedBulkBtn) {
+        removeSelectedBulkBtn.addEventListener('click', async () => {
+          if (window.selectedModsForBulk.size === 0) {
+            showCustomAlert('No mods selected. Please select mods to remove.', 'notice');
+            return;
+          }
+          
+          const confirmed = await window.showCustomConfirm(
+            `Remove ${window.selectedModsForBulk.size} selected mod(s) from results?`,
+            'Remove Selected Mods'
+          );
+          
+          if (confirmed) {
+            window.selectedModsForBulk.forEach(projectId => {
+              const card = document.querySelector(`.result-card[data-project-id="${projectId}"]`);
+              if (card) card.remove();
+            });
+            window.selectedModsForBulk.clear();
+            updateBulkSelectionCounts();
+          }
+        });
+      }
+
+      // Cancel bulk actions button
+      const cancelBulkBtn = document.getElementById('cancel-bulk-btn');
+      if (cancelBulkBtn) {
+        cancelBulkBtn.addEventListener('click', toggleBulkActionsMode);
       }
 
       // --- Copy to clipboard functionality ---
@@ -6367,7 +6804,7 @@
           });
 
           if (downloadsToProcess.length === 0) {
-            alert('No mods to download. All mods are currently ignored.');
+            showCustomAlert('No mods to download. All mods are currently ignored.', 'notice');
             return;
           }
 
@@ -6777,6 +7214,32 @@
       // --- Add ignore mode event handler to download link ---
       downloadLink.addEventListener('click', (event) => {
         window.handleDownloadOrIgnore(event, mod.projectId);
+      });
+
+      // --- Add click handler for bulk actions mode ---
+      downloadLink.addEventListener('click', (e) => {
+        // Only handle selection in bulk actions mode
+        if (!window.isBulkActionsMode) return;
+        
+        e.preventDefault(); // Prevent download in bulk mode
+        
+        const projectId = mod.projectId;
+        
+        // Toggle selection
+        if (window.selectedModsForBulk.has(projectId)) {
+          window.selectedModsForBulk.delete(projectId);
+          downloadLink.classList.remove('selected');
+          downloadLink.textContent = 'Select';
+        } else {
+          window.selectedModsForBulk.add(projectId);
+          downloadLink.classList.add('selected');
+          downloadLink.textContent = 'Selected';
+        }
+        
+        // Update counts in bulk action bar
+        if (typeof window.updateBulkSelectionCounts === 'function') {
+          window.updateBulkSelectionCounts();
+        }
       });
 
       // --- Add Dependency Chain Icon if needed ---
