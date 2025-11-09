@@ -5817,6 +5817,7 @@
       // --- Unified Bulk Actions Mode ---
       window.isBulkActionsMode = false;
       window.selectedModsForBulk = new Set();
+      window.lastClickedModIndex = null; // Track last clicked mod for shift+click range selection
 
       function toggleBulkActionsMode() {
         window.isBulkActionsMode = !window.isBulkActionsMode;
@@ -5842,6 +5843,7 @@
           bulkModeBtn.classList.remove('active');
           bulkActionsBar.classList.remove('show');
           window.selectedModsForBulk.clear();
+          window.lastClickedModIndex = null; // Reset shift+click tracking
           
           // Reset all buttons to normal download buttons
           document.querySelectorAll('.download-link').forEach(btn => {
@@ -7290,17 +7292,48 @@
         e.preventDefault(); // Prevent download in bulk mode
         
         const projectId = mod.projectId;
+        const currentCard = downloadLink.closest('.result-card');
         
-        // Toggle selection
-        if (window.selectedModsForBulk.has(projectId)) {
-          window.selectedModsForBulk.delete(projectId);
-          downloadLink.classList.remove('selected');
-          downloadLink.textContent = 'Select';
+        // Handle shift+click for range selection
+        if (e.shiftKey && window.lastClickedModIndex !== null && window.lastClickedModIndex !== undefined) {
+          // Get all cards in the results section
+          const allCards = Array.from(document.querySelectorAll('#results-found .result-card'));
+          const currentIndex = allCards.indexOf(currentCard);
+          
+          if (currentIndex !== -1 && currentIndex !== window.lastClickedModIndex) {
+            // Determine range (works for both forward and backward selection)
+            const startIndex = Math.min(window.lastClickedModIndex, currentIndex);
+            const endIndex = Math.max(window.lastClickedModIndex, currentIndex);
+            
+            // Select all cards in range
+            for (let i = startIndex; i <= endIndex; i++) {
+              const card = allCards[i];
+              const cardProjectId = card.dataset.projectId;
+              const btn = card.querySelector('.download-link');
+              
+              if (btn && cardProjectId) {
+                window.selectedModsForBulk.add(cardProjectId);
+                btn.classList.add('selected');
+                btn.textContent = 'Selected';
+              }
+            }
+          }
         } else {
-          window.selectedModsForBulk.add(projectId);
-          downloadLink.classList.add('selected');
-          downloadLink.textContent = 'Selected';
+          // Regular click - toggle selection
+          if (window.selectedModsForBulk.has(projectId)) {
+            window.selectedModsForBulk.delete(projectId);
+            downloadLink.classList.remove('selected');
+            downloadLink.textContent = 'Select';
+          } else {
+            window.selectedModsForBulk.add(projectId);
+            downloadLink.classList.add('selected');
+            downloadLink.textContent = 'Selected';
+          }
         }
+        
+        // Update last clicked index for next shift+click
+        const allCards = Array.from(document.querySelectorAll('#results-found .result-card'));
+        window.lastClickedModIndex = allCards.indexOf(currentCard);
         
         // Update counts in bulk action bar
         if (typeof window.updateBulkSelectionCounts === 'function') {
