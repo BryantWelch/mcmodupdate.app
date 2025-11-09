@@ -1285,6 +1285,35 @@
       color: var(--secondary-text);
     }
 
+    .search-box-wrapper {
+      position: relative;
+      display: inline-block;
+    }
+
+    .search-clear-btn {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: var(--secondary-text);
+      font-size: 20px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.2s ease;
+    }
+
+    .search-clear-btn:hover {
+      color: var(--primary-text);
+    }
+
     /* -- Styles for sort dropdown -- */
     .sort-dropdown-container {
       position: relative;
@@ -5317,7 +5346,10 @@
       <div class="results-header-container">
         <h2 id="header-found">Updates Found</h2>
         <div class="header-buttons">
-          <input type="text" id="search-found" class="search-box" placeholder="Filter mods..." style="margin-right: 0.5rem;" title="Filter successful results by mod name">
+          <div class="search-box-wrapper" style="position: relative; margin-right: 0.5rem;">
+            <input type="text" id="search-found" class="search-box" placeholder="Filter mods..." title="Filter successful results by mod name">
+            <button class="search-clear-btn" id="search-found-clear" title="Clear filter" style="display: none;">×</button>
+          </div>
           <button id="bulk-actions-mode-btn" class="layout-toggle header-button" title="Toggle bulk actions mode - manage multiple mods at once">${checkboxIcon}</button>
           <div class="sort-dropdown-container">
             <button id="sort-found-btn" class="layout-toggle" title="Sort and filter results by name, downloads, followers, or environment">${sortIcon}</button>
@@ -5440,7 +5472,10 @@
       <div class="results-header-container">
         <h2 id="header-warning">Not Compatible</h2>
         <div class="header-buttons">
-          <input type="text" id="search-warning" class="search-box" placeholder="Filter mods..." style="margin-right: 0.5rem;" title="Filter incompatible results by mod name">
+          <div class="search-box-wrapper" style="position: relative; margin-right: 0.5rem;">
+            <input type="text" id="search-warning" class="search-box" placeholder="Filter mods..." title="Filter incompatible results by mod name">
+            <button class="search-clear-btn" id="search-warning-clear" title="Clear filter" style="display: none;">×</button>
+          </div>
 
           <div class="sort-dropdown-container">
             <button id="sort-warning-btn" class="layout-toggle" title="Sort and filter incompatible mods by name, downloads, or followers">${sortIcon}</button>
@@ -5814,10 +5849,11 @@
             // Check if this mod is ignored
             if (btn.classList.contains('ignored-state')) {
               btn.textContent = 'Ignored';
+              btn.setAttribute('title', 'This mod is ignored');
             } else {
               btn.textContent = 'Download';
+              btn.setAttribute('title', 'Download this mod file');
             }
-            btn.setAttribute('title', 'Download this mod file');
           });
         }
       }
@@ -6104,13 +6140,43 @@
       }
 
       // Add event listeners for search inputs
+      const searchFoundClearBtn = document.getElementById("search-found-clear");
+      const searchWarningClearBtn = document.getElementById("search-warning-clear");
+
       searchFoundInput.addEventListener("input", (e) => {
         filterCards(e.target.value, "#results-found");
+        // Show/hide clear button based on input value
+        if (searchFoundClearBtn) {
+          searchFoundClearBtn.style.display = e.target.value ? "flex" : "none";
+        }
       });
 
       searchWarningInput.addEventListener("input", (e) => {
         filterCards(e.target.value, "#results-warning");
+        // Show/hide clear button based on input value
+        if (searchWarningClearBtn) {
+          searchWarningClearBtn.style.display = e.target.value ? "flex" : "none";
+        }
       });
+
+      // Clear button functionality
+      if (searchFoundClearBtn) {
+        searchFoundClearBtn.addEventListener("click", () => {
+          searchFoundInput.value = "";
+          searchFoundClearBtn.style.display = "none";
+          filterCards("", "#results-found");
+          searchFoundInput.focus();
+        });
+      }
+
+      if (searchWarningClearBtn) {
+        searchWarningClearBtn.addEventListener("click", () => {
+          searchWarningInput.value = "";
+          searchWarningClearBtn.style.display = "none";
+          filterCards("", "#results-warning");
+          searchWarningInput.focus();
+        });
+      }
 
       // --- Sort functionality ---
       const sortFoundBtn = document.getElementById("sort-found-btn");
