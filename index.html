@@ -5938,6 +5938,7 @@
           if (allSelected) {
             // Deselect all
             window.selectedModsForBulk.clear();
+            window.lastClickedModIndex = null; // Reset shift+click tracking
             document.querySelectorAll('.download-link.selected').forEach(btn => {
               btn.classList.remove('selected');
               btn.textContent = 'Select';
@@ -6023,6 +6024,7 @@
           
           // Clear selection after ignoring
           window.selectedModsForBulk.clear();
+          window.lastClickedModIndex = null; // Reset shift+click tracking
           document.querySelectorAll('.download-link.selected').forEach(btn => {
             btn.classList.remove('selected');
             btn.textContent = 'Select';
@@ -6058,6 +6060,7 @@
           
           // Clear selection after unignoring
           window.selectedModsForBulk.clear();
+          window.lastClickedModIndex = null; // Reset shift+click tracking
           document.querySelectorAll('.download-link.selected').forEach(btn => {
             btn.classList.remove('selected');
             btn.textContent = 'Select';
@@ -6087,6 +6090,7 @@
               if (card) card.remove();
             });
             window.selectedModsForBulk.clear();
+            window.lastClickedModIndex = null; // Reset shift+click tracking
             updateBulkSelectionCounts();
           }
         });
@@ -7321,19 +7325,34 @@
         } else {
           // Regular click - toggle selection
           if (window.selectedModsForBulk.has(projectId)) {
+            // Deselecting - check if we need to update lastClickedModIndex
             window.selectedModsForBulk.delete(projectId);
             downloadLink.classList.remove('selected');
             downloadLink.textContent = 'Select';
+            
+            // If we just deselected the last clicked mod, find the most recent still-selected mod
+            const allCards = Array.from(document.querySelectorAll('#results-found .result-card'));
+            const currentIndex = allCards.indexOf(currentCard);
+            if (window.lastClickedModIndex === currentIndex) {
+              // Find the last selected mod (highest index that's still selected)
+              window.lastClickedModIndex = null;
+              for (let i = allCards.length - 1; i >= 0; i--) {
+                const card = allCards[i];
+                if (window.selectedModsForBulk.has(card.dataset.projectId)) {
+                  window.lastClickedModIndex = i;
+                  break;
+                }
+              }
+            }
           } else {
+            // Selecting - update shift+click tracking to this mod
             window.selectedModsForBulk.add(projectId);
             downloadLink.classList.add('selected');
             downloadLink.textContent = 'Selected';
+            const allCards = Array.from(document.querySelectorAll('#results-found .result-card'));
+            window.lastClickedModIndex = allCards.indexOf(currentCard);
           }
         }
-        
-        // Update last clicked index for next shift+click
-        const allCards = Array.from(document.querySelectorAll('#results-found .result-card'));
-        window.lastClickedModIndex = allCards.indexOf(currentCard);
         
         // Update counts in bulk action bar
         if (typeof window.updateBulkSelectionCounts === 'function') {
