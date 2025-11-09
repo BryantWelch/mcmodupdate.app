@@ -2534,23 +2534,43 @@
       <!-- Search header section with centered layout -->
       <div class="modal-search-header"
         style="text-align: center; margin-bottom: 2rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border-color);">
-        <h2 id="search-title" style="margin: 0 0 1.25rem 0; font-size: 1.75rem;">Search for Mods</h2>
+        <h2 id="search-title" style="margin: 0 0 1.25rem 0; font-size: 1.75rem;">Search Modrinth</h2>
 
         <!-- Duplicate search box inside modal -->
         <div class="search-container" style="max-width: 300px; margin: 0 auto;">
-          <input type="text" id="modal-search-input" placeholder="Find mods by name..."
+          <input type="text" id="modal-search-input" placeholder="Search by name..."
             style="width: 100%; margin-left: 0;"
             title="Search Modrinth for mods, resource packs, shaders, and modpacks">
           <button id="modal-search-clear-button" class="search-clear-button" title="Clear search input">&times;</button>
         </div>
 
-        <!-- Featured content controls -->
-        <div class="featured-controls"
-          style="display: flex; gap: 1rem; justify-content: center; margin-top: 1rem; flex-wrap: wrap;">
+        <!-- All filter controls in one row -->
+        <div class="search-filter-controls"
+          style="display: flex; gap: 0.75rem; justify-content: center; margin-top: 1rem; flex-wrap: wrap;">
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
+            <label for="modal-loader-select" style="font-size: 0.9rem; color: var(--secondary-text);">Loader</label>
+            <select id="modal-loader-select" autocomplete="off"
+              title="Filter search results by mod loader compatibility"
+              style="background-color: var(--bg-color); color: var(--primary-text); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.4rem 0.6rem; font-size: 0.9rem; max-width: 140px;">
+              <option value="">All Loaders</option>
+              <option value="fabric">Fabric</option>
+              <option value="forge">Forge</option>
+              <option value="neoforge">NeoForge</option>
+              <option value="quilt">Quilt</option>
+            </select>
+          </div>
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
+            <label for="modal-version-select" style="font-size: 0.9rem; color: var(--secondary-text);">Version</label>
+            <select id="modal-version-select"
+              title="Filter search results by Minecraft version compatibility"
+              style="background-color: var(--bg-color); color: var(--primary-text); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.4rem 0.6rem; font-size: 0.9rem; max-width: 140px;">
+            </select>
+          </div>
           <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
             <label for="sort-select" style="font-size: 0.9rem; color: var(--secondary-text);">Sort by</label>
-            <select id="sort-select" title="Sort search results by popularity, downloads, update date, or creation date"
-              style="background-color: var(--bg-color); color: var(--primary-text); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.4rem 0.6rem; font-size: 0.9rem; max-width: 160px;">
+            <select id="sort-select" title="Sort search results by relevance, popularity, downloads, update date, or creation date"
+              style="background-color: var(--bg-color); color: var(--primary-text); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.4rem 0.6rem; font-size: 0.9rem; max-width: 140px;">
+              <option value="relevance">Relevance</option>
               <option value="follows">Most Popular</option>
               <option value="downloads">Most Downloaded</option>
               <option value="updated">Recently Updated</option>
@@ -2558,11 +2578,10 @@
             </select>
           </div>
           <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
-            <label for="project-type-select" style="font-size: 0.9rem; color: var(--secondary-text);">Project
-              Type</label>
+            <label for="project-type-select" style="font-size: 0.9rem; color: var(--secondary-text);">Project Type</label>
             <select id="project-type-select"
               title="Filter search results by project type - mods, resource packs, shaders, modpacks, data packs, or plugins"
-              style="background-color: var(--bg-color); color: var(--primary-text); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.4rem 0.6rem; font-size: 0.9rem; max-width: 160px;">
+              style="background-color: var(--bg-color); color: var(--primary-text); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.4rem 0.6rem; font-size: 0.9rem; max-width: 140px;">
               <option value="">All Projects</option>
               <option value="mod">Mods</option>
               <option value="modpack">Modpacks</option>
@@ -2576,7 +2595,6 @@
       </div>
 
       <div id="search-results-container">
-        <p>Start typing in the search bar to find mods.</p>
       </div>
       <div class="modal-actions">
         <button id="search-close-button" class="clear-all-button" title="Close search dialog">Close</button>
@@ -2736,6 +2754,8 @@
     const sortSelect = document.getElementById("sort-select");
     const projectTypeSelect = document.getElementById("project-type-select");
     const clearResultsButton = document.getElementById("clear-results-button");
+    const modalLoaderSelect = document.getElementById("modal-loader-select");
+    const modalVersionSelect = document.getElementById("modal-version-select");
 
     // --- UI LOGIC ---
     helpLink.addEventListener("click", () => {
@@ -2916,7 +2936,47 @@
         searchResultsContainer.innerHTML = "<p>Searching...</p>";
       }
 
-      const searchUrl = `https://api.modrinth.com/v2/search?query=${encodeURIComponent(query)}&limit=10&offset=${currentSearchOffset}`;
+      // Build search URL with facets for loader and version filtering
+      let searchUrl = `https://api.modrinth.com/v2/search?query=${encodeURIComponent(query)}&limit=${searchResultsPerPage}&offset=${currentSearchOffset}`;
+      
+      // Add sort parameter (relevance is default, so only add if it's something else)
+      const sortBy = sortSelect.value;
+      if (sortBy && sortBy !== 'relevance') {
+        searchUrl += `&index=${sortBy}`;
+      }
+      
+      // Add project type filter from the project type select
+      const projectType = projectTypeSelect.value;
+      
+      // Add facets for loader and version from modal selects
+      const facets = [];
+      
+      // Add project type facet if specified
+      if (projectType) {
+        facets.push(`["project_type:${projectType}"]`);
+      }
+      
+      // Only apply loader and version filters for project types that support them
+      // Shaders, resource packs, and data packs are typically loader-agnostic
+      const loaderAgnosticTypes = ["shader", "resourcepack", "datapack"];
+      const shouldApplyLoaderFilters = !projectType || !loaderAgnosticTypes.includes(projectType);
+      
+      if (shouldApplyLoaderFilters) {
+        // Add loader facet - use categories for loader filtering
+        if (modalLoaderSelect.value) {
+          facets.push(`["categories:${modalLoaderSelect.value}"]`);
+        }
+        
+        // Add version facet
+        if (modalVersionSelect.value) {
+          facets.push(`["versions:${modalVersionSelect.value}"]`);
+        }
+      }
+      
+      if (facets.length > 0) {
+        searchUrl += `&facets=[${facets.join(",")}]`;
+      }
+      
       try {
         const response = await fetchWithRetry(searchUrl);
         const data = await response.json();
@@ -2931,7 +2991,7 @@
         }
 
         // Update offset for next load
-        currentSearchOffset += 10;
+        currentSearchOffset += searchResultsPerPage;
 
         // Show/hide load more button based on whether there are more results
         updateLoadMoreButton();
@@ -2964,9 +3024,34 @@
           searchUrl += `&index=${sortBy}`;
         }
 
+        // Build facets array for filtering
+        const facets = [];
+        
         // Add project type filter if specified
         if (projectType) {
-          searchUrl += `&facets=[["project_type:${projectType}"]]`;
+          facets.push(`["project_type:${projectType}"]`);
+        }
+        
+        // Only apply loader and version filters for project types that support them
+        // Shaders, resource packs, and data packs are typically loader-agnostic
+        const loaderAgnosticTypes = ["shader", "resourcepack", "datapack"];
+        const shouldApplyLoaderFilters = !projectType || !loaderAgnosticTypes.includes(projectType);
+        
+        if (shouldApplyLoaderFilters) {
+          // Add loader facet from modal select
+          if (modalLoaderSelect.value) {
+            facets.push(`["categories:${modalLoaderSelect.value}"]`);
+          }
+          
+          // Add version facet from modal select
+          if (modalVersionSelect.value) {
+            facets.push(`["versions:${modalVersionSelect.value}"]`);
+          }
+        }
+        
+        // Apply facets if any exist
+        if (facets.length > 0) {
+          searchUrl += `&facets=[${facets.join(",")}]`;
         }
 
         const response = await fetchWithRetry(searchUrl);
@@ -2995,7 +3080,7 @@
       }
     }
 
-    // Function to randomly select initial featured content
+    // Function to randomly select initial featured content (exclude relevance)
     function getRandomSortOption() {
       const sortOptions = ['follows', 'downloads', 'updated', 'newest'];
       return sortOptions[Math.floor(Math.random() * sortOptions.length)];
@@ -3003,17 +3088,11 @@
 
     // Function to randomly select project type (weighted toward "All Projects")
     function getRandomProjectType() {
-      const projectTypes = ['', '', '', 'mod', 'modpack', 'shader']; // Empty string appears 3x for higher probability
+      const projectTypes = ['', '', '', '', 'mod', 'modpack', 'shader', 'resourcepack', 'datapack', 'plugin']; // Empty string appears 4x for higher probability
       return projectTypes[Math.floor(Math.random() * projectTypes.length)];
     }
 
-    // Function to show/hide featured controls
-    function toggleFeaturedControls(show) {
-      const featuredControls = document.querySelector('.featured-controls');
-      if (featuredControls) {
-        featuredControls.style.display = show ? 'flex' : 'none';
-      }
-    }
+    // Note: toggleFeaturedControls function removed as all controls are now always visible in .search-filter-controls
 
     async function loadMoreResults() {
       // Show loading state on the button
@@ -3050,7 +3129,7 @@
           loadMoreBtn.className = "action-button";
           loadMoreBtn.style.marginTop = "1rem";
           loadMoreBtn.style.width = "100%";
-          loadMoreBtn.textContent = "Show 10 more";
+          loadMoreBtn.textContent = `Show ${searchResultsPerPage} more`;
           loadMoreBtn.addEventListener("click", loadMoreResults);
           searchResultsContainer.appendChild(loadMoreBtn);
         } else {
@@ -3106,14 +3185,14 @@
       // Perform search or show featured content
       if (query.length > 1) {
         isShowingFeatured = false;
-        toggleFeaturedControls(false); // Hide controls during manual search
+        // Set sort to relevance when user starts searching
+        sortSelect.value = 'relevance';
         positionSearchModal();
         searchModal.classList.add("visible");
         document.body.style.overflow = "hidden"; // Prevent background scrolling
         debouncedSearch(query);
       } else {
         // Show featured content when search is empty
-        toggleFeaturedControls(true); // Show controls for featured content
         if (!isShowingFeatured) {
           const randomSort = getRandomSortOption();
           const randomProjectType = getRandomProjectType();
@@ -3138,7 +3217,6 @@
       totalSearchResults = 0;
       isShowingFeatured = false;
       // Show featured content when cleared
-      toggleFeaturedControls(true);
       const randomSort = getRandomSortOption();
       const randomProjectType = getRandomProjectType();
       sortSelect.value = randomSort;
@@ -3185,13 +3263,18 @@
       modalSearchInput.focus();
 
       // If no search query, show featured content
-      if (!currentSearchQuery && !isShowingFeatured) {
-        toggleFeaturedControls(true);
-        const randomSort = getRandomSortOption();
-        const randomProjectType = getRandomProjectType();
-        sortSelect.value = randomSort;
-        projectTypeSelect.value = randomProjectType;
-        loadFeaturedContent(randomSort, randomProjectType);
+      if (!currentSearchQuery) {
+        // Only randomize if not already showing featured content
+        if (!isShowingFeatured) {
+          const randomSort = getRandomSortOption();
+          const randomProjectType = getRandomProjectType();
+          sortSelect.value = randomSort;
+          projectTypeSelect.value = randomProjectType;
+          currentFeaturedSort = randomSort;
+          currentFeaturedProjectType = randomProjectType;
+        }
+        // Always reload featured content to ensure fresh results with current filters
+        loadFeaturedContent(currentFeaturedSort, currentFeaturedProjectType);
       }
     });
 
@@ -3202,15 +3285,25 @@
       document.body.style.overflow = "hidden"; // Prevent background scrolling
     });
 
-    // Event listeners for featured content dropdowns
+    // Event listeners for filter dropdowns
     sortSelect.addEventListener("change", () => {
-      if (isShowingFeatured || !currentSearchQuery) {
+      if (currentSearchQuery) {
+        // If there's an active search, re-run the search with the new sort
+        currentSearchOffset = 0;
+        performSearch(currentSearchQuery);
+      } else if (isShowingFeatured) {
+        // Otherwise, reload featured content
         loadFeaturedContent(sortSelect.value, projectTypeSelect.value);
       }
     });
 
     projectTypeSelect.addEventListener("change", () => {
-      if (isShowingFeatured || !currentSearchQuery) {
+      if (currentSearchQuery) {
+        // If there's an active search, re-run the search with the new project type filter
+        currentSearchOffset = 0;
+        performSearch(currentSearchQuery);
+      } else if (isShowingFeatured) {
+        // Otherwise, reload featured content
         loadFeaturedContent(sortSelect.value, projectTypeSelect.value);
       }
     });
@@ -3238,7 +3331,34 @@
     function renderSearchResults(hits) {
       searchResultsContainer.innerHTML = "";
       if (hits.length === 0) {
-        searchResultsContainer.innerHTML = "<p>No mods found.</p>";
+        // Get the selected project type and create a dynamic message
+        const projectType = projectTypeSelect.value;
+        let projectTypeName = "mods";
+        
+        switch(projectType) {
+          case "mod":
+            projectTypeName = "mods";
+            break;
+          case "modpack":
+            projectTypeName = "modpacks";
+            break;
+          case "shader":
+            projectTypeName = "shaders";
+            break;
+          case "resourcepack":
+            projectTypeName = "resource packs";
+            break;
+          case "datapack":
+            projectTypeName = "data packs";
+            break;
+          case "plugin":
+            projectTypeName = "plugins";
+            break;
+          default:
+            projectTypeName = "projects";
+        }
+        
+        searchResultsContainer.innerHTML = `<p>No ${projectTypeName} found.</p>`;
         return;
       }
       hits.forEach(hit => {
@@ -3690,29 +3810,53 @@
         });
 
         mcVersionSelect.innerHTML = ""; // Clear existing options
+        modalVersionSelect.innerHTML = ""; // Clear modal version select too
 
-        // Populate the dropdown with the hierarchical structure
+        // Add "All Versions" option only to modal dropdown
+        const allVersionsModal = document.createElement("option");
+        allVersionsModal.value = "";
+        allVersionsModal.textContent = "All Versions";
+        modalVersionSelect.appendChild(allVersionsModal);
+
+        // Populate both dropdowns with the hierarchical structure
         sortedMajorVersions.forEach((majorVersion) => {
-          // Add the main version entry (e.g., 1.21)
+          // Add the main version entry (e.g., 1.21) to main select
           const mainOption = document.createElement("option");
           mainOption.value = majorVersion;
           mainOption.textContent = majorVersion;
           mcVersionSelect.appendChild(mainOption);
 
+          // Add the main version entry to modal select
+          const modalMainOption = document.createElement("option");
+          modalMainOption.value = majorVersion;
+          modalMainOption.textContent = majorVersion;
+          modalVersionSelect.appendChild(modalMainOption);
+
           // Add the indented sub-version entries (e.g., 1.21.6, 1.21.5)
           const subVersions = groupedVersions[majorVersion];
           subVersions.forEach((subVersion) => {
+            // Add to main select
             const subOption = document.createElement("option");
             subOption.value = subVersion;
             // Use non-breaking spaces for indentation
             subOption.innerHTML = `&nbsp;&nbsp;${subVersion}`;
             mcVersionSelect.appendChild(subOption);
+
+            // Add to modal select
+            const modalSubOption = document.createElement("option");
+            modalSubOption.value = subVersion;
+            modalSubOption.innerHTML = `&nbsp;&nbsp;${subVersion}`;
+            modalVersionSelect.appendChild(modalSubOption);
           });
         });
 
-        // Select the latest version by default
+        // Select the latest version by default in both selects
         if (mcVersionSelect.options.length > 0) {
           mcVersionSelect.options[0].selected = true;
+        }
+        // Modal select defaults to latest version (skip "All Versions" at index 0)
+        if (modalVersionSelect.options.length > 1) {
+          modalVersionSelect.options[1].selected = true;
         }
       } catch (error) {
         console.error("Failed to fetch MC versions after multiple attempts:", error);
@@ -3726,6 +3870,34 @@
       }
     }
 
+    // Sync modal loader/version selects with main page selects
+    modLoaderSelect.addEventListener("change", () => {
+      modalLoaderSelect.value = modLoaderSelect.value;
+    });
+
+    mcVersionSelect.addEventListener("change", () => {
+      modalVersionSelect.value = mcVersionSelect.value;
+    });
+
+    // When modal selects change, trigger a new search if there's an active query
+    modalLoaderSelect.addEventListener("change", () => {
+      if (currentSearchQuery) {
+        currentSearchOffset = 0; // Reset offset for new search
+        performSearch(currentSearchQuery);
+      } else if (isShowingFeatured) {
+        loadFeaturedContent(currentFeaturedSort, currentFeaturedProjectType);
+      }
+    });
+
+    modalVersionSelect.addEventListener("change", () => {
+      if (currentSearchQuery) {
+        currentSearchOffset = 0; // Reset offset for new search
+        performSearch(currentSearchQuery);
+      } else if (isShowingFeatured) {
+        loadFeaturedContent(currentFeaturedSort, currentFeaturedProjectType);
+      }
+    });
+
     // Call these functions when the page loads
     document.addEventListener("DOMContentLoaded", () => {
       populateMcVersions();
@@ -3737,6 +3909,10 @@
 
       // Capture the welcome message snapshot
       welcomeMessageSnapshot = resultsArea.innerHTML;
+
+      // Sync modal selects with main page selects on load
+      modalLoaderSelect.value = modLoaderSelect.value;
+      modalVersionSelect.value = mcVersionSelect.value;
     });
 
     // --- UI State Reset Function ---
