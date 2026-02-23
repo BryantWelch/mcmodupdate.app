@@ -86,6 +86,7 @@
       --dropzone-hover-bg: rgba(255, 255, 255, 0.1);
       --pill-bg: #2a2a3a;
       --gradient-start: #4ade80;
+      --gradient-mid: #27ab6c;
       --gradient-end: #047857;
       --success-color: #4caf50;
       --error-color: #f44336;
@@ -692,13 +693,12 @@
     }
 
     .result-card.search .add-mod-button {
-      background-color: var(--success-color);
-      transition: all 0.2s ease;
+      background-color: var(--gradient-mid);
+      transition: background-color 0.2s ease;
     }
 
     .result-card.search .add-mod-button:hover:not(:disabled) {
-      transform: scale(1.05);
-      box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+      background-color: var(--gradient-end);
     }
 
     .result-card.search .add-mod-button:disabled {
@@ -988,30 +988,20 @@
     }
 
     .download-link {
-      background-color: var(--success-color);
+      background-color: var(--gradient-mid);
       color: white;
       padding: 0.5rem 1rem;
       border-radius: 6px;
       text-decoration: none;
       font-weight: bold;
       font-size: 0.9rem;
+      text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+      transition: background-color 0.2s ease, border-color 0.2s ease;
     }
 
-    /* Ignore Mode Styles */
-    .header-button.ignore-mode-active {
-      background: var(--gradient-start);
-      color: white;
-    }
-
-    .download-link.ignore-mode {
-      background-color: var(--error-color);
-      color: white;
-    }
-
-    .download-link.ignore-mode.ignored {
-      background-color: #2196F3;
-      /* Blue for un-ignore */
-      color: white;
+    .download-link:not(.bulk-select-mode):not(.ignored-state):not(.ignore-mode):hover {
+      background-color: var(--gradient-end);
     }
 
     .download-link.ignored-state {
@@ -1211,7 +1201,7 @@
 
     /* Style for the "Add" button on search result cards */
     .add-mod-button {
-      background-color: var(--success-color);
+      background-color: var(--gradient-mid);
       color: white;
       padding: 0.5rem 1rem;
       border-radius: 6px;
@@ -1220,6 +1210,12 @@
       font-size: 0.9rem;
       border: none;
       cursor: pointer;
+      text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+    }
+
+    .add-mod-button:hover:not(:disabled) {
+      background-color: var(--gradient-end);
     }
 
     .add-mod-button:disabled {
@@ -1479,9 +1475,11 @@
     }
 
     .bulk-actions-bar button.primary {
-      background-color: var(--success-color);
+      background-color: var(--gradient-mid);
       color: white;
-      border-color: var(--success-color);
+      border-color: var(--gradient-mid);
+      text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
     }
 
     .bulk-actions-bar button.primary:hover {
@@ -1518,14 +1516,21 @@
 
     /* Selected state */
     .download-link.bulk-select-mode.selected {
-      background-color: var(--gradient-start);
+      background-color: var(--gradient-mid);
       color: white;
-      border-color: var(--gradient-start);
+      border-color: var(--gradient-mid);
+      text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
     }
 
     .download-link.bulk-select-mode.selected::before {
       content: "✓ ";
       font-weight: bold;
+    }
+
+    .download-link.bulk-select-mode.selected:hover {
+      background-color: var(--gradient-end);
+      border-color: var(--gradient-end);
     }
 
     /* -- Default Visibility: Hide grid-only elements -- */
@@ -7357,6 +7362,18 @@
         // Update counts in bulk action bar
         if (typeof window.updateBulkSelectionCounts === 'function') {
           window.updateBulkSelectionCounts();
+        }
+      });
+
+      // --- Deselect text on hover for selected bulk buttons ---
+      downloadLink.addEventListener('mouseenter', () => {
+        if (window.isBulkActionsMode && downloadLink.classList.contains('selected')) {
+          downloadLink.textContent = 'Deselect';
+        }
+      });
+      downloadLink.addEventListener('mouseleave', () => {
+        if (window.isBulkActionsMode && downloadLink.classList.contains('selected')) {
+          downloadLink.textContent = 'Selected';
         }
       });
 
