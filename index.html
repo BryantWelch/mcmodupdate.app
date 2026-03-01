@@ -42,9 +42,6 @@
     content="Easily update your Minecraft mods or build a new modpack from scratch. Upload your .jar files or search for mods on Modrinth.">
   <meta name="twitter:image" content="https://mcmodupdate.app/social-preview.png">
 
-  <!-- Rybbit Analytics -->
-  <script src="https://app.rybbit.io/api/script.js" data-site-id="1392" defer></script>
-
   <!-- Structured Data for SEO -->
   <script type="application/ld+json">
     {
@@ -69,7 +66,7 @@
       "browserRequirements": "Requires JavaScript",
       "softwareVersion": "1.0"
     }
-    </script>
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script src="https://unpkg.com/toml-js@0.0.8/lib/amd/toml.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -3091,20 +3088,6 @@
     }
 
     async function performSearch(query, isLoadMore = false) {
-      // --- Rybbit Analytics Event ---
-      try {
-        if (window.rybbit && query) { // Only track if there's a query
-          window.rybbit.event('Search Interaction', {
-            action: 'query',
-            query: query,
-            isLoadMore: isLoadMore,
-            selectedLoader: modLoaderSelect.value,
-            selectedMcVersion: mcVersionSelect.value
-          });
-        }
-      } catch (e) {
-        console.error('Rybbit analytics error:', e);
-      }
       if (!query) {
         searchResultsContainer.innerHTML = "<p>Start typing to find mods.</p>";
         currentSearchQuery = "";
@@ -3682,20 +3665,6 @@
         const projectId = e.target.dataset.projectId;
         const title = e.target.dataset.title;
 
-        // --- Rybbit Analytics Event ---
-        try {
-          if (window.rybbit) {
-            window.rybbit.event('Search Interaction', {
-              action: 'add_from_results',
-              modTitle: title,
-              selectedLoader: modLoaderSelect.value,
-              selectedMcVersion: mcVersionSelect.value
-            });
-          }
-        } catch (err) {
-          console.error('Rybbit analytics error:', err);
-        }
-
         if (!searchedMods.has(projectId)) {
           searchedMods.set(projectId, { title: title });
           createFilePill({ name: `${title} (Searched)` });
@@ -4199,25 +4168,6 @@
     updateButton.addEventListener("click", handleUpdate);
 
     async function handleUpdate() {
-      // --- Rybbit Analytics Event ---
-      try {
-        if (window.rybbit) {
-          const jarFiles = Array.from(uploadedFiles.values()).filter(f => f.name.endsWith('.jar'));
-          const mrpackFiles = Array.from(uploadedFiles.values()).filter(f => f.name.endsWith('.mrpack'));
-
-          window.rybbit.event('Update Mods Clicked', {
-            totalFiles: uploadedFiles.size,
-            jarFileCount: jarFiles.length,
-            mrpackFileCount: mrpackFiles.length,
-            mrpackModsCount: mrpackMods.size, // Added for .mrpack mods
-            searchedModsCount: searchedMods.size,
-            selectedLoader: modLoaderSelect.value,
-            selectedMcVersion: mcVersionSelect.value
-          });
-        }
-      } catch (e) {
-        console.error('Rybbit analytics error:', e);
-      }
       // Combine jobs from both sources first.
       const fileJobs = Array.from(uploadedFiles.values()).map((file) => {
         // Create a special job type for .mrpack files to handle them as modpacks

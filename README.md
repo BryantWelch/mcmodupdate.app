@@ -19,40 +19,40 @@ MC Mod Updater provides a simple, elegant solution by allowing you to either dra
 ## ✨ Key Features
 
 ### Core Functionality
-*   **🔍 Accurate Mod Identification:** Uses a **hash-first search** for 100% accuracy, with smart ID/Name search as fallback
-*   **🔗 Automatic Dependency Resolution:** Automatically finds and includes required dependencies (APIs, libraries, etc.)
-*   **🔎 Mod Discovery:** Built-in search to find and add new mods directly from Modrinth's database
-*   **📦 Modpack Export:** Download as standard `.mrpack` files for easy import into launchers
+*   **Accurate Mod Identification:** Uses a **hash-first search** for 100% accuracy, with smart ID/Name search as fallback
+*   **Automatic Dependency Resolution:** Automatically finds and includes required dependencies (APIs, libraries, etc.)
+*   **Mod Discovery:** Built-in search to find and add new mods directly from Modrinth's database
+*   **Modpack Export:** Download as standard `.mrpack` files for easy import into launchers
 
 ### Platform Support
-*   **🧵 Fabric** - Full support with latest versions
-*   **⚒️ Forge** - Complete compatibility 
-*   **🔥 NeoForge** - Modern Forge alternative support
-*   **🪡 Quilt** - Fabric fork compatibility
-*   **🎮 All Minecraft Versions** - From legacy to latest releases
+*   **Fabric** - Full support with latest versions
+*   **Forge** - Complete compatibility 
+*   **NeoForge** - Modern Forge alternative support
+*   **Quilt** - Fabric fork compatibility
+*   **All Minecraft Versions** - From legacy to latest releases
 
 ### Performance & UX
-*   **⚡ Smart Caching** - Session-based caching reduces API calls and improves speed
-*   **📊 Batch Processing** - Efficient handling of large mod collections
-*   **🚦 Rate Limit Handling** - Transparent API rate limit management with countdown
-*   **📱 Mobile Responsive** - Works perfectly on phones and tablets
-*   **🎨 Modern UI** - Clean, dark theme with intuitive controls
+*   **Smart Caching** - Session-based caching reduces API calls and improves speed
+*   **Batch Processing** - Efficient handling of large mod collections
+*   **Rate Limit Handling** - Transparent API rate limit management with countdown
+*   **Mobile Responsive** - Works perfectly on phones and tablets
+*   **Modern UI** - Clean, dark theme with intuitive controls
 
 ### Rich Information Display
-*   **🖼️ Mod Icons & Details** - Visual mod information with descriptions
-*   **👤 Author Information** - Direct links to mod creators
-*   **📈 Download Statistics** - See mod popularity metrics  
-*   **📝 Changelogs** - View what's new in mod updates
-*   **🏷️ Categories & Tags** - Understand mod types at a glance
+*   **Mod Icons & Details** - Visual mod information with descriptions
+*   **Author Information** - Direct links to mod creators
+*   **Download Statistics** - See mod popularity metrics  
+*   **Changelogs** - View what's new in mod updates
+*   **Categories & Tags** - Understand mod types at a glance
 
 ## 🚀 How To Use
 
-1.  **🎛️ Select Your Target:** Choose your mod loader (Fabric, Forge, NeoForge, Quilt) and Minecraft version
-2.  **📁 Add Your Mods:**
+1.  **Select Your Target:** Choose your mod loader (Fabric, Forge, NeoForge, Quilt) and Minecraft version
+2.  **Add Your Mods:**
     *   **To Update:** Drag and drop existing `.jar` files or your `.mrpack` into the upload area
     *   **To Discover:** Use the search bar to find new mods from Modrinth
-3.  **⚙️ Process Your List:** Click the "Update" button and watch the magic happen
-4.  **📥 Review & Download:** Get latest compatible versions plus dependencies that you can download individually, as a `.zip`, or as a complete `.mrpack`
+3.  **Process Your List:** Click the "Update" button and watch the magic happen
+4.  **Review & Download:** Get latest compatible versions plus dependencies that you can download individually, as a `.zip`, or as a complete `.mrpack`
 
 ## 🛠️ Tech Stack
 
@@ -72,8 +72,7 @@ Built with performance and accessibility in mind, using modern web standards wit
 
 ### Infrastructure
 *   **[Netlify](https://netlify.com)** - Hosting with automatic deployments
-*   **[Rybbit Analytics](https://rybbit.io)** - Privacy-focused, cookie-free analytics
-*   **Custom Domain** - Professional presence at mcmodupdate.app
+*   **Custom Domain** - Professional presence at https://mcmodupdate.app
 
 ## 📊 Performance Features
 
@@ -104,12 +103,6 @@ Contributions make the open-source community amazing! Any contributions are **gr
 ## 📄 License
 
 Distributed under the **Mozilla Public License 2.0**. See `LICENSE` for more information.
-
-This license ensures that:
-*   ✅ You can use this tool freely for any purpose
-*   ✅ You can modify and distribute the code
-*   ✅ Any improvements to the original files must be shared back
-*   ✅ Commercial use is allowed
 
 ## 🙏 Acknowledgments
 
