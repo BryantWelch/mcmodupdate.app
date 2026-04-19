@@ -794,6 +794,15 @@
       margin-top: 0.5rem;
     }
 
+    .mod-meta-toggles {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      font-size: 0.85rem;
+      color: var(--secondary-text);
+      margin-top: 0.4rem;
+    }
+
     .mod-meta-item {
       display: flex;
       align-items: center;
@@ -894,9 +903,13 @@
     }
 
     .channel-link {
-      text-decoration: underline;
+      display: inline-flex;
+      align-items: center;
+      text-decoration: none;
       cursor: pointer;
       transition: color 0.2s ease;
+      font-size: 0;
+      line-height: 0;
     }
 
     /* Match the hover effect of the changelog link */
@@ -915,6 +928,34 @@
 
     .channel-link.alpha {
       color: var(--alpha-color);
+    }
+
+    .channel-link::before {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      font-size: 0.6rem;
+      font-weight: bold;
+      color: #0d1117;
+      flex-shrink: 0;
+    }
+
+    .channel-link.release::before {
+      content: 'R';
+      background-color: var(--success-color);
+    }
+
+    .channel-link.beta::before {
+      content: 'B';
+      background-color: var(--beta-color);
+    }
+
+    .channel-link.alpha::before {
+      content: 'A';
+      background-color: var(--alpha-color);
     }
 
     .changelog-content {
@@ -942,6 +983,149 @@
       height: auto;
       border-radius: 8px;
       /* Optional: adds rounded corners to the media */
+    }
+
+    .gallery-toggle,
+    .description-toggle {
+      cursor: pointer;
+      text-decoration: underline;
+    }
+
+    .gallery-toggle:hover,
+    .description-toggle:hover {
+      color: var(--primary-text);
+    }
+
+    .gallery-content,
+    .description-content {
+      display: none;
+      width: 100%;
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border-color);
+      color: var(--secondary-text);
+      font-size: 0.9rem;
+    }
+
+    .gallery-content.visible,
+    .description-content.visible {
+      display: block;
+    }
+
+    .changelog-content.visible::before,
+    .gallery-content.visible::before,
+    .description-content.visible::before,
+    .reason-content.visible::before {
+      display: block;
+      font-size: 1rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--primary-text);
+      opacity: 0.9;
+      margin-bottom: 0.75rem;
+    }
+
+    .changelog-content.visible::before {
+      content: 'Changelog';
+    }
+
+    .gallery-content.visible::before {
+      content: 'Gallery';
+    }
+
+    .description-content.visible::before {
+      content: 'Description';
+    }
+
+    .reason-content.visible::before {
+      content: 'Reason';
+    }
+
+    .reason-content {
+      display: none;
+      width: 100%;
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border-color);
+      color: var(--secondary-text);
+      font-size: 0.9rem;
+    }
+
+    .reason-content.visible {
+      display: block;
+    }
+
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 0.75rem;
+    }
+
+    .gallery-grid img {
+      width: 100%;
+      height: 140px;
+      object-fit: cover;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: opacity 0.2s ease;
+    }
+
+    .gallery-grid img:hover {
+      opacity: 0.85;
+    }
+
+    #gallery-lightbox {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #gallery-lightbox-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.88);
+      cursor: pointer;
+    }
+
+    #gallery-lightbox-content {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
+      max-width: 90vw;
+      max-height: 90vh;
+    }
+
+    #gallery-lightbox-img {
+      max-width: 90vw;
+      max-height: 82vh;
+      object-fit: contain;
+      border-radius: 8px;
+      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.7);
+    }
+
+    #gallery-lightbox-caption {
+      color: rgba(255, 255, 255, 0.8);
+      font-size: 0.9rem;
+      text-align: center;
+    }
+
+    .description-content ul {
+      padding-left: 20px;
+      margin: 0;
+    }
+
+    .description-content video,
+    .description-content img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
     }
 
     .mod-actions {
@@ -1530,135 +1714,6 @@
       border-color: var(--gradient-end);
     }
 
-    /* -- Default Visibility: Hide grid-only elements -- */
-    .grid-view-channels {
-      display: none;
-    }
-
-    /* -- Grid View Container Style -- */
-    .results-list.grid-view {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 1rem;
-    }
-
-    /* -- Card Styles in Grid View -- */
-    .results-list.grid-view .result-card {
-      flex-direction: column;
-      padding: 0.75rem;
-      align-items: center;
-      text-align: center;
-      gap: 0.5rem;
-    }
-
-    .results-list.grid-view .result-card-main {
-      flex-direction: column;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    /* -- Child Element Styles in Grid View -- */
-    .results-list.grid-view .mod-icon {
-      width: 64px;
-      height: 64px;
-    }
-
-    .results-list.grid-view .mod-title {
-      font-size: 1rem;
-      font-weight: 600;
-      line-height: 1.3;
-      height: auto;
-      min-height: 2.6em;
-      text-align: center;
-    }
-
-    /* In grid view, keep title link inline */
-    .results-list.grid-view .mod-title>a {
-      display: inline;
-    }
-
-    /* In grid view, add line break after title and put icons on new line */
-    .results-list.grid-view .mod-title>a::after {
-      content: "";
-      display: block;
-      height: 0.25rem;
-    }
-
-    /* In grid view, put all icons on the new line below the title */
-    .results-list.grid-view .mod-title>.dependency-chain-tooltip-container,
-    .results-list.grid-view .mod-title>.conflict-tooltip-container,
-    .results-list.grid-view .mod-title>.project-type-icon-container,
-    .results-list.grid-view .mod-title>.up-to-date-icon-container {
-      display: inline-block;
-      margin-right: 0.5rem;
-    }
-
-    /* Hide elements not needed in compact view */
-    .results-list.grid-view .mod-author,
-    .results-list.grid-view .mod-description,
-    .results-list.grid-view .mod-meta {
-      display: none;
-    }
-
-    /* -- Action Area in Grid View -- */
-    .results-list.grid-view .mod-actions {
-      width: 100%;
-      margin-top: auto;
-      padding-top: 0.5rem;
-      border-top: 1px solid var(--border-color);
-      align-items: stretch;
-      gap: 0.5rem;
-    }
-
-    .results-list.grid-view .version-select {
-      text-align: center;
-      padding: 0.2rem 0.5rem;
-      margin-left: auto;
-      margin-right: auto;
-    }
-
-    /* -- New Bottom Line Container -- */
-    .results-list.grid-view .grid-bottom-line {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 0.85rem;
-    }
-
-    .results-list.grid-view .grid-view-channels {
-      display: block;
-    }
-
-    .results-list.grid-view .download-link {
-      background: none;
-      padding: 0;
-      font-weight: normal;
-      color: var(--secondary-text);
-      text-decoration: underline;
-    }
-
-    .results-list.grid-view .download-link:hover {
-      color: var(--primary-text);
-    }
-
-    /* Tags styling in grid view - only text tags appear on new line */
-    .results-list.grid-view .mod-title-tag:not(.dependency-tag) {
-      display: block;
-      margin-left: 0;
-      /* Remove left margin since they're on their own line */
-      margin-top: 0.25rem;
-      text-align: center;
-    }
-
-    /* Keep dependency tooltip container inline in grid view */
-    .results-list.grid-view .dependency-tooltip-container {
-      display: inline-flex;
-      align-items: center;
-      text-align: center;
-    }
-
-
-
     /* This new class will style ALL tags */
     .mod-title-tag {
       font-size: 0.9rem;
@@ -1704,16 +1759,6 @@
       color: var(--primary-text);
     }
 
-    /* Grid view specific styling for dependency icon */
-    .results-list.grid-view .puzzle-dependency-icon {
-      position: relative;
-      top: -1px;
-      /* Fine-tune vertical alignment with other icons */
-      margin-right: 4px;
-    }
-
-
-
     .dependency-tooltip {
       visibility: hidden;
       opacity: 0;
@@ -1748,25 +1793,12 @@
       margin-left: 0.5rem;
     }
 
-    /* Keep conflict tooltip container inline in grid view */
-    .results-list.grid-view .conflict-tooltip-container {
-      display: inline-flex;
-      align-items: center;
-    }
-
     /* Warning triangle icon styling */
     .warning-triangle-icon {
       display: inline-block;
       vertical-align: middle;
       margin-right: 0.25rem;
       cursor: help;
-    }
-
-    /* Grid view specific styling for conflict icon */
-    .results-list.grid-view .warning-triangle-icon {
-      position: relative;
-      top: -1px;
-      /* Fine-tune vertical alignment with other icons */
     }
 
     .conflict-tooltip {
@@ -1894,13 +1926,6 @@
       margin-left: 0.5rem;
     }
 
-    /* Keep project type icon container inline in grid view */
-    .results-list.grid-view .project-type-icon-container {
-      display: inline-flex;
-      align-items: center;
-    }
-
-    /* Project type icon styling */
     .project-type-icon {
       display: inline-block;
       vertical-align: middle;
@@ -1910,13 +1935,6 @@
 
     .project-type-icon:hover {
       color: var(--primary-text);
-    }
-
-    /* Grid view specific styling for project type icon */
-    .results-list.grid-view .project-type-icon {
-      position: relative;
-      top: -1px;
-      /* Fine-tune vertical alignment with other icons */
     }
 
     .project-type-tooltip {
@@ -1968,13 +1986,6 @@
       margin-left: 0.5rem;
     }
 
-    /* Keep up-to-date icon container inline in grid view */
-    .results-list.grid-view .up-to-date-icon-container {
-      display: inline-flex;
-      align-items: center;
-    }
-
-    /* Up-to-date icon styling */
     .up-to-date-icon {
       display: inline-block;
       vertical-align: middle;
@@ -1984,13 +1995,6 @@
 
     .up-to-date-icon:hover {
       color: var(--primary-text);
-    }
-
-    /* Grid view specific styling for up-to-date icon */
-    .results-list.grid-view .up-to-date-icon {
-      position: relative;
-      top: -1px;
-      /* Fine-tune vertical alignment with other icons */
     }
 
     .up-to-date-tooltip {
@@ -2316,26 +2320,6 @@
         font-size: 0.9rem !important;
       }
 
-      /* --- Mobile grid view layout adjustments --- */
-      body .results-list.grid-view .mod-actions {
-        flex-direction: column !important;
-        gap: 0.5rem !important;
-      }
-
-      body .results-list.grid-view .version-select {
-        width: 100% !important;
-        margin: 0 !important;
-        text-align: left !important;
-      }
-
-      body .results-list.grid-view .grid-bottom-line {
-        flex-direction: row !important;
-        justify-content: space-between !important;
-        align-items: center !important;
-        gap: 1rem !important;
-        padding: 0 0.25rem !important;
-      }
-
       /* Center the 'Add' button in the search modal on mobile */
       #search-modal .result-card .mod-actions {
         justify-content: center !important;
@@ -2620,7 +2604,6 @@
         <li><b>Search &amp; Filter:</b> Use the search boxes to quickly find specific mods in your results</li>
         <li><b>Sort Options:</b> Click the sort button to organize by name, downloads, followers, or filter by
           environment/channel</li>
-        <li><b>Layout Toggle:</b> Switch between detailed list view and compact grid view using the layout button</li>
         <li><b>Copy Lists:</b> Use the copy button to quickly copy mod names to your clipboard</li>
         <li><b>Version Selection:</b> Choose between Release, Beta, or Alpha versions for each mod</li>
         <li><b>Download Options:</b> Download individual mods or get everything as a ready-to-use <code>.mrpack</code>
@@ -5070,7 +5053,9 @@
             dependencies: latestVersion.dependencies,
             isDependency: job.isDependencyJob === true,
             // Flag if this is the actual .mrpack file (not the extracted mods)
-            isMrpackFile: job.type === "mrpack" || job.isMrpackFile === true
+            isMrpackFile: job.type === "mrpack" || job.isMrpackFile === true,
+            gallery: projectDetails.gallery || [],
+            body: projectDetails.body || ""
           });
 
         } catch (error) {
@@ -5287,9 +5272,6 @@
 
     // --- Setup Result Sections ---
     function setupResultSections() {
-      // --- SVG icons for the layout toggle button ---
-      const gridIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect></svg>`;
-      const listIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>`;
       const copyIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="m5 15-1 0c-1.1 0-2-.9-2-2l0-9c0-1.1.9-2 2-2l9 0c1.1 0 2 .9 2 2l0 1"></path></svg>`;
       const sortIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="7,10 12,5 17,10"></polyline><polyline points="7,14 12,19 17,14"></polyline></svg>`;
       const ignoreIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M4.93 4.93l14.14 14.14"></path></svg>`;
@@ -5405,7 +5387,6 @@
             </div>
           </div>
           <button id="copy-found-btn" class="layout-toggle" title="Copy list of successful mod names to clipboard">${copyIcon}</button>
-          <button id="layout-toggle-btn" class="layout-toggle" title="Switch between detailed list view and compact grid view">${gridIcon}</button>
         </div>
       </div>
       <!-- Bulk actions bar (hidden by default) -->
@@ -5501,7 +5482,6 @@
             </div>
           </div>
           <button id="copy-warning-btn" class="layout-toggle" title="Copy list of incompatible mod names to clipboard">${copyIcon}</button>
-          <button id="warning-layout-toggle-btn" class="layout-toggle" title="Switch between detailed list view and compact grid view for incompatible mods">${gridIcon}</button>
         </div>
       </div>
       <div class="results-list"></div>
@@ -5511,98 +5491,6 @@
       <div class="results-list"></div>
     </div>
   `;
-
-      // --- Logic for the found section layout toggle button ---
-      const layoutToggleBtn = document.getElementById("layout-toggle-btn");
-      const foundResultsList = document.querySelector("#results-found .results-list");
-
-      // Function to set the layout based on stored preference or default
-      function setLayout() {
-        const currentLayout = localStorage.getItem("mod-layout") || "list";
-        if (currentLayout === "grid") {
-          foundResultsList.classList.add("grid-view");
-          layoutToggleBtn.innerHTML = listIcon;
-        } else {
-          foundResultsList.classList.remove("grid-view");
-          layoutToggleBtn.innerHTML = gridIcon;
-        }
-      }
-
-      layoutToggleBtn.addEventListener("click", () => {
-        foundResultsList.classList.toggle("grid-view");
-        // Save the new preference to localStorage
-        if (foundResultsList.classList.contains("grid-view")) {
-          localStorage.setItem("mod-layout", "grid");
-          layoutToggleBtn.innerHTML = listIcon; // Show list icon
-        } else {
-          localStorage.setItem("mod-layout", "list");
-          layoutToggleBtn.innerHTML = gridIcon; // Show grid icon
-        }
-      });
-
-      // Set the initial layout when the page loads
-      setLayout();
-
-      // --- Logic for the warning section layout toggle button ---
-      const warningLayoutToggleBtn = document.getElementById("warning-layout-toggle-btn");
-      const warningResultsList = document.querySelector("#results-warning .results-list");
-
-      // Function to set the warning layout based on stored preference or default
-      function setWarningLayout() {
-        const currentLayout = localStorage.getItem("warning-layout") || "list";
-        if (currentLayout === "grid") {
-          warningResultsList.classList.add("grid-view");
-          warningLayoutToggleBtn.innerHTML = listIcon;
-          // Auto-expand reason sections in grid view
-          expandAllReasons();
-        } else {
-          warningResultsList.classList.remove("grid-view");
-          warningLayoutToggleBtn.innerHTML = gridIcon;
-          // Auto-hide reason sections in list view
-          hideAllReasons();
-        }
-      }
-
-      // Function to expand all reason sections in warning cards
-      function expandAllReasons() {
-        const warningCards = document.querySelectorAll("#results-warning .result-card");
-        warningCards.forEach(card => {
-          const reasonContent = card.querySelector(".changelog-content");
-          if (reasonContent) {
-            reasonContent.classList.add("visible");
-          }
-        });
-      }
-
-      // Function to hide all reason sections in warning cards
-      function hideAllReasons() {
-        const warningCards = document.querySelectorAll("#results-warning .result-card");
-        warningCards.forEach(card => {
-          const reasonContent = card.querySelector(".changelog-content");
-          if (reasonContent) {
-            reasonContent.classList.remove("visible");
-          }
-        });
-      }
-
-      warningLayoutToggleBtn.addEventListener("click", () => {
-        warningResultsList.classList.toggle("grid-view");
-        // Save the new preference to localStorage
-        if (warningResultsList.classList.contains("grid-view")) {
-          localStorage.setItem("warning-layout", "grid");
-          warningLayoutToggleBtn.innerHTML = listIcon; // Show list icon
-          // Auto-expand reason sections in grid view
-          expandAllReasons();
-        } else {
-          localStorage.setItem("warning-layout", "list");
-          warningLayoutToggleBtn.innerHTML = gridIcon; // Show grid icon
-          // Auto-hide reason sections in list view
-          hideAllReasons();
-        }
-      });
-
-      // Set the initial warning layout when the page loads
-      setWarningLayout();
 
       // --- Ignore Mode Functionality (Global Scope) ---
       let isIgnoreMode = false;
@@ -7064,7 +6952,6 @@
         })
         .join("");
 
-      // This HTML now contains TWO sets of channel links.
       card.innerHTML = `
     <div class="result-card-main">
       <a href="${mod.project_url
@@ -7126,45 +7013,43 @@
             </svg>
             <span class="category-tooltip"></span>
           </div>
-          <div class="mod-meta-item changelog-toggle" title="Click to view changelog and version details">Changelog</div>
           <div class="mod-meta-item list-view-channels">
-            <a href="#" target="_blank" rel="noopener noreferrer" class="channel-link release" style="display: none;" title="Stable release version">Release</a>
-            <a href="#" target="_blank" rel="noopener noreferrer" class="channel-link beta" style="display: none;" title="Beta testing version">Beta</a>
-            <a href="#" target="_blank" rel="noopener noreferrer" class="channel-link alpha" style="display: none;" title="Alpha testing version">Alpha</a>
+            <span class="meta-tooltip-container"><a href="#" target="_blank" rel="noopener noreferrer" class="channel-link release" style="display: none;"></a><span class="meta-tooltip">Release</span></span>
+            <span class="meta-tooltip-container"><a href="#" target="_blank" rel="noopener noreferrer" class="channel-link beta" style="display: none;"></a><span class="meta-tooltip">Beta</span></span>
+            <span class="meta-tooltip-container"><a href="#" target="_blank" rel="noopener noreferrer" class="channel-link alpha" style="display: none;"></a><span class="meta-tooltip">Alpha</span></span>
           </div>
+        </div>
+        <div class="mod-meta-toggles">
+          <div class="mod-meta-item description-toggle" title="Click to view full mod description">Description</div>
+          <div class="mod-meta-item gallery-toggle" title="Click to view mod gallery">Gallery</div>
+          <div class="mod-meta-item changelog-toggle" title="Click to view changelog and version details">Changelog</div>
         </div>
       </div>
       <div class="mod-actions">
         <select class="version-select" title="Choose which version of this mod to download">${versionOptions}</select>
-        <div class="grid-bottom-line">
-          <div class="grid-view-channels">
-            <a href="#" target="_blank" rel="noopener noreferrer" class="channel-link release" style="display: none;" title="Stable release version">Release</a>
-            <a href="#" target="_blank" rel="noopener noreferrer" class="channel-link beta" style="display: none;" title="Beta testing version">Beta</a>
-            <a href="#" target="_blank" rel="noopener noreferrer" class="channel-link alpha" style="display: none;" title="Alpha testing version">Alpha</a>
-          </div>
-          <a href="#" class="download-link" data-project-id="${mod.projectId}" title="Download this mod file">Download</a>
-        </div>
+        <a href="#" class="download-link" data-project-id="${mod.projectId}" title="Download this mod file">Download</a>
       </div>
     </div>
-    <div class="changelog-content"></div>`;
+    <div class="changelog-content"></div>
+    <div class="gallery-content"></div>
+    <div class="description-content"></div>`;
 
       // Get references to ALL the elements we need to update
       const versionSelect = card.querySelector(".version-select");
       const downloadLink = card.querySelector(".download-link");
       const dateSpan = card.querySelector(".mod-meta-date");
       const changelogToggle = card.querySelector(".changelog-toggle");
+      const galleryToggle = card.querySelector(".gallery-toggle");
+      const descriptionToggle = card.querySelector(".description-toggle");
       const changelogContent = card.querySelector(".changelog-content");
+      const galleryContent = card.querySelector(".gallery-content");
+      const descriptionContent = card.querySelector(".description-content");
 
-      // Get references to BOTH sets of links
+      // Get references to channel links
       const listLinks = {
         release: card.querySelector(".list-view-channels .release"),
         beta: card.querySelector(".list-view-channels .beta"),
         alpha: card.querySelector(".list-view-channels .alpha"),
-      };
-      const gridLinks = {
-        release: card.querySelector(".grid-view-channels .release"),
-        beta: card.querySelector(".grid-view-channels .beta"),
-        alpha: card.querySelector(".grid-view-channels .alpha"),
       };
 
       // --- Update Dynamic Content ---
@@ -7215,25 +7100,53 @@
           selectedVersion.changelog || "No changelog provided for this version."
         );
 
-        // Hide all links in both sets first
+        // Hide all channel links first
         Object.values(listLinks).forEach((link) => (link.style.display = "none"));
-        Object.values(gridLinks).forEach((link) => (link.style.display = "none"));
 
         const versionUrl = `${mod.project_url}/version/${selectedVersion.version_number}`;
         const versionType = selectedVersion.version_type; // 'release', 'beta', or 'alpha'
 
-        // Update the correct link in BOTH sets
-        if (listLinks[versionType] && gridLinks[versionType]) {
+        // Update the correct link
+        if (listLinks[versionType]) {
           listLinks[versionType].href = versionUrl;
           listLinks[versionType].style.display = "inline";
-          gridLinks[versionType].href = versionUrl;
-          gridLinks[versionType].style.display = "inline";
         }
       }
 
       versionSelect.addEventListener("change", updateDynamicContent);
       changelogToggle.addEventListener("click", () => {
         changelogContent.classList.toggle("visible");
+      });
+
+      galleryToggle.addEventListener("click", () => {
+        galleryContent.classList.toggle("visible");
+        if (galleryContent.classList.contains("visible") && galleryContent.innerHTML === "") {
+          if (mod.gallery && mod.gallery.length > 0) {
+            const imgs = mod.gallery.map(img =>
+              `<img src="${img.url}" alt="${img.title || 'Gallery image'}" title="${img.title || ''}" loading="lazy">`
+            ).join("");
+            galleryContent.innerHTML = `<div class="gallery-grid">${imgs}</div>`;
+          } else {
+            galleryContent.innerHTML = `<p style="color: var(--secondary-text); margin: 0;">No gallery images available for this mod.</p>`;
+          }
+        }
+      });
+
+      galleryContent.addEventListener("click", (e) => {
+        if (e.target.tagName === "IMG") {
+          openGalleryLightbox(e.target.src, e.target.alt);
+        }
+      });
+
+      descriptionToggle.addEventListener("click", () => {
+        descriptionContent.classList.toggle("visible");
+        if (descriptionContent.classList.contains("visible") && descriptionContent.innerHTML === "") {
+          if (mod.body) {
+            descriptionContent.innerHTML = marked.parse(mod.body);
+          } else {
+            descriptionContent.innerHTML = `<p style="color: var(--secondary-text); margin: 0;">No description available.</p>`;
+          }
+        }
       });
 
       updateDynamicContent();
@@ -7540,16 +7453,16 @@
       </div>
 
     </div>
-    <div class="changelog-content"></div>`;
+    <div class="reason-content"></div>`;
 
-      // Get references to the elements we need to update
-      const reasonToggle = card.querySelector(".changelog-toggle");
-      const reasonContent = card.querySelector(".changelog-content");
+  // Get references to the elements we need to update
+  const reasonToggle = card.querySelector(".changelog-toggle");
+  const reasonContent = card.querySelector(".reason-content");
 
-      // Set up the reason toggle functionality
-      reasonToggle.addEventListener("click", () => {
-        reasonContent.classList.toggle("visible");
-      });
+  // Set up the reason toggle functionality
+  reasonToggle.addEventListener("click", () => {
+    reasonContent.classList.toggle("visible");
+  });
 
       // Set the reason content (but keep it hidden initially)
       reasonContent.innerHTML = `<p style="color: var(--warning-color); font-weight: bold; margin: 0;">${mod.reason}</p>`;
@@ -8095,6 +8008,27 @@
       // Clear the in-memory file hash cache on page load
       fileHashCache.clear();
       initializeCache();
+    });
+  </script>
+
+  <div id="gallery-lightbox" style="display:none;">
+    <div id="gallery-lightbox-backdrop"></div>
+    <div id="gallery-lightbox-content">
+      <img id="gallery-lightbox-img" src="" alt="">
+      <div id="gallery-lightbox-caption"></div>
+    </div>
+  </div>
+  <script>
+    function openGalleryLightbox(src, alt) {
+      document.getElementById("gallery-lightbox-img").src = src;
+      document.getElementById("gallery-lightbox-caption").textContent = alt || "";
+      document.getElementById("gallery-lightbox").style.display = "flex";
+    }
+    document.getElementById("gallery-lightbox-backdrop").addEventListener("click", () => {
+      document.getElementById("gallery-lightbox").style.display = "none";
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") document.getElementById("gallery-lightbox").style.display = "none";
     });
   </script>
 </body>
