@@ -897,6 +897,10 @@
       /* Keep the same warning color on hover */
     }
 
+    .warning .changelog-toggle.active {
+      color: var(--warning-color);
+    }
+
     .mod-channel-links {
       display: flex;
       align-items: center;
@@ -994,6 +998,13 @@
     .gallery-toggle:hover,
     .description-toggle:hover {
       color: var(--primary-text);
+    }
+
+    .changelog-toggle.active,
+    .gallery-toggle.active,
+    .description-toggle.active {
+      color: var(--gradient-start);
+      text-decoration: underline;
     }
 
     .gallery-content,
@@ -7116,10 +7127,12 @@
       versionSelect.addEventListener("change", updateDynamicContent);
       changelogToggle.addEventListener("click", () => {
         changelogContent.classList.toggle("visible");
+        changelogToggle.classList.toggle("active");
       });
 
       galleryToggle.addEventListener("click", () => {
         galleryContent.classList.toggle("visible");
+        galleryToggle.classList.toggle("active");
         if (galleryContent.classList.contains("visible") && galleryContent.innerHTML === "") {
           if (mod.gallery && mod.gallery.length > 0) {
             const imgs = mod.gallery.map(img =>
@@ -7140,6 +7153,7 @@
 
       descriptionToggle.addEventListener("click", () => {
         descriptionContent.classList.toggle("visible");
+        descriptionToggle.classList.toggle("active");
         if (descriptionContent.classList.contains("visible") && descriptionContent.innerHTML === "") {
           if (mod.body) {
             descriptionContent.innerHTML = marked.parse(mod.body);
@@ -7448,7 +7462,7 @@
             </svg>
             <span class="category-tooltip"></span>
           </div>
-          <div class="mod-meta-item changelog-toggle" style="color: var(--warning-color); font-weight: bold;" title="Click to view why this mod is incompatible">Reason</div>
+          <div class="mod-meta-item changelog-toggle" title="Click to view why this mod is incompatible">Reason</div>
         </div>
       </div>
 
@@ -7462,68 +7476,69 @@
   // Set up the reason toggle functionality
   reasonToggle.addEventListener("click", () => {
     reasonContent.classList.toggle("visible");
+    reasonToggle.classList.toggle("active");
   });
 
-      // Set the reason content (but keep it hidden initially)
-      reasonContent.innerHTML = `<p style="color: var(--warning-color); font-weight: bold; margin: 0;">${mod.reason}</p>`;
+  // Set the reason content (but keep it hidden initially)
+  reasonContent.innerHTML = `<p style="font-weight: bold; margin: 0;">${mod.reason}</p>`;
 
-      // --- Add project_type icon if available ---
-      if (mod.project_type) {
-        const titleElement = card.querySelector(".mod-title");
-        const iconData = getProjectTypeIcon(mod.project_type);
-        const iconContainer = document.createElement("span");
-        iconContainer.className = "project-type-icon-container";
-        iconContainer.innerHTML = `
-          <span class="project-type-icon">${iconData.svg}</span>
-          <span class="project-type-tooltip">${iconData.tooltip}</span>
-        `;
-        titleElement.appendChild(iconContainer);
-      }
+  // --- Add project_type icon if available ---
+  if (mod.project_type) {
+    const titleElement = card.querySelector(".mod-title");
+    const iconData = getProjectTypeIcon(mod.project_type);
+    const iconContainer = document.createElement("span");
+    iconContainer.className = "project-type-icon-container";
+    iconContainer.innerHTML = `
+      <span class="project-type-icon">${iconData.svg}</span>
+      <span class="project-type-tooltip">${iconData.tooltip}</span>
+    `;
+    titleElement.appendChild(iconContainer);
+  }
 
-      // --- Populate Category Tooltip ---
-      if (mod.categories && mod.categories.length > 0) {
-        const categoryContainer = card.querySelector(".category-tooltip-container");
-        const categoryTooltip = card.querySelector(".category-tooltip");
+  // --- Populate Category Tooltip ---
+  if (mod.categories && mod.categories.length > 0) {
+    const categoryContainer = card.querySelector(".category-tooltip-container");
+    const categoryTooltip = card.querySelector(".category-tooltip");
 
-        // This helper function turns a slug like "world-gen" into "World Gen"
-        function formatCategoryName(slug) {
-          return slug
-            .split("-")
-            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-            .join(" ");
-        }
+    // This helper function turns a slug like "world-gen" into "World Gen"
+    function formatCategoryName(slug) {
+      return slug
+        .split("-")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
+    }
 
-        // We map over the array of string slugs and format each one
-        const formattedCategories = mod.categories.map(formatCategoryName);
-        categoryTooltip.textContent = formattedCategories.join(", ");
+    // We map over the array of string slugs and format each one
+    const formattedCategories = mod.categories.map(formatCategoryName);
+    categoryTooltip.textContent = formattedCategories.join(", ");
 
-        // Now that it's populated, make the icon visible
-        categoryContainer.style.display = "flex";
-      }
+    // Now that it's populated, make the icon visible
+    categoryContainer.style.display = "flex";
+  }
 
-      // --- Add Cache Indicator if from cache ---
-      if (mod.fromCache) {
-        const modTitleDiv = card.querySelector('.mod-title');
-        const cacheContainer = document.createElement('span');
-        cacheContainer.className = 'cache-indicator-container';
-        cacheContainer.innerHTML = `
+  // --- Add Cache Indicator if from cache ---
+  if (mod.fromCache) {
+    const modTitleDiv = card.querySelector('.mod-title');
+    const cacheContainer = document.createElement('span');
+    cacheContainer.className = 'cache-indicator-container';
+    cacheContainer.innerHTML = `
       <svg class="cache-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
       </svg>
       <span class="cache-tooltip">Loaded from cache</span>
     `;
 
-        // Insert after any existing icons but before tags
-        const firstTag = modTitleDiv.querySelector('.mod-title-tag, .dependency-tooltip-container');
-        if (firstTag) {
-          modTitleDiv.insertBefore(cacheContainer, firstTag);
-        } else {
-          modTitleDiv.appendChild(cacheContainer);
-        }
-      }
-
-      return card;
+    // Insert after any existing icons but before tags
+    const firstTag = modTitleDiv.querySelector('.mod-title-tag, .dependency-tooltip-container');
+    if (firstTag) {
+      modTitleDiv.insertBefore(cacheContainer, firstTag);
+    } else {
+      modTitleDiv.appendChild(cacheContainer);
     }
+  }
+
+  return card;
+}
 
     // --- Create Failure Card ---
     function createFailureCard(mod) {
