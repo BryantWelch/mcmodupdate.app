@@ -5011,10 +5011,15 @@
             continue;
           }
 
-          // Compare versions if we have original mod info
-          const isUpToDate = originalModInfo.version &&
-            latestVersion &&
-            originalModInfo.version === latestVersion.version_number;
+          // Compare versions: prefer hash-based ID match (reliable), fall back to manifest string comparison
+          const isUpToDate = latestVersion && (
+            (versionDetails && versionDetails.id === latestVersion.id) ||
+            (originalModInfo.version && (
+              originalModInfo.version === latestVersion.version_number ||
+              latestVersion.version_number.startsWith(originalModInfo.version + '+') ||
+              latestVersion.version_number.startsWith(originalModInfo.version + '-')
+            ))
+          );
 
           // Gather download info for .mrpack file
           // Define the folder path based on project type
