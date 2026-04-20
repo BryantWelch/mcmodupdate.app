@@ -2379,6 +2379,38 @@
       color: var(--secondary-text);
     }
 
+    .download-status-info {
+      font-size: 0.7rem;
+      margin-top: 0.15rem;
+      color: var(--secondary-text);
+      min-height: 1em;
+    }
+
+    .download-status-info.success {
+      color: var(--success-color);
+    }
+
+    .download-status-info.error {
+      color: var(--error-color);
+    }
+
+    .download-status-bar {
+      width: 100%;
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--secondary-text);
+      margin: 0.5rem 0 0 0;
+      min-height: 1.2em;
+    }
+
+    .download-status-bar.success {
+      color: var(--success-color);
+    }
+
+    .download-status-bar.error {
+      color: var(--error-color);
+    }
+
     /* --- Info Button Styles --- */
     #info-button {
       /* Make the button larger without changing its shape */
@@ -6740,6 +6772,9 @@
             return;
           }
 
+          downloadStatusBar.textContent = `Downloading ${downloadsToProcess.length} file${downloadsToProcess.length !== 1 ? 's' : ''}...`;
+          downloadStatusBar.className = "download-status-bar";
+
           let i = 0;
           function downloadNext() {
             if (i < downloadsToProcess.length) {
@@ -6751,7 +6786,11 @@
               link.click();
               document.body.removeChild(link);
               i++;
+              downloadStatusBar.textContent = `Downloading ${i} / ${downloadsToProcess.length}...`;
               setTimeout(downloadNext, 300);
+            } else {
+              downloadStatusBar.textContent = `✓ Downloaded ${downloadsToProcess.length} file${downloadsToProcess.length !== 1 ? 's' : ''}`;
+              downloadStatusBar.className = "download-status-bar success";
             }
           }
           downloadNext();
@@ -6782,7 +6821,7 @@
             <polyline points="8 16 12 20 16 16"></polyline>
             <path d="M12 12v8"></path>
           </svg>`;
-        downloadZipBtn.onclick = () => downloadAllAsZip();
+        downloadZipBtn.onclick = () => downloadAllAsZip(downloadStatusBar);
         downloadZipGroup.appendChild(downloadZipBtn);
 
         // Create a dedicated container for the "Download as .mrpack" button and its size
@@ -6794,7 +6833,7 @@
         downloadPackBtn.className = "action-button";
         downloadPackBtn.setAttribute("title", "Download as Modrinth modpack (.mrpack) - compatible with most launchers");
         downloadPackBtn.innerHTML = `Download as .mrpack`;
-        downloadPackBtn.onclick = () => createModpack();
+        downloadPackBtn.onclick = () => createModpack(downloadStatusBar);
         downloadPackGroup.appendChild(downloadPackBtn);
 
         // Add all the groups to the main actions container
@@ -6802,6 +6841,11 @@
         actionsContainer.appendChild(downloadZipGroup);
         actionsContainer.appendChild(downloadPackGroup);
         foundSection.appendChild(actionsContainer);
+
+        // Shared download status bar (shown below all buttons after any download action)
+        const downloadStatusBar = document.createElement("p");
+        downloadStatusBar.className = "download-status-bar";
+        foundSection.appendChild(downloadStatusBar);
 
         // --- Calculate and add the size info to all button groups ---
         try {
@@ -7689,7 +7733,7 @@
     }
 
     // --- Download All as ZIP ---
-    async function downloadAllAsZip() {
+    async function downloadAllAsZip(statusEl) {
       const zip = new JSZip();
 
       const downloadsToProcess = successfulDownloads.filter(dl => {
@@ -7707,6 +7751,11 @@
       const zipButton = Array.from(document.querySelectorAll('.action-button')).find(btn => btn.textContent.includes('Download .zip'));
       const originalText = zipButton.innerHTML;
 
+      if (statusEl) {
+        statusEl.textContent = `Downloading ${downloadsToProcess.length} file${downloadsToProcess.length !== 1 ? 's' : ''}...`;
+        statusEl.className = 'download-status-info';
+      }
+
       try {
         zipButton.innerHTML = 'Creating ZIP...';
         zipButton.disabled = true;
@@ -7717,9 +7766,11 @@
           'shader': 'shaderpacks'
         };
 
+        let failedCount = 0;
         for (let i = 0; i < downloadsToProcess.length; i++) {
           const dl = downloadsToProcess[i];
           zipButton.innerHTML = `Adding ${i + 1}/${downloadsToProcess.length}...`;
+          if (statusEl) statusEl.textContent = `Downloading ${i + 1} / ${downloadsToProcess.length}...`;
 
           try {
             const response = await fetch(dl.url);
@@ -7728,15 +7779,19 @@
               const folderName = folderMap[dl.projectType] || 'mods'; // Default to 'mods'
               zip.file(`${folderName}/${dl.filename}`, blob);
             } else {
+              failedCount++;
               console.warn(`Failed to download ${dl.filename}`, response.status, response.statusText);
             }
           } catch (error) {
+            failedCount++;
             console.warn(`Error downloading ${dl.filename}:`, error);
           }
         }
 
         zipButton.innerHTML = 'Generating ZIP...';
+        if (statusEl) statusEl.textContent = 'Generating ZIP...';
         const content = await zip.generateAsync({ type: "blob" });
+        const zipSizeMB = formatBytes(content.size);
 
         const link = document.createElement("a");
         link.href = URL.createObjectURL(content);
@@ -7745,8 +7800,22 @@
         link.click();
         document.body.removeChild(link);
 
+        if (statusEl) {
+          const succeeded = downloadsToProcess.length - failedCount;
+          if (failedCount > 0) {
+            statusEl.textContent = `✓ Downloaded ${succeeded} file${succeeded !== 1 ? 's' : ''} (${failedCount} failed) • ${zipSizeMB}`;
+          } else {
+            statusEl.textContent = `✓ Downloaded ${succeeded} file${succeeded !== 1 ? 's' : ''} • ${zipSizeMB}`;
+          }
+          statusEl.className = 'download-status-info success';
+        }
+
       } catch (error) {
         console.error("Error creating ZIP:", error);
+        if (statusEl) {
+          statusEl.textContent = 'Error creating ZIP file.';
+          statusEl.className = 'download-status-info error';
+        }
         showCustomAlert("Error creating ZIP file. Please check the console for details.", 'error');
       } finally {
         if (zipButton) {
@@ -7755,7 +7824,7 @@
         }
       }
     } // --- Create Modpack ---
-    function createModpack() {
+    function createModpack(statusEl) {
       // Get custom modpack name and version from user
       const packName = prompt("Enter modpack name:", "My Awesome Pack");
       if (packName === null) return; // User cancelled
@@ -7783,7 +7852,6 @@
         const isMrpackFile = dl.isMrpackFile === true;
         return !isIgnored && !isMrpackFile;
       });
-
 
       if (filteredDownloads.length === 0) {
         alert('No mods to include in modpack. All mods are currently ignored.');
@@ -7823,6 +7891,11 @@
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+
+        if (statusEl) {
+          statusEl.textContent = `✓ Created ${filename} • ${filteredDownloads.length} mod${filteredDownloads.length !== 1 ? 's' : ''} included`;
+          statusEl.className = 'download-status-info success';
+        }
       });
     }
 
