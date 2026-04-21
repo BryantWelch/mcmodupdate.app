@@ -3694,7 +3694,14 @@
 
         if (!searchedMods.has(projectId)) {
           searchedMods.set(projectId, { title: title });
-          createFilePill({ name: `${title} (Searched)` });
+          createFilePill({ name: `${title} (Searched)` }, () => {
+            searchedMods.delete(projectId);
+            const btn = document.querySelector(`.add-mod-button[data-project-id="${projectId}"]`);
+            if (btn) {
+              btn.disabled = false;
+              btn.textContent = "Add";
+            }
+          });
           dropzonePrompt.style.display = "none";
           dropzone.classList.add("dropzone-expanded");
           clearAllButton.style.display = "inline-flex";
@@ -3702,8 +3709,6 @@
 
         e.target.disabled = true;
         e.target.textContent = "Added";
-        searchModal.classList.remove("visible");
-        document.body.style.overflow = ""; // Restore background scrolling
       });
 
       return card;
@@ -3891,9 +3896,8 @@
       }
     }
 
-
     // --- File Pill Logic ---
-    function createFilePill(file) {
+    function createFilePill(file, onRemove) {
       const filePill = document.createElement("div");
       filePill.classList.add("file-pill");
       const fileNameSpan = document.createElement("span");
@@ -3910,7 +3914,8 @@
         event.stopPropagation();
         uploadedFiles.delete(file.name);
         filePill.remove();
-        if (uploadedFiles.size === 0) {
+        if (onRemove) onRemove();
+        if (uploadedFiles.size === 0 && searchedMods.size === 0 && mrpackMods.size === 0) {
           dropzonePrompt.style.display = "block";
           dropzone.classList.remove("dropzone-expanded");
           clearAllButton.style.display = "none"; // HIDE THE BUTTON
@@ -3928,7 +3933,6 @@
 
     document.getElementById("current-year").textContent =
       new Date().getFullYear();
-
     // --- Dynamic Minecraft Version Loading with Hierarchical Layout ---
     async function populateMcVersions() {
       try {
