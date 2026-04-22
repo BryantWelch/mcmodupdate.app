@@ -4985,6 +4985,9 @@
                 reason = "No compatible version found for selected loader/version.";
             }
 
+            const supportedVersions = [...new Set(versionInfo.allVersions?.flatMap(v => v.game_versions) || [])];
+            const supportedLoaders = [...new Set(versionInfo.allVersions?.flatMap(v => v.loaders) || [])];
+
             results.push({
               status: "warning",
               title: projectDetails.title,
@@ -5001,7 +5004,9 @@
               followers: projectDetails.followers,
               categories: projectDetails.categories,
               project_type: projectDetails.project_type,
-              reason: reason
+              reason: reason,
+              supportedVersions,
+              supportedLoaders
             });
             continue;
           }
@@ -7488,7 +7493,30 @@
   });
 
   // Set the reason content (but keep it hidden initially)
-  reasonContent.innerHTML = `<p style="font-weight: bold; margin: 0;">${mod.reason}</p>`;
+  let chipsHtml = '';
+  if (mod.supportedLoaders && mod.supportedLoaders.length) {
+    const sortedLoaders = [...mod.supportedLoaders].sort((a, b) => a.localeCompare(b));
+    chipsHtml += `<div style="margin-top:0.6rem;">
+      <span style="font-size:0.75em;color:var(--secondary-text);display:block;margin-bottom:0.3rem;">Supported Loaders</span>
+      <div style="display:flex;flex-wrap:wrap;gap:0.3rem;">${sortedLoaders.map(l => `<span style="background:var(--pill-bg);padding:0.15rem 0.5rem;border-radius:0.5rem;font-size:0.75em;border:1px solid var(--border-color);text-transform:capitalize;">${l}</span>`).join('')}</div>
+    </div>`;
+  }
+  if (mod.supportedVersions && mod.supportedVersions.length) {
+    const sortedVersions = [...mod.supportedVersions].sort((a, b) => {
+      const pa = a.split('.').map(n => parseInt(n, 10) || 0);
+      const pb = b.split('.').map(n => parseInt(n, 10) || 0);
+      for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+        const diff = (pb[i] || 0) - (pa[i] || 0);
+        if (diff !== 0) return diff;
+      }
+      return 0;
+    });
+    chipsHtml += `<div style="margin-top:0.6rem;">
+      <span style="font-size:0.75em;color:var(--secondary-text);display:block;margin-bottom:0.3rem;">Supported Versions</span>
+      <div style="display:flex;flex-wrap:wrap;gap:0.3rem;">${sortedVersions.map(v => `<span style="background:var(--pill-bg);padding:0.15rem 0.5rem;border-radius:0.5rem;font-size:0.75em;border:1px solid var(--border-color);">${v}</span>`).join('')}</div>
+    </div>`;
+  }
+  reasonContent.innerHTML = `<p style="font-weight: bold; margin: 0 0 0.8rem 0;">${mod.reason}</p>${chipsHtml}`;
 
   // --- Add project_type icon if available ---
   if (mod.project_type) {
@@ -7543,12 +7571,44 @@
     function createFailureCard(mod) {
       const card = document.createElement("div");
       card.className = "result-card failure";
+      const cleanName = cleanModFileName(mod.title);
+      const displayName = cleanName || mod.title;
+      const modrinthUrl = `https://modrinth.com/mods?q=${encodeURIComponent(cleanName || mod.title)}`;
+      const curseForgeUrl = `https://www.curseforge.com/minecraft/search?search=${encodeURIComponent(cleanName || mod.title)}`;
       card.innerHTML = `
+        <div class="result-card-main">
+          <a href="${modrinthUrl}" target="_blank" rel="noopener" class="mod-icon-link">
+            <img src="${DEFAULT_MOD_ICON}" alt="${displayName} icon" class="mod-icon">
+          </a>
           <div class="mod-details">
-            <div class="mod-title">${mod.title}</div>
+            <div class="mod-title">
+              <a href="${modrinthUrl}" target="_blank" rel="noopener"
+                 style="color: inherit; text-decoration: none;"
+                 onmouseover="this.style.textDecoration='underline'"
+                 onmouseout="this.style.textDecoration='none'"
+                 title="Search Modrinth for '${displayName}'">
+                ${displayName}
+              </a>
+              <span style="opacity:0.5;font-size:0.85em;margin-left:0.3rem;">(${mod.title})</span>
+            </div>
             <div class="mod-description">${mod.reason}</div>
-          </div>`;
+            <div class="mod-meta-toggles" style="margin-top:0.4rem;">
+              <a class="mod-meta-item" href="${curseForgeUrl}" target="_blank" rel="noopener"
+                 style="color:inherit;text-decoration:underline;cursor:pointer;"
+                 onmouseover="this.style.color='#f44336'"
+                 onmouseout="this.style.color='inherit'">Search CurseForge</a>
+            </div>
+          </div>
+        </div>`;
       return card;
+    }
+
+    // Extract probable mod name from a JAR filename like "appleskin-fabric-mc1.20.3-2.5.1"
+    function cleanModFileName(filename) {
+      return filename
+        .replace(/-(fabric|forge|neoforge|quilt)(-mc)?[\d.]+.*$/i, "")
+        .replace(/-v?[\d.]+(-[\w]+)?$/i, "")
+        .replace(/-/g, " ");
     }
 
     // --- Helper Functions ---
