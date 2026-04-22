@@ -128,7 +128,6 @@
 
     h1 {
       font-size: 3rem;
-      margin-bottom: 0.5rem;
       font-weight: bold;
       background: linear-gradient(to right,
           var(--gradient-start),
@@ -665,13 +664,6 @@
     .result-card.already-up-to-date {
       border-left: 4px solid #ffffff;
       /* White color for already up-to-date */
-    }
-
-    .result-card.search {
-      border-left: 4px solid var(--gradient-start);
-      /* Purple gradient color for search results */
-      transition: all 0.2s ease;
-      position: relative;
     }
 
     .result-card.search {
@@ -1691,6 +1683,17 @@
       border-color: #d32f2f;
     }
 
+    .bulk-actions-bar .bulk-selection-count {
+      color: var(--primary-text);
+      margin: 0 0.75rem;
+      font-weight: 500;
+    }
+
+    .bulk-actions-bar .bulk-divider {
+      color: var(--border-color);
+      margin: 0 0.5rem;
+    }
+
     /* -- Bulk Actions Mode Styling -- */
     .result-card {
       position: relative;
@@ -1699,7 +1702,7 @@
     /* Download button becomes select button in bulk mode */
     .download-link.bulk-select-mode {
       background-color: var(--card-bg);
-      color: var(--text-color);
+      color: var(--primary-text);
       border: 2px solid var(--border-color);
     }
 
@@ -2152,28 +2155,6 @@
         /* Reset the transform */
         margin-top: 0.5rem;
         /* Add some space above it */
-      }
-
-
-
-      .modal-content h2 {
-        font-size: 1.5rem;
-        margin-bottom: 1rem;
-      }
-
-      .modal-content h3 {
-        font-size: 1.2rem;
-        margin-top: 1.5rem;
-        margin-bottom: 0.75rem;
-      }
-
-      .modal-content ul {
-        padding-left: 1.25rem;
-      }
-
-      .modal-content li {
-        margin-bottom: 0.5rem;
-        line-height: 1.4;
       }
 
       /* --- Mobile-friendly Info Modal --- */
@@ -2879,6 +2860,9 @@
     // Default mod icon as a data URL
     const DEFAULT_MOD_ICON = 'data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGcgaWQ9Ik1pbmVjcmFmdCI+PHBhdGggZD0ibTIxIDFoLTE4YTIgMiAwIDAgMCAtMiAydjE4YTIgMiAwIDAgMCAyIDJoMThhMiAyIDAgMCAwIDItMnYtMThhMiAyIDAgMCAwIC0yLTJ6bS0xNSA4LjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYzYS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV6bTExIDhhLjUuNSAwIDAgMSAtLjUuNWgtMmEuNS41IDAgMCAxIC0uNS0uNXYtMS41aC00djEuNWEuNS41IDAgMCAxIC0uNS41aC0yYS41LjUgMCAwIDEgLS41LS41di01YS41LjUgMCAwIDEgLjUtLjVoMi41di0xLjVhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYxLjVoMi41YS41LjUgMCAwIDEgLjUuNXptMS04YS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXoiIGZpbGw9IiMzMDNjNDIiLz48L2c+PC9zdmc+';
 
+    // Loader-agnostic project types (shaders, resource packs, data packs don't need loader/version filtering)
+    const LOADER_AGNOSTIC_TYPES = ["shader", "resourcepack", "datapack"];
+
     // --- DOM Element References ---
     const dropzone = document.getElementById("dropzone");
     const dropzonePrompt = document.getElementById("dropzone-prompt");
@@ -2889,7 +2873,6 @@
     const modalCloseButton = document.getElementById("modal-close-button");
     const mcVersionSelect = document.getElementById("mc-version");
     const updateButton = document.getElementById("update-button");
-    const updateButtonIcon = updateButton.querySelector("svg");
     const modLoaderSelect = document.getElementById("mod-loader");
     const resultsArea = document.getElementById("results-area");
     const progressBarContainer = document.getElementById("progress-bar-container");
@@ -3152,8 +3135,7 @@
       
       // Only apply loader and version filters for project types that support them
       // Shaders, resource packs, and data packs are typically loader-agnostic
-      const loaderAgnosticTypes = ["shader", "resourcepack", "datapack"];
-      const shouldApplyLoaderFilters = !projectType || !loaderAgnosticTypes.includes(projectType);
+      const shouldApplyLoaderFilters = !projectType || !LOADER_AGNOSTIC_TYPES.includes(projectType);
       
       if (shouldApplyLoaderFilters) {
         // Add loader facet - use categories for loader filtering
@@ -3227,9 +3209,7 @@
         }
         
         // Only apply loader and version filters for project types that support them
-        // Shaders, resource packs, and data packs are typically loader-agnostic
-        const loaderAgnosticTypes = ["shader", "resourcepack", "datapack"];
-        const shouldApplyLoaderFilters = !projectType || !loaderAgnosticTypes.includes(projectType);
+        const shouldApplyLoaderFilters = !projectType || !LOADER_AGNOSTIC_TYPES.includes(projectType);
         
         if (shouldApplyLoaderFilters) {
           // Add loader facet from modal select
@@ -3664,14 +3644,6 @@
         );
 
         if (contentCategories.length > 0) {
-          // Format category names (turn "world-gen" into "World Gen")
-          function formatCategoryName(slug) {
-            return slug
-              .split("-")
-              .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-              .join(" ");
-          }
-
           const formattedCategories = contentCategories.map(formatCategoryName);
           categoryTooltip.textContent = formattedCategories.join(", ");
 
@@ -4318,8 +4290,7 @@
               }
             }
 
-            if (result.status === "success" && renderedModIds.has(result.modId)) {
-            } else {
+            if (!(result.status === "success" && renderedModIds.has(result.modId))) {
               renderSingleResult(result);
               if (result.status === "success") {
                 renderedModIds.add(result.modId);
@@ -5291,8 +5262,6 @@
               }
             }
 
-            if (!modName) {
-            }
             return modName || 'Unknown mod';
           }).join(', ');
 
@@ -5445,13 +5414,13 @@
       <!-- Bulk actions bar (hidden by default) -->
       <div id="bulk-actions-bar" class="bulk-actions-bar">
         <button id="toggle-select-all-bulk-btn">Select All</button>
-        <span id="bulk-selection-count" style="color: var(--text-color); margin: 0 0.75rem; font-weight: 500;">0 selected</span>
-        <span style="color: var(--border-color); margin: 0 0.5rem;">|</span>
+        <span id="bulk-selection-count" class="bulk-selection-count">0 selected</span>
+        <span class="bulk-divider">|</span>
         <button id="download-selected-bulk-btn" class="primary">Download</button>
         <button id="ignore-selected-bulk-btn">Ignore</button>
         <button id="unignore-selected-bulk-btn">Unignore</button>
         <button id="remove-selected-bulk-btn" class="danger">Remove</button>
-        <span style="color: var(--border-color); margin: 0 0.5rem;">|</span>
+        <span class="bulk-divider">|</span>
         <button id="cancel-bulk-btn">Cancel</button>
       </div>
       <div class="results-list"></div>
@@ -5644,10 +5613,6 @@
                 });
               }
             }
-
-
-          } else {
-
           }
         } catch (error) {
           console.error('Error updating download counters:', error);
@@ -6646,9 +6611,7 @@
       }
 
       // First, check for duplicates.
-      if (result.status === "success" && renderedModIds.has(result.modId)) {
-        // If it's a duplicate, we do nothing else.
-      } else {
+      if (!(result.status === "success" && renderedModIds.has(result.modId))) {
         // If it's NOT a duplicate (or it's a warning/failure), then we render it.
         const section = document.getElementById(sectionId);
         if (section) {
@@ -7427,15 +7390,6 @@
         const categoryContainer = card.querySelector(".category-tooltip-container");
         const categoryTooltip = card.querySelector(".category-tooltip");
 
-        // This helper function turns a slug like "world-gen" into "World Gen"
-        function formatCategoryName(slug) {
-          return slug
-            .split("-")
-            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-            .join(" ");
-        }
-
-        // We map over the array of string slugs and format each one
         const formattedCategories = mod.categories.map(formatCategoryName);
         categoryTooltip.textContent = formattedCategories.join(", ");
 
@@ -7554,15 +7508,6 @@
     const categoryContainer = card.querySelector(".category-tooltip-container");
     const categoryTooltip = card.querySelector(".category-tooltip");
 
-    // This helper function turns a slug like "world-gen" into "World Gen"
-    function formatCategoryName(slug) {
-      return slug
-        .split("-")
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(" ");
-    }
-
-    // We map over the array of string slugs and format each one
     const formattedCategories = mod.categories.map(formatCategoryName);
     categoryTooltip.textContent = formattedCategories.join(", ");
 
@@ -7607,8 +7552,13 @@
     }
 
     // --- Helper Functions ---
-
-
+    // This helper function turns a slug like "world-gen" into "World Gen"
+    function formatCategoryName(slug) {
+      return slug
+        .split("-")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
+    }
 
     // --- File Hash Calculation with Caching ---
     const fileHashCache = new Map();
@@ -8084,21 +8034,6 @@
       } catch (error) {
         console.warn('Cache clear error:', error);
       }
-    }
-
-    // Get cache statistics
-    function getCacheStats() {
-      const cache = getCache();
-      const totalRequests = cacheStats.hits + cacheStats.misses;
-      const hitRate = totalRequests > 0 ? (cacheStats.hits / totalRequests * 100).toFixed(1) : 0;
-
-      return {
-        ...cacheStats,
-        totalRequests,
-        hitRate: `${hitRate}%`,
-        cacheSize: cache.metadata.totalEntries,
-        cacheAge: cache.metadata.created ? Math.round((Date.now() - cache.metadata.created) / 1000 / 60) : 0
-      };
     }
 
     // Initialize cache when page loads
