@@ -4305,7 +4305,10 @@
                     result.all_versions.find(v => v.version_type === "alpha");
 
                   if (latestVersion) {
-                    const primaryFile = latestVersion.files.find(f => f.primary);
+                    let primaryFile = latestVersion.files.find(f => f.primary);
+                    if (!primaryFile && latestVersion.files.length > 0) {
+                      primaryFile = latestVersion.files[0];
+                    }
                     if (primaryFile) {
                       const downloadInfo = {
                         url: primaryFile.url,
@@ -5011,14 +5014,32 @@
             continue;
           }
 
-          const primaryFile = latestVersion.files.find(f => f.primary);
+          let primaryFile = latestVersion.files.find(f => f.primary);
+          if (!primaryFile && latestVersion.files.length > 0) {
+            primaryFile = latestVersion.files[0];
+          }
           if (!primaryFile) {
+            const supportedVersions = [...new Set(versionInfo.allVersions?.flatMap(v => v.game_versions) || [])];
+            const supportedLoaders = [...new Set(versionInfo.allVersions?.flatMap(v => v.loaders) || [])];
             results.push({
               status: "warning",
               title: projectDetails.title,
+              projectId: projectDetails.id,
+              hash: fileHash,
               author_name: author.name,
               author_url: author.url,
-              reason: "No primary file found for latest version."
+              description: projectDetails.description,
+              icon_url: projectDetails.icon_url,
+              project_url: `https://modrinth.com/project/${projectDetails.slug}`,
+              client_side: projectDetails.client_side,
+              server_side: projectDetails.server_side,
+              downloads: projectDetails.downloads,
+              followers: projectDetails.followers,
+              categories: projectDetails.categories,
+              project_type: projectDetails.project_type,
+              reason: "No primary file found for latest version.",
+              supportedVersions,
+              supportedLoaders
             });
             continue;
           }
@@ -6414,10 +6435,10 @@
         const betaLink = card.querySelector('.channel-link.beta');
         const releaseLink = card.querySelector('.channel-link.release');
 
-        // Check which channel link is visible (has display: inline)
-        if (alphaLink && alphaLink.style.display === 'inline') return 'alpha';
-        if (betaLink && betaLink.style.display === 'inline') return 'beta';
-        if (releaseLink && releaseLink.style.display === 'inline') return 'release';
+        // Check which channel link's container is visible (has display: flex)
+        if (alphaLink && alphaLink.parentElement.style.display === 'flex') return 'alpha';
+        if (betaLink && betaLink.parentElement.style.display === 'flex') return 'beta';
+        if (releaseLink && releaseLink.parentElement.style.display === 'flex') return 'release';
 
         return 'release'; // Default to release if no visible channel found
       }
@@ -7047,9 +7068,9 @@
             <span class="category-tooltip"></span>
           </div>
           <div class="mod-meta-item list-view-channels">
-            <span class="meta-tooltip-container"><a href="#" target="_blank" rel="noopener noreferrer" class="channel-link release" style="display: none;"></a><span class="meta-tooltip">Release</span></span>
-            <span class="meta-tooltip-container"><a href="#" target="_blank" rel="noopener noreferrer" class="channel-link beta" style="display: none;"></a><span class="meta-tooltip">Beta</span></span>
-            <span class="meta-tooltip-container"><a href="#" target="_blank" rel="noopener noreferrer" class="channel-link alpha" style="display: none;"></a><span class="meta-tooltip">Alpha</span></span>
+            <span class="meta-tooltip-container" style="display: none;"><a href="#" target="_blank" rel="noopener noreferrer" class="channel-link release"></a><span class="meta-tooltip">Release</span></span>
+            <span class="meta-tooltip-container" style="display: none;"><a href="#" target="_blank" rel="noopener noreferrer" class="channel-link beta"></a><span class="meta-tooltip">Beta</span></span>
+            <span class="meta-tooltip-container" style="display: none;"><a href="#" target="_blank" rel="noopener noreferrer" class="channel-link alpha"></a><span class="meta-tooltip">Alpha</span></span>
           </div>
         </div>
         <div class="mod-meta-toggles">
@@ -7093,7 +7114,10 @@
         );
         if (!selectedVersion) return;
 
-        const primaryFile = selectedVersion.files.find((f) => f.primary);
+        let primaryFile = selectedVersion.files.find((f) => f.primary);
+        if (!primaryFile && selectedVersion.files.length > 0) {
+          primaryFile = selectedVersion.files[0];
+        }
 
         // Remove previous version from downloads list if it exists
         const existingDownloadIndex = successfulDownloads.findIndex(dl => dl.projectId === mod.projectId);
@@ -7133,8 +7157,8 @@
           selectedVersion.changelog || "No changelog provided for this version."
         );
 
-        // Hide all channel links first
-        Object.values(listLinks).forEach((link) => (link.style.display = "none"));
+        // Hide all channel link containers first
+        Object.values(listLinks).forEach((link) => (link.parentElement.style.display = "none"));
 
         const versionUrl = `${mod.project_url}/version/${selectedVersion.version_number}`;
         const versionType = selectedVersion.version_type; // 'release', 'beta', or 'alpha'
@@ -7142,7 +7166,8 @@
         // Update the correct link
         if (listLinks[versionType]) {
           listLinks[versionType].href = versionUrl;
-          listLinks[versionType].style.display = "inline";
+          listLinks[versionType].parentElement.style.display = "flex";
+
         }
       }
 
@@ -7511,12 +7536,32 @@
       }
       return 0;
     });
-    chipsHtml += `<div style="margin-top:0.6rem;">
+    const VISIBLE_COUNT = 25;
+    const visibleVersions = sortedVersions.slice(0, VISIBLE_COUNT);
+    const hiddenVersions = sortedVersions.slice(VISIBLE_COUNT);
+    const chipStyle = `background:var(--pill-bg);padding:0.15rem 0.5rem;border-radius:0.5rem;font-size:0.75em;border:1px solid var(--border-color);`;
+    let versionsHtml = `<div style="margin-top:0.6rem;">
       <span style="font-size:0.75em;color:var(--secondary-text);display:block;margin-bottom:0.3rem;">Supported Versions</span>
-      <div style="display:flex;flex-wrap:wrap;gap:0.3rem;">${sortedVersions.map(v => `<span style="background:var(--pill-bg);padding:0.15rem 0.5rem;border-radius:0.5rem;font-size:0.75em;border:1px solid var(--border-color);">${v}</span>`).join('')}</div>
-    </div>`;
+      <div style="display:flex;flex-wrap:wrap;gap:0.3rem;">${visibleVersions.map(v => `<span style="${chipStyle}">${v}</span>`).join('')}</div>`;
+    if (hiddenVersions.length) {
+      versionsHtml += `<div class="version-chips-hidden" style="display:none;flex-wrap:wrap;gap:0.3rem;margin-top:0.3rem;">${hiddenVersions.map(v => `<span style="${chipStyle}">${v}</span>`).join('')}</div>
+      <button type="button" class="show-more-versions" style="margin-top:0.4rem;background:transparent;border:none;color:var(--secondary-text);font-size:0.75em;cursor:pointer;text-decoration:underline;padding:0;">Show all ${sortedVersions.length} versions</button>`;
+    }
+    versionsHtml += `</div>`;
+    chipsHtml += versionsHtml;
   }
   reasonContent.innerHTML = `<p style="font-weight: bold; margin: 0 0 0.8rem 0;">${mod.reason}</p>${chipsHtml}`;
+
+  // Attach toggle listener for expandable version chips
+  const showMoreBtn = reasonContent.querySelector('.show-more-versions');
+  if (showMoreBtn) {
+    showMoreBtn.addEventListener('click', () => {
+      const hidden = reasonContent.querySelector('.version-chips-hidden');
+      const isHidden = hidden.style.display === 'none';
+      hidden.style.display = isHidden ? 'flex' : 'none';
+      showMoreBtn.textContent = isHidden ? 'Show fewer versions' : `Show all ${mod.supportedVersions.length} versions`;
+    });
+  }
 
   // --- Add project_type icon if available ---
   if (mod.project_type) {
@@ -7603,9 +7648,10 @@
       return card;
     }
 
-    // Extract probable mod name from a JAR filename like "appleskin-fabric-mc1.20.3-2.5.1"
+    // Extract probable mod name from a filename like "appleskin-fabric-mc1.20.3-2.5.1"
     function cleanModFileName(filename) {
       return filename
+        .replace(/\.(jar|zip)$/i, "")
         .replace(/-(fabric|forge|neoforge|quilt)(-mc)?[\d.]+.*$/i, "")
         .replace(/-v?[\d.]+(-[\w]+)?$/i, "")
         .replace(/-/g, " ");
