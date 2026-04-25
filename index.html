@@ -143,6 +143,34 @@
       margin-top: 0;
     }
 
+    .modrinth-stats {
+      display: flex;
+      justify-content: center;
+      gap: 0.6rem;
+      margin-top: 0.25rem;
+      flex-wrap: wrap;
+      font-size: 0.8rem;
+      color: var(--secondary-text);
+    }
+
+    .stat-item {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 0.25rem;
+    }
+
+    .stat-value {
+      font-weight: 600;
+      color: var(--gradient-start);
+    }
+
+    .stat-sep {
+      color: var(--secondary-text);
+      user-select: none;
+      font-size: 1.1em;
+      opacity: 0.7;
+    }
+
     .controls {
       display: flex;
       justify-content: center;
@@ -1185,7 +1213,7 @@
       transition: background-color 0.2s ease, border-color 0.2s ease;
     }
 
-    .download-link:not(.bulk-select-mode):not(.ignored-state):not(.ignore-mode):hover {
+    .download-link:not(.bulk-select-mode):not(.ignored-state):hover {
       background-color: var(--gradient-end);
     }
 
@@ -1843,6 +1871,128 @@
       opacity: 1;
     }
 
+    /* Severity color overrides for the title triangle. */
+    .conflict-icon.severity-breaks .warning-triangle-icon {
+      stroke: var(--error-color);
+    }
+
+    .conflict-icon.severity-conflicts .warning-triangle-icon {
+      stroke: var(--warning-color);
+    }
+
+    /* "Conflicts" toggle (next to Changelog/Reason) - only present when conflicts exist.
+       Matches other toggles in color by default; only tints red/yellow on hover/active. */
+    .conflicts-toggle {
+      cursor: pointer;
+      text-decoration: underline;
+    }
+
+    .conflicts-toggle.severity-breaks:hover,
+    .conflicts-toggle.severity-breaks.active {
+      color: var(--error-color);
+    }
+
+    .conflicts-toggle.severity-conflicts:hover,
+    .conflicts-toggle.severity-conflicts.active {
+      color: var(--warning-color);
+    }
+
+    /* Detailed conflicts panel inside each affected card. */
+    .conflicts-content {
+      display: none;
+      width: 100%;
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border-color);
+      color: var(--secondary-text);
+      font-size: 0.9rem;
+    }
+
+    .conflicts-content.visible {
+      display: block;
+    }
+
+    .conflicts-content.visible::before {
+      content: 'Conflicts';
+      display: block;
+      font-size: 1rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--primary-text);
+      opacity: 0.9;
+      margin-bottom: 0.75rem;
+    }
+
+    .conflict-pair {
+      margin-bottom: 0.75rem;
+      padding: 0.6rem 0.75rem;
+      border-left: 3px solid var(--border-color);
+      background-color: rgba(0, 0, 0, 0.15);
+      border-radius: 0 6px 6px 0;
+    }
+
+    .conflict-pair.severity-breaks {
+      border-left-color: var(--error-color);
+    }
+
+    .conflict-pair.severity-conflicts {
+      border-left-color: var(--warning-color);
+    }
+
+    .conflict-pair-header {
+      font-weight: 600;
+      color: var(--primary-text);
+      margin-bottom: 0.4rem;
+    }
+
+    .conflict-declaration-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .conflict-declaration {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+      padding: 0.25rem 0;
+      line-height: 1.4;
+    }
+
+    .conflict-severity-pill {
+      flex-shrink: 0;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      padding: 0.1rem 0.4rem;
+      border-radius: 4px;
+      color: #fff;
+      text-transform: uppercase;
+    }
+
+    .conflict-severity-pill.severity-breaks {
+      background-color: var(--error-color);
+    }
+
+    .conflict-severity-pill.severity-conflicts {
+      background-color: var(--warning-color);
+      color: #000;
+    }
+
+    .conflict-sentence code {
+      background-color: rgba(255, 255, 255, 0.08);
+      padding: 0.05rem 0.3rem;
+      border-radius: 3px;
+      font-size: 0.85em;
+    }
+
+    .conflict-source-tag {
+      font-style: italic;
+      opacity: 0.7;
+      font-size: 0.85em;
+    }
+
     /* Dependency chain icon and tooltip styling */
     .dependency-chain-tooltip-container {
       position: relative;
@@ -2414,6 +2564,15 @@
       <p class="subtitle">
         Manage Minecraft mods, Resource Packs, Shaders, and Modpacks - all powered by Modrinth
       </p>
+      <div id="modrinth-stats" class="modrinth-stats">
+        <div class="stat-item"><span class="stat-value" id="stat-projects">—</span> projects</div>
+        <span class="stat-sep">|</span>
+        <div class="stat-item"><span class="stat-value" id="stat-versions">—</span> versions</div>
+        <span class="stat-sep">|</span>
+        <div class="stat-item"><span class="stat-value" id="stat-files">—</span> files</div>
+        <span class="stat-sep">|</span>
+        <div class="stat-item"><span class="stat-value" id="stat-authors">—</span> authors</div>
+      </div>
     </header>
 
 
@@ -2519,7 +2678,6 @@
   <input type="file" id="file-input" multiple style="display: none" accept=".jar,.mrpack,.zip" />
 
 
-
   <!-- Info Modal -->
   <div id="info-modal" class="modal-overlay">
     <div class="modal-content">
@@ -2559,17 +2717,13 @@
       <ul>
         <li><b><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
               stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
-              <path
-                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
-              </path>
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
               <polyline points="3.29 7 12 12 20.71 7"></polyline>
               <line x1="12" y1="22" x2="12" y2="12"></line>
             </svg> Box:</b> Standard mod</li>
         <li><b><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
               stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
-              <path
-                d="M18.37 2.63 14 7l-1.59-1.59a2 2 0 0 0-2.82 0L8 7l9 9 1.59-1.59a2 2 0 0 0 0-2.82L17 10l4.37-4.37a2.12 2.12 0 1 0-3-3Z">
-              </path>
+              <path d="M18.37 2.63 14 7l-1.59-1.59a2 2 0 0 0-2.82 0L8 7l9 9 1.59-1.59a2 2 0 0 0 0-2.82L17 10l4.37-4.37a2.12 2.12 0 1 0-3-3Z"></path>
               <path d="M9 8c-2 3-4 3.5-7 4l8 10c2-1 6-5 6-7"></path>
               <path d="M14.5 17.5 4.5 15"></path>
             </svg> Paintbrush:</b> Resource pack</li>
@@ -2588,13 +2742,10 @@
             </svg> Brackets:</b> Data pack</li>
         <li><b><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
               stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
-              <path d="M12 22v-9" />
-              <path
-                d="M15.17 2.21a1.67 1.67 0 0 1 1.63 0L21 4.57a1.93 1.93 0 0 1 0 3.36L8.82 14.79a1.655 1.655 0 0 1-1.64 0L3 12.43a1.93 1.93 0 0 1 0-3.36z" />
-              <path
-                d="M20 13v3.87a2.06 2.06 0 0 1-1.11 1.83l-6 3.08a1.93 1.93 0 0 1-1.78 0l-6-3.08A2.06 2.06 0 0 1 4 16.87V13" />
-              <path
-                d="M21 12.43a1.93 1.93 0 0 0 0-3.36L8.83 2.2a1.64 1.64 0 0 0-1.63 0L3 4.57a1.93 1.93 0 0 0 0 3.36l12.18 6.86a1.636 1.636 0 0 0 1.63 0z" />
+              <path d="M12 22v-9"></path>
+              <path d="M15.17 2.21a1.67 1.67 0 0 1 1.63 0L21 4.57a1.93 1.93 0 0 1 0 3.36L8.82 14.79a1.655 1.655 0 0 1-1.64 0L3 12.43a1.93 1.93 0 0 1 0-3.36z"></path>
+              <path d="M20 13v3.87a2.06 2.06 0 0 1-1.11 1.83l-6 3.08a1.93 1.93 0 0 1-1.78 0l-6-3.08A2.06 2.06 0 0 1 4 16.87V13"></path>
+              <path d="M21 12.43a1.93 1.93 0 0 0 0-3.36L8.83 2.2a1.64 1.64 0 0 0-1.63 0L3 4.57a1.93 1.93 0 0 0 0 3.36l12.18 6.86a1.636 1.636 0 0 0 1.63 0z"></path>
             </svg> Open Box:</b> Modpack</li>
         <li><b><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
               stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
@@ -2663,6 +2814,21 @@
       <div class="modal-actions">
         <button id="confirm-cancel-button" class="clear-all-button">Cancel</button>
         <button id="confirm-ok-button" class="action-button">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROMPT MODAL BLOCK (used for modpack name/version, replacing native prompt()) -->
+  <div id="prompt-modal" class="modal-overlay">
+    <div class="modal-content">
+      <button id="prompt-x-close-button" class="modal-close-button" title="Close">&times;</button>
+      <h2 id="prompt-title">Input Required</h2>
+      <p id="prompt-message" style="margin: 1.5rem 0 0.5rem 0;"></p>
+      <input type="text" id="prompt-input"
+        style="width: 100%; box-sizing: border-box; background-color: var(--bg-color); color: var(--primary-text); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem 0.75rem; font-size: 1rem; margin-bottom: 1rem;">
+      <div class="modal-actions">
+        <button id="prompt-cancel-button" class="clear-all-button">Cancel</button>
+        <button id="prompt-ok-button" class="action-button">OK</button>
       </div>
     </div>
   </div>
@@ -2844,6 +3010,7 @@
     let successfulDownloads = [];
     let sectionCounts = {};
     let renderedModIds = new Set();
+    let renderedArtifactIds = new Set(); // Tracks (slug, artifactType) to allow multiple artifact types per project
     let searchedMods = new Map();
     let mrpackMods = new Map(); // For mods from .mrpack files
     let isCurrentlySearching = false;
@@ -2853,15 +3020,85 @@
     let resultsSectionsSetup = false; // Track if result sections have been set up
     let dependencyMap = new Map(); // Track which mod requires each dependency
     let reverseDependencyMap = new Map(); // Track what dependencies each mod has
-    let incompatibleMap = new Map(); // Track incompatible relationships between mods
+    let incompatibleMap = new Map(); // Track incompatible relationships between mods (sourceProjectId -> Set<targetProjectId>)
     let modIdToNameMap = new Map(); // Track mod ID to name mapping
-    let conflictResults = null; // Store conflict detection results
+    let installedModVersions = new Map(); // Track installed version of each uploaded mod (projectId -> versionString)
+    let conflictResults = null; // Populated by analyzeConflicts(); read by addConflictIndicatorsToCards() (top-level fn)
 
     // Default mod icon as a data URL
     const DEFAULT_MOD_ICON = 'data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGcgaWQ9Ik1pbmVjcmFmdCI+PHBhdGggZD0ibTIxIDFoLTE4YTIgMiAwIDAgMCAtMiAydjE4YTIgMiAwIDAgMCAyIDJoMThhMiAyIDAgMCAwIDItMnYtMThhMiAyIDAgMCAwIC0yLTJ6bS0xNSA4LjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYzYS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV6bTExIDhhLjUuNSAwIDAgMSAtLjUuNWgtMmEuNS41IDAgMCAxIC0uNS0uNXYtMS41aC00djEuNWEuNS41IDAgMCAxIC0uNS41aC0yYS41LjUgMCAwIDEgLS41LS41di01YS41LjUgMCAwIDEgLjUtLjVoMi41di0xLjVhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYxLjVoMi41YS41LjUgMCAwIDEgLjUuNXptMS04YS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXoiIGZpbGw9IiMzMDNjNDIiLz48L2c+PC9zdmc+';
+    // Inline `onerror="this.src=window.DEFAULT_MOD_ICON"` handlers run in a scope chain
+    // that does NOT reliably reach top-level `const` bindings, so expose it as a
+    // `window` property too.
+    window.DEFAULT_MOD_ICON = DEFAULT_MOD_ICON;
 
-    // Loader-agnostic project types (shaders, resource packs, data packs don't need loader/version filtering)
-    const LOADER_AGNOSTIC_TYPES = ["shader", "resourcepack", "datapack"];
+    // One-time registration of the document-level click listener used to close
+    // sort dropdowns. Calling this multiple times is a no-op so setupResultSections
+    // can call it on every Update run without leaking listeners.
+    let _sortDropdownCloserRegistered = false;
+    function registerGlobalSortDropdownCloser() {
+      if (_sortDropdownCloserRegistered) return;
+      _sortDropdownCloserRegistered = true;
+      document.addEventListener('click', (e) => {
+        if (e.target.closest('.sort-dropdown-container')) return;
+        // Resolve the dropdowns lazily so we don't hold references to detached
+        // nodes after a Clear Results / re-Update cycle.
+        const found = document.getElementById('sort-found-dropdown');
+        const warning = document.getElementById('sort-warning-dropdown');
+        if (found) found.classList.remove('show');
+        if (warning) warning.classList.remove('show');
+      });
+    }
+
+    // Artifact type configuration: single source of truth for folder path, file extensions,
+    // whether the user-selected mod loader gates compatibility, and (for loader-agnostic
+    // types) which Modrinth loader tags a version must declare to count as that artifact.
+    //
+    // `loaderTags` is important because a single Modrinth project can ship multiple
+    // artifact types under one project id (e.g. Veinminer publishes both a Fabric mod and
+    // a datapack). Without a tag filter, a datapack upload's version dropdown would show
+    // the mod versions too (and vice versa). Set to `null` for types we don't restrict.
+    const ARTIFACT_CONFIG = {
+      mod:          { folder: 'mods',          exts: ['.jar'],    needsLoader: true,  loaderTags: null },
+      plugin:       { folder: 'plugins',       exts: ['.jar'],    needsLoader: true,  loaderTags: null },
+      datapack:     { folder: 'datapacks',     exts: ['.zip'],    needsLoader: false, loaderTags: ['datapack'] },
+      resourcepack: { folder: 'resourcepacks', exts: ['.zip'],    needsLoader: false, loaderTags: ['minecraft'] },
+      shader:       { folder: 'shaderpacks',   exts: ['.zip'],    needsLoader: false, loaderTags: ['iris', 'optifine', 'canvas', 'vanilla'] },
+      modpack:      { folder: null,            exts: ['.mrpack'], needsLoader: false, loaderTags: null },
+    };
+
+    // Backward-compatible: types that skip loader filtering
+    const LOADER_AGNOSTIC_TYPES = Object.entries(ARTIFACT_CONFIG)
+      .filter(([_, cfg]) => !cfg.needsLoader)
+      .map(([type]) => type);
+
+    // Returns the destination folder for an artifact type, or `null` for types
+    // that should be placed at the archive root (modpacks). Unknown types fall
+    // back to 'mods' for safety. Note: do NOT use `||` here — modpack's folder
+    // is explicitly `null`, and `null || 'mods'` would route modpacks into the
+    // mods folder, which is not what we want.
+    function getArtifactFolder(type) {
+      const cfg = ARTIFACT_CONFIG[type];
+      if (!cfg) return 'mods';
+      return cfg.folder; // may be null for modpack — caller must handle
+    }
+
+    // Build a `path` field for `modrinth.index.json` and `downloadInfo.path`.
+    // Folder-less artifacts (modpacks) go at the archive root, so their path
+    // is just the filename with no leading folder segment.
+    function buildArtifactPath(type, filename) {
+      const folder = getArtifactFolder(type);
+      return folder ? `${folder}/${filename}` : filename;
+    }
+
+    function selectArtifactFile(version, artifactType) {
+      const cfg = ARTIFACT_CONFIG[artifactType];
+      if (!cfg) return version.files.find(f => f.primary) || version.files[0];
+      const primaryMatch = version.files.find(f => f.primary && cfg.exts.some(ext => f.filename.endsWith(ext)));
+      if (primaryMatch) return primaryMatch;
+      const anyMatch = version.files.find(f => cfg.exts.some(ext => f.filename.endsWith(ext)));
+      return anyMatch || version.files[0];
+    }
 
     // --- DOM Element References ---
     const dropzone = document.getElementById("dropzone");
@@ -2922,8 +3159,10 @@
     // --- Custom Alert Modal Logic ---
     function showCustomAlert(message, type = "notice", customTitle = null) {
       const icons = {
-        notice: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--warning-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`,
-        error: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--error-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`,
+        notice: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+          stroke="var(--warning-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`,
+        error: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+          stroke="var(--error-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`,
       };
       const titles = {
         notice: "Notice",
@@ -2969,7 +3208,8 @@
         confirmResolve = resolve;
         
         // Set warning icon
-        const warningIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--warning-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`;
+        const warningIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+          stroke="var(--warning-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`;
         
         confirmTitle.childNodes[1].nodeValue = customTitle;
         confirmIcon.innerHTML = warningIcon;
@@ -3001,6 +3241,63 @@
 
     // Make globally accessible
     window.showCustomConfirm = showCustomConfirm;
+
+    // --- Custom Prompt Modal Logic ---
+    // Replaces native `prompt()` for input flows (modpack name/version) so the
+    // UX matches the rest of the custom modals. Returns the entered string on
+    // OK or null on cancel/close, mirroring `prompt()`'s contract.
+    const promptModal = document.getElementById("prompt-modal");
+    const promptTitle = document.getElementById("prompt-title");
+    const promptMessage = document.getElementById("prompt-message");
+    const promptInput = document.getElementById("prompt-input");
+    const promptOkButton = document.getElementById("prompt-ok-button");
+    const promptCancelButton = document.getElementById("prompt-cancel-button");
+    const promptXCloseButton = document.getElementById("prompt-x-close-button");
+
+    let promptResolve = null;
+
+    function showCustomPrompt(message, defaultValue = "", customTitle = "Input Required") {
+      return new Promise((resolve) => {
+        promptResolve = resolve;
+        promptTitle.textContent = customTitle;
+        promptMessage.textContent = message;
+        promptInput.value = defaultValue;
+        promptModal.classList.add("visible");
+        document.body.style.overflow = "hidden";
+        // Defer focus until after the modal is laid out so the cursor lands in the input.
+        setTimeout(() => {
+          promptInput.focus();
+          promptInput.select();
+        }, 0);
+      });
+    }
+
+    function hideCustomPrompt(result) {
+      promptModal.classList.remove("visible");
+      document.body.style.overflow = "";
+      if (promptResolve) {
+        promptResolve(result);
+        promptResolve = null;
+      }
+    }
+
+    promptOkButton.addEventListener("click", () => hideCustomPrompt(promptInput.value));
+    promptCancelButton.addEventListener("click", () => hideCustomPrompt(null));
+    promptXCloseButton.addEventListener("click", () => hideCustomPrompt(null));
+    promptModal.addEventListener("click", (event) => {
+      if (event.target === promptModal) hideCustomPrompt(null);
+    });
+    promptInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        hideCustomPrompt(promptInput.value);
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        hideCustomPrompt(null);
+      }
+    });
+
+    window.showCustomPrompt = showCustomPrompt;
 
     // --- Scroll to Top/Bottom Button Logic ---
     function handleScrollButtons() {
@@ -3086,6 +3383,7 @@
     let isShowingFeatured = false;
     let currentFeaturedSort = "";
     let currentFeaturedProjectType = "";
+    let hasRandomizedInitialFeatured = false;
     const searchResultsPerPage = 20;
 
     function debounce(func, delay) {
@@ -3157,13 +3455,16 @@
         const response = await fetchWithRetry(searchUrl);
         const data = await response.json();
 
+        // Enrich hits with full project details for unknown environments
+        const enrichedHits = await enrichSearchHits(data.hits);
+
         // Store total results count
         totalSearchResults = data.total_hits;
 
         if (isLoadMore) {
-          appendSearchResults(data.hits);
+          appendSearchResults(enrichedHits);
         } else {
-          renderSearchResults(data.hits);
+          renderSearchResults(enrichedHits);
         }
 
         // Update offset for next load
@@ -3194,7 +3495,7 @@
 
         // Build the API URL
         let searchUrl = `https://api.modrinth.com/v2/search?limit=${searchResultsPerPage}&offset=${currentSearchOffset}`;
-
+        
         // Add sorting
         if (sortBy) {
           searchUrl += `&index=${sortBy}`;
@@ -3231,13 +3532,16 @@
         const response = await fetchWithRetry(searchUrl);
         const data = await response.json();
 
+        // Enrich hits with full project details for unknown environments
+        const enrichedHits = await enrichSearchHits(data.hits);
+
         // Store total results count
         totalSearchResults = data.total_hits;
 
         if (isLoadMore) {
-          appendSearchResults(data.hits);
+          appendSearchResults(enrichedHits);
         } else {
-          renderSearchResults(data.hits);
+          renderSearchResults(enrichedHits);
         }
 
         // Update offset for next load
@@ -3266,8 +3570,6 @@
       return projectTypes[Math.floor(Math.random() * projectTypes.length)];
     }
 
-    // Note: toggleFeaturedControls function removed as all controls are now always visible in .search-filter-controls
-
     async function loadMoreResults() {
       // Show loading state on the button
       const loadMoreBtn = document.getElementById("load-more-btn");
@@ -3282,9 +3584,9 @@
         await performSearch(currentSearchQuery, true);
       }
 
-      // Reset button state
+      // Reset button state. Text is set correctly inside updateLoadMoreButton()
+      // (called transitively from appendSearchResults), so we only need to re-enable.
       if (loadMoreBtn) {
-        loadMoreBtn.textContent = "Show 10 more";
         loadMoreBtn.disabled = false;
       }
     }
@@ -3366,13 +3668,9 @@
         document.body.style.overflow = "hidden"; // Prevent background scrolling
         debouncedSearch(query);
       } else {
-        // Show featured content when search is empty
+        // Show featured content when search is empty - don't randomize, use current filters
         if (!isShowingFeatured) {
-          const randomSort = getRandomSortOption();
-          const randomProjectType = getRandomProjectType();
-          sortSelect.value = randomSort;
-          projectTypeSelect.value = randomProjectType;
-          loadFeaturedContent(randomSort, randomProjectType);
+          loadFeaturedContent(sortSelect.value, projectTypeSelect.value);
         }
       }
     }
@@ -3390,14 +3688,15 @@
       currentSearchOffset = 0;
       totalSearchResults = 0;
       isShowingFeatured = false;
-      // Show featured content when cleared
-      const randomSort = getRandomSortOption();
-      const randomProjectType = getRandomProjectType();
-      sortSelect.value = randomSort;
-      projectTypeSelect.value = randomProjectType;
-      loadFeaturedContent(randomSort, randomProjectType);
+      // Show featured content when cleared - don't randomize, use current filters
+      loadFeaturedContent(sortSelect.value, projectTypeSelect.value);
       // Clear the searchedMods Map to reset added mod states
       searchedMods.clear();
+      // Reset sort states
+      if (window.resetSortStates) {
+        window.resetSortStates();
+      }
+
       // Focus the specified input
       if (focusInput) {
         focusInput.focus();
@@ -3438,17 +3737,18 @@
 
       // If no search query, show featured content
       if (!currentSearchQuery) {
-        // Only randomize if not already showing featured content
-        if (!isShowingFeatured) {
+        // Only randomize on first open per session
+        if (!hasRandomizedInitialFeatured) {
           const randomSort = getRandomSortOption();
           const randomProjectType = getRandomProjectType();
           sortSelect.value = randomSort;
           projectTypeSelect.value = randomProjectType;
           currentFeaturedSort = randomSort;
           currentFeaturedProjectType = randomProjectType;
+          hasRandomizedInitialFeatured = true;
         }
         // Always reload featured content to ensure fresh results with current filters
-        loadFeaturedContent(currentFeaturedSort, currentFeaturedProjectType);
+        loadFeaturedContent(currentFeaturedSort || sortSelect.value, currentFeaturedProjectType || projectTypeSelect.value);
       }
     });
 
@@ -3500,6 +3800,48 @@
         document.body.style.overflow = ""; // Restore background scrolling
       }
     });
+
+    // --- Enrich Search Hits with Full Project Details ---
+    async function enrichSearchHits(hits) {
+      const unknownEnvHits = hits.filter(
+        (hit) => hit.client_side === "unknown" && hit.server_side === "unknown"
+      );
+      if (unknownEnvHits.length === 0) return hits;
+
+      const idsParam = JSON.stringify(
+        unknownEnvHits.map((hit) => hit.project_id)
+      );
+      try {
+        const response = await fetchWithRetry(
+          `https://api.modrinth.com/v2/projects?ids=${encodeURIComponent(idsParam)}`
+        );
+        if (response.ok) {
+          const projects = await response.json();
+          const projectMap = new Map(
+            projects.map((p) => [p.id, p])
+          );
+
+          return hits.map((hit) => {
+            const fullProject = projectMap.get(hit.project_id);
+            if (
+              fullProject &&
+              (fullProject.client_side !== "unknown" ||
+                fullProject.server_side !== "unknown")
+            ) {
+              return {
+                ...hit,
+                client_side: fullProject.client_side,
+                server_side: fullProject.server_side,
+              };
+            }
+            return hit;
+          });
+        }
+      } catch (e) {
+        console.warn("Failed to enrich search hits:", e);
+      }
+      return hits;
+    }
 
     // --- Search Modal Results Logic ---
     function renderSearchResults(hits) {
@@ -3570,13 +3912,15 @@
       card.innerHTML = `
           <div class="result-card-main">
             <a href="${projectUrl}" target="_blank" rel="noopener noreferrer" class="mod-icon-link">
-              <img src="${mod.icon_url || DEFAULT_MOD_ICON}" alt="${mod.title} icon" class="mod-icon" onerror="this.src=DEFAULT_MOD_ICON">
+              <img src="${mod.icon_url || DEFAULT_MOD_ICON}" alt="${mod.title} icon" class="mod-icon" onerror="this.src=window.DEFAULT_MOD_ICON">
             </a>
             <div class="mod-details">
               <div class="mod-title">
                 <a href="${projectUrl}" target="_blank" rel="noopener noreferrer">${mod.title}</a>
                 ${mod.project_type ? (() => {
-          const iconData = getProjectTypeIcon(mod.project_type);
+          // Use the active search filter as the artifact type for icon display
+          const artifactType = projectTypeSelect.value || mod.project_type;
+          const iconData = getProjectTypeIcon(artifactType);
           return `<span class="project-type-icon-container">
                     <span class="project-type-icon">${iconData.svg}</span>
                     <span class="project-type-tooltip">${iconData.tooltip}</span>
@@ -3612,8 +3956,7 @@
                 </div>
                 <div class="mod-meta-item category-tooltip-container" style="display: none;">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 2H2v10l9.29 9.29a1 1 0 0 0 1.42 0l8-8a1 1 0 0 0 0-1.42L12 2z"></path>
-                    <path d="M7 7h.01"></path>
+                    <path d="M12 2H2v10l9.29 9.29a1 1 0 0 0 1.42 0l8-8a1 1 0 0 0 0-1.42L12 2z"></path><path d="M7 7h.01"></path>
                   </svg>
                   <span class="category-tooltip"></span>
                 </div>
@@ -3664,8 +4007,14 @@
         const projectId = e.target.dataset.projectId;
         const title = e.target.dataset.title;
 
+        // Respect the user's search filter intent for dual-type projects.
+        // If they searched under "datapack", treat it as a datapack;
+        // if they searched under "mod", keep it as a mod.
+        // The user's search filter is the source of truth for artifact type.
+        const artifactType = projectTypeSelect.value || mod.project_type;
+
         if (!searchedMods.has(projectId)) {
-          searchedMods.set(projectId, { title: title });
+          searchedMods.set(projectId, { title: title, artifactType: artifactType });
           createFilePill({ name: `${title} (Searched)` }, () => {
             searchedMods.delete(projectId);
             const btn = document.querySelector(`.add-mod-button[data-project-id="${projectId}"]`);
@@ -3718,14 +4067,67 @@
         fileInput.click();
       }
     });
-    fileInput.addEventListener("change", (event) => {
+    fileInput.addEventListener("change", async (event) => {
       if (event.target.files.length > 0) {
-        handleFiles(event.target.files);
+        await handleFiles(event.target.files);
       }
       event.target.value = null;
     });
 
-    function handleFiles(files) {
+    // Detects and extracts "container" .zip archives — the same shape produced
+    // by our own "Download .zip" button (flat top-level folders: mods/, plugins/,
+    // datapacks/, resourcepacks/, shaderpacks/). When a container is detected,
+    // each inner .jar/.zip is returned as a fresh `File` object so the rest of
+    // the upload pipeline can treat it like an individually dropped file.
+    //
+    // Returns `File[]` if `file` is a container, `null` otherwise (including
+    // single-artifact zips — those are handled by `detectZipContentType`).
+    async function extractContainerZip(file) {
+      try {
+        const zip = await JSZip.loadAsync(file);
+
+        // Bail if this is a single-artifact zip: mod .jar renamed to .zip, or a
+        // resource/data pack (pack.mcmeta at root). `detectZipContentType`
+        // handles those cases downstream.
+        if (
+          zip.file("fabric.mod.json") ||
+          zip.file("quilt.mod.json") ||
+          zip.file("META-INF/mods.toml") ||
+          zip.file("META-INF/neoforge.mods.toml") ||
+          zip.file("pack.mcmeta") ||
+          zip.file("modrinth.index.json") // .mrpack payload misnamed as .zip
+        ) {
+          return null;
+        }
+
+        // Derive allowed folder prefixes from the single source of truth so
+        // adding a new artifact type (e.g., "kubejs") in ARTIFACT_CONFIG is enough
+        // to teach this extractor about it automatically.
+        const allowedFolders = new Set(
+          Object.values(ARTIFACT_CONFIG)
+            .map(cfg => cfg.folder)
+            .filter(Boolean)
+        );
+
+        const extracted = [];
+        for (const [path, entry] of Object.entries(zip.files)) {
+          if (entry.dir) continue;
+          const parts = path.split("/");
+          if (parts.length !== 2) continue; // only accept exactly <folder>/<filename>
+          const [folder, innerName] = parts;
+          if (!allowedFolders.has(folder)) continue;
+          if (!innerName.endsWith(".jar") && !innerName.endsWith(".zip")) continue;
+          const blob = await entry.async("blob");
+          extracted.push(new File([blob], innerName, { type: "application/octet-stream" }));
+        }
+        return extracted.length > 0 ? extracted : null;
+      } catch (e) {
+        // Corrupt/non-zip payload — let the normal path handle/validate it.
+        return null;
+      }
+    }
+
+    async function handleFiles(files) {
       if (files.length === 0) return;
 
       // Check if a .mrpack file is among the dropped files
@@ -3739,49 +4141,88 @@
         // Add the .mrpack file itself to uploadedFiles so it can be updated as a whole package
         uploadedFiles.set(mrpackFile.name, mrpackFile);
         processMrpack(mrpackFile);
+        return;
+      }
+
+      // Pre-pass: expand any "container" .zip files (the shape our own
+      // "Download .zip" button produces) into their inner artifacts. Loose
+      // .jar/.zip uploads mixed in alongside a container are preserved.
+      const containerCandidates = Array.from(files).filter(f => f.name.endsWith(".zip"));
+      const expandedFiles = [];
+      const expansionSummary = []; // [{ name, count }] for user-facing feedback
+      const processingPills = []; // temp UI pills shown during extraction
+
+      for (const candidate of containerCandidates) {
+        const pill = createFilePill({ name: `Processing: ${candidate.name}...` });
+        processingPills.push(pill);
+      }
+      // Ensure the dropzone is expanded while we work so the pills are visible.
+      if (processingPills.length > 0) {
+        dropzonePrompt.style.display = "none";
+        dropzone.classList.add("dropzone-expanded");
+      }
+
+      const expandedContainerNames = new Set();
+      for (const candidate of containerCandidates) {
+        const inner = await extractContainerZip(candidate);
+        if (inner && inner.length > 0) {
+          expandedFiles.push(...inner);
+          expandedContainerNames.add(candidate.name);
+          expansionSummary.push({ name: candidate.name, count: inner.length });
+        }
+      }
+
+      // Remove the temporary "Processing: ..." pills now that extraction is done.
+      for (const pill of processingPills) {
+        if (pill && pill.parentNode) pill.parentNode.removeChild(pill);
+      }
+
+      // Build the effective input list: keep everything that wasn't a container,
+      // plus the extracted contents of every container that was one.
+      const effectiveFiles = [
+        ...Array.from(files).filter(f => !expandedContainerNames.has(f.name)),
+        ...expandedFiles,
+      ];
+
+      // Separate validation for better error messages
+      const acceptedFiles = effectiveFiles.filter(file => file.name.endsWith('.jar') || file.name.endsWith('.zip'));
+      const duplicateFiles = acceptedFiles.filter(file => uploadedFiles.has(file.name));
+      const validFiles = acceptedFiles.filter(file => !uploadedFiles.has(file.name));
+      const invalidFiles = effectiveFiles.filter(file => !file.name.endsWith('.jar') && !file.name.endsWith('.zip'));
+
+      if (validFiles.length > 0) {
+        // Only update UI if we have valid files
+        dropzonePrompt.style.display = "none";
+        dropzone.classList.add("dropzone-expanded");
+        clearAllButton.style.display = "inline-flex";
+
+        for (const file of validFiles) {
+          uploadedFiles.set(file.name, file);
+          createFilePill(file);
+        }
+
+        // If we expanded any containers, tell the user what happened so the
+        // sudden appearance of many pills isn't surprising.
+        if (expansionSummary.length > 0) {
+          const parts = expansionSummary.map(s => `${s.name} (${s.count})`).join(", ");
+          statusMessage.textContent = `Extracted from archive: ${parts}`;
+          statusMessage.classList.add("visible");
+        }
       } else {
-        // Separate validation for better error messages
-        const acceptedFiles = Array.from(files).filter(file => file.name.endsWith('.jar') || file.name.endsWith('.zip'));
-        const duplicateFiles = acceptedFiles.filter(file => uploadedFiles.has(file.name));
-        const validFiles = acceptedFiles.filter(file => !uploadedFiles.has(file.name));
-        const invalidFiles = Array.from(files).filter(file => !file.name.endsWith('.jar') && !file.name.endsWith('.zip'));
-
-        if (validFiles.length > 0) {
-          // Only update UI if we have valid files
-          dropzonePrompt.style.display = "none";
-          dropzone.classList.add("dropzone-expanded");
-          clearAllButton.style.display = "inline-flex";
-
-          for (const file of validFiles) {
-            uploadedFiles.set(file.name, file);
-            createFilePill(file);
-          }
-        } else {
-          // Provide specific error messages based on what went wrong
-          if (duplicateFiles.length > 0 && invalidFiles.length === 0) {
-            // Only duplicates
-            const fileNames = duplicateFiles.map(f => f.name).join(", ");
-            showCustomAlert(
-              `The following file(s) are already uploaded: ${fileNames}`,
-              "notice",
-              "Duplicate Files"
-            );
-          } else if (duplicateFiles.length > 0 && invalidFiles.length > 0) {
-            // Both duplicates and invalid files
-            const duplicateNames = duplicateFiles.map(f => f.name).join(", ");
-            showCustomAlert(
-              `Some files are already uploaded (${duplicateNames}) and others are not valid. Please upload .jar, .zip, or .mrpack files.`,
-              "notice",
-              "Mixed File Issues"
-            );
-          } else {
-            // Only invalid file types
-            showCustomAlert(
-              "Please upload valid files (.jar, .zip) or a Modrinth modpack (.mrpack).",
-              "notice",
-              "Invalid File Type"
-            );
-          }
+        // Provide specific error messages based on what went wrong
+        if (duplicateFiles.length > 0) {
+          const fileNames = duplicateFiles.map(f => f.name).join(", ");
+          showCustomAlert(
+            `The following file(s) are already uploaded: ${fileNames}`,
+            "notice",
+            "Duplicate Files"
+          );
+        } else if (invalidFiles.length > 0) {
+          showCustomAlert(
+            "Please upload valid files (.jar, .zip) or a Modrinth modpack (.mrpack).",
+            "notice",
+            "Invalid File Type"
+          );
         }
       }
     }
@@ -3828,14 +4269,17 @@
           if (manifest.dependencies.minecraft) {
             sourceVersion = manifest.dependencies.minecraft;
           }
+          // Order matters: some transitional packs declare both `forge` and
+          // `neoforge` keys, so we must match NeoForge first to avoid the more
+          // generic `forge` branch falsely winning.
           if (manifest.dependencies["fabric-loader"]) {
             sourceLoader = "Fabric";
-          } else if (manifest.dependencies.forge) {
-            sourceLoader = "Forge";
           } else if (manifest.dependencies["quilt-loader"]) {
             sourceLoader = "Quilt";
           } else if (manifest.dependencies.neoforge) {
             sourceLoader = "NeoForge";
+          } else if (manifest.dependencies.forge) {
+            sourceLoader = "Forge";
           }
         }
 
@@ -3901,11 +4345,13 @@
       };
       filePill.appendChild(removeButton);
       fileListContainer.appendChild(filePill);
+      // Returning the element lets callers (e.g., the container-zip extractor)
+      // remove transient "Processing..." pills once work completes.
+      return filePill;
     }
 
     document.getElementById("current-year").textContent =
       new Date().getFullYear();
-    // --- Dynamic Minecraft Version Loading with Hierarchical Layout ---
     async function populateMcVersions() {
       try {
         const response = await fetchWithRetry(
@@ -4014,6 +4460,12 @@
         if (modalVersionSelect.options.length > 1) {
           modalVersionSelect.options[1].selected = true;
         }
+        // Sync modal selects with the main page selects now that the option lists
+        // are populated. (The DOMContentLoaded handler does this synchronously,
+        // but populateMcVersions is async so the modal select would otherwise
+        // still be empty when the sync runs there.)
+        modalLoaderSelect.value = modLoaderSelect.value;
+        if (mcVersionSelect.value) modalVersionSelect.value = mcVersionSelect.value;
       } catch (error) {
         console.error("Failed to fetch MC versions after multiple attempts:", error);
         // Fallback or show an error
@@ -4023,6 +4475,49 @@
           "Could not load Minecraft versions from Modrinth. Please check your connection and refresh.",
           "error"
         );
+      }
+    }
+
+    async function fetchModrinthStats() {
+      const cacheKey = "modrinth_stats_cache";
+      const ttl = 1000 * 60 * 60 * 6; // 6 hours
+      const elProjects = document.getElementById("stat-projects");
+      const elVersions = document.getElementById("stat-versions");
+      const elFiles = document.getElementById("stat-files");
+      const elAuthors = document.getElementById("stat-authors");
+
+      // 1. Show cached values immediately so the user never sees "—"
+      try {
+        const cached = JSON.parse(localStorage.getItem(cacheKey));
+        if (cached && Date.now() - cached.ts < ttl) {
+          if (cached.projects != null) elProjects.textContent = cached.projects;
+          if (cached.versions != null) elVersions.textContent = cached.versions;
+          if (cached.files != null) elFiles.textContent = cached.files;
+          if (cached.authors != null) elAuthors.textContent = cached.authors;
+        }
+      } catch (_) { /* ignore corrupt cache */ }
+
+      // 2. Refresh in background using the shared fetchWithRetry
+      try {
+        const response = await fetchWithRetry("https://api.modrinth.com/v2/statistics", {
+          headers: { "Accept": "application/json" }
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        const stats = {
+          projects: data.projects != null ? data.projects.toLocaleString() : null,
+          versions: data.versions != null ? data.versions.toLocaleString() : null,
+          files: data.files != null ? data.files.toLocaleString() : null,
+          authors: data.authors != null ? data.authors.toLocaleString() : null,
+          ts: Date.now()
+        };
+        if (stats.projects != null) elProjects.textContent = stats.projects;
+        if (stats.versions != null) elVersions.textContent = stats.versions;
+        if (stats.files != null) elFiles.textContent = stats.files;
+        if (stats.authors != null) elAuthors.textContent = stats.authors;
+        localStorage.setItem(cacheKey, JSON.stringify(stats));
+      } catch (e) {
+        // Silently fail - stats are non-critical
       }
     }
 
@@ -4056,7 +4551,8 @@
 
     // Call these functions when the page loads
     document.addEventListener("DOMContentLoaded", () => {
-      populateMcVersions();
+      // Batch the version list and stats calls together on load
+      Promise.all([populateMcVersions(), fetchModrinthStats()]);
       handleScrollButtons(); // This runs our check once on load
 
       // Clear both search inputs on page load/refresh
@@ -4082,6 +4578,7 @@
         if (restoredHelpLink) {
           restoredHelpLink.addEventListener("click", () => {
             infoModal.classList.add("visible");
+            document.body.style.overflow = "hidden"; // Match original handler so background can't scroll
           });
         }
       } else {
@@ -4100,7 +4597,7 @@
 
       // Reset mod tracking for search modal
       renderedModIds.clear();
-      searchedMods.clear();
+      renderedArtifactIds.clear();
 
       // Reset sort states
       if (window.resetSortStates) {
@@ -4172,20 +4669,22 @@
 
     async function handleUpdate() {
       // Combine jobs from both sources first.
-      const fileJobs = Array.from(uploadedFiles.values()).map((file) => {
-        // Create a special job type for .mrpack files to handle them as modpacks
-        if (file.name.endsWith(".mrpack")) {
-          return {
-            type: "mrpack",
-            data: file,
-            isMrpackFile: true, // Flag to identify it's the actual .mrpack file
-          };
-        }
-        return {
+      //
+      // `.mrpack` files are *containers*: `processMrpack` already pulled out
+      // every inner mod's SHA1 and pushed them into `mrpackMods`, which the
+      // `mrpackJobs` block below turns into real hash lookups. The .mrpack
+      // file itself has no Modrinth-side identity for locally-generated packs
+      // (its hash won't match anything), so processing it as a separate job
+      // produced a misleading "Mod not found" failure card AND — because that
+      // failure result had no `title` — crashed `createFailureCard` mid-render,
+      // killing the entire results pass. We simply drop .mrpack entries from
+      // the job list; the user-visible pill stays since it's purely UI.
+      const fileJobs = Array.from(uploadedFiles.values())
+        .filter((file) => !file.name.endsWith(".mrpack"))
+        .map((file) => ({
           type: "file",
           data: file,
-        };
-      });
+        }));
       const searchJobs = Array.from(searchedMods.entries()).map(
         ([key, modInfo]) => {
           const isHash = /^[a-f0-9]{40}$/.test(key);
@@ -4193,6 +4692,7 @@
             type: isHash ? "hash" : "id",
             data: key,
             title: modInfo.title,
+            artifactType: modInfo.artifactType || null,
           };
         }
       );
@@ -4217,11 +4717,13 @@
 
         // Reset the UI and state for a new run.
         renderedModIds.clear();
+        renderedArtifactIds.clear();
         dependencyMap.clear(); // Reset dependency tracking
         reverseDependencyMap.clear(); // Reset reverse dependency tracking
         incompatibleMap.clear(); // Reset incompatible dependency tracking
         modIdToNameMap.clear(); // Reset mod name mapping
-        conflictResults = null; // Reset conflict results
+        installedModVersions.clear(); // Reset installed version tracking
+        conflictResults = null; // Reset conflict results from prior run
         apiCallCount = 0; // Reset API call counter
         processingStartTime = Date.now(); // Start timing
         cacheStats = { hits: 0, misses: 0, stores: 0 }; // Reset cache stats for this run
@@ -4241,9 +4743,11 @@
         sectionCounts = { found: 0, warning: 0, failure: 0 };
 
         const processedIds = new Set();
+        const processedProjectIds = new Set(); // Tracks project IDs only, for dependency deduplication
         let allJobs = [...jobs];
         let completedJobs = 0;
         const allDependencies = new Set(); // Store all discovered dependencies
+        const allInitialResults = []; // Snapshot of every initial-phase result; consumed by analyzeConflicts() in Phase 3
 
         // Phase 1: Process all initial mods in batches
         statusMessage.textContent = `Searching updates for ${jobs.length} mods...`;
@@ -4255,13 +4759,27 @@
 
           // Process and render results immediately as each batch completes
           for (const result of results) {
-            const key = result.modId || (result.title + result.reason);
+            const key = (result.modId || (result.title + result.reason)) + '|' + (result.project_type || 'unknown');
 
             if (processedIds.has(key)) {
               completedJobs++;
               continue;
             }
             processedIds.add(key);
+            processedProjectIds.add(result.projectId || result.modId);
+            allInitialResults.push(result);
+
+            // Track the TARGET version (the one the user is updating to) for conflict context.
+            // We intentionally prefer `targetVersion` over the uploaded `installedVersion` because
+            // conflicts should reflect the post-update world, not the pre-update one. For warning
+            // results (no compatible target version) we still fall back to the installed version so
+            // the panel has *something* to show.
+            if ((result.status === "success" || result.status === "warning") && result.projectId) {
+              const contextVersion = result.targetVersion || result.installedVersion;
+              if (contextVersion) {
+                installedModVersions.set(result.projectId, contextVersion);
+              }
+            }
 
             // Collect dependencies BEFORE rendering the card
             if (result.status === "success" && result.dependencies) {
@@ -4290,12 +4808,16 @@
               }
             }
 
-            if (!(result.status === "success" && renderedModIds.has(result.modId))) {
+            if (!(result.status === "success" && renderedArtifactIds.has(result.modId + '|' + result.project_type))) {
               renderSingleResult(result);
               if (result.status === "success") {
                 renderedModIds.add(result.modId);
+                renderedArtifactIds.add(result.modId + '|' + result.project_type);
                 // Store mod ID to name mapping for dependency tooltips
                 modIdToNameMap.set(result.projectId, result.title);
+
+                // Update any parent cards that were waiting for this dependency name
+                updateDependencyChainTooltip(result.projectId, result.title);
 
                 // Add to successfulDownloads if it has the required download info
                 // This handles both cached and fresh results
@@ -4305,24 +4827,24 @@
                     result.all_versions.find(v => v.version_type === "alpha");
 
                   if (latestVersion) {
-                    let primaryFile = latestVersion.files.find(f => f.primary);
-                    if (!primaryFile && latestVersion.files.length > 0) {
-                      primaryFile = latestVersion.files[0];
-                    }
+                    const primaryFile = selectArtifactFile(latestVersion, result.project_type);
                     if (primaryFile) {
                       const downloadInfo = {
                         url: primaryFile.url,
                         filename: primaryFile.filename,
                         hashes: primaryFile.hashes,
-                        path: `mods/${primaryFile.filename}`,
+                        path: buildArtifactPath(result.project_type, primaryFile.filename),
                         fileSize: primaryFile.size,
                         client_side: result.client_side,
                         server_side: result.server_side,
                         projectId: result.projectId,
+                        artifactType: result.project_type,
+                        // Mirror combineResults() so version-change reshapes are no-ops.
+                        isMrpackFile: result.isMrpackFile === true,
                       };
 
-                      // Check if this download info is already in the array (avoid duplicates)
-                      const isDuplicate = successfulDownloads.some(dl => dl.projectId === result.projectId);
+                      // Check if this download info is already in the array (avoid duplicates per artifact type)
+                      const isDuplicate = successfulDownloads.some(dl => dl.projectId === result.projectId && dl.artifactType === result.project_type);
                       if (!isDuplicate) {
                         successfulDownloads.push(downloadInfo);
                       }
@@ -4345,8 +4867,11 @@
           }
         }
 
+        // Complete the progress bar and create summary
+        progressBar.style.width = "100%";
+
         // Phase 2: Recursively process dependencies
-        let dependencyQueue = Array.from(allDependencies).filter(depId => !processedIds.has(depId));
+        let dependencyQueue = Array.from(allDependencies).filter(depId => !processedProjectIds.has(depId));
         let actualDependenciesAdded = 0;
         const totalInitialDependencies = dependencyQueue.length;
         let dependenciesProcessed = 0;
@@ -4365,7 +4890,7 @@
           const results = await getModUpdateInfoBatch(dependencyJobs, dependencyJobs.length);
 
           for (const result of results) {
-            const key = result.modId || result.projectId || (result.title + result.reason);
+            const key = (result.modId || result.projectId || (result.title + result.reason)) + '|' + (result.project_type || 'unknown');
 
             if (processedIds.has(key)) {
               if (result.status === "success" && result.projectId) {
@@ -4374,6 +4899,7 @@
               continue;
             }
             processedIds.add(key);
+            processedProjectIds.add(result.projectId || result.modId);
             dependenciesProcessed++;
 
             // Render the dependency card
@@ -4382,7 +4908,10 @@
             if (result.status === "success") {
               actualDependenciesAdded++;
               renderedModIds.add(result.modId);
+              renderedArtifactIds.add(result.modId + '|' + result.project_type);
               modIdToNameMap.set(result.projectId, result.title);
+
+              // Update any parent cards that were waiting for this dependency name
               updateDependencyChainTooltip(result.projectId, result.title);
 
               // Check for nested dependencies
@@ -4390,7 +4919,7 @@
                 for (const dep of result.dependencies) {
                   if (dep.dependency_type === "required") {
                     const depKey = dep.project_id;
-                    if (!processedIds.has(depKey) && !dependencyQueue.includes(depKey)) {
+                    if (!processedProjectIds.has(depKey) && !dependencyQueue.includes(depKey)) {
                       dependencyQueue.push(depKey); // Add new dependency to the queue
                       allDependencies.add(depKey); // Keep track of all unique dependencies
                       dependencyMap.set(depKey, result.title); // Track who requires this
@@ -4420,7 +4949,7 @@
 
           // Update progress bar (from 50% to 95% during dependency phase)
           const totalDependencies = allDependencies.size;
-          const processedDependencyCount = Array.from(allDependencies).filter(id => processedIds.has(id)).length;
+          const processedDependencyCount = Array.from(allDependencies).filter(id => processedProjectIds.has(id)).length;
           const depProgressPercentage = 50 + (Math.min(processedDependencyCount / (totalDependencies || 1), 1) * 45);
           progressBar.style.width = `${depProgressPercentage}%`;
 
@@ -4429,12 +4958,16 @@
           }
         }
 
-        // Complete the progress bar and create summary
-        progressBar.style.width = "100%";
+        // Conflict detection is driven purely by each mod's TARGET-version Modrinth metadata
+        // (version-level `dependencies[].dependency_type === "incompatible"`). Uploaded-JAR
+        // `breaks`/`conflicts`/`incompatible` declarations are intentionally ignored because
+        // the user is moving AWAY from those JARs, so their declarations describe a world the
+        // user isn't staying in. incompatibleMap is populated above and again during the
+        // dependency-resolution pass below.
 
         // Phase 3: Analyze conflicts after all mods are processed
         statusMessage.textContent = "Analyzing mod conflicts...";
-        conflictResults = analyzeConflicts();
+        conflictResults = analyzeConflicts(allInitialResults);
 
         // Add conflict indicators to existing cards
         addConflictIndicatorsToCards();
@@ -4554,8 +5087,7 @@
       const requestOptions = {
         ...options, // Spread any existing options
         headers: {
-          // Add our custom User-Agent following Modrinth's recommendations
-          // "User-Agent": "BryantWelch/mcmodupdate.app/1.0.0 (https://github.com/BryantWelch/mcmodupdate.app)",
+          // Note: browsers forbid setting User-Agent from JS, so we rely on the default.
           ...(options?.headers || {})
         },
       };
@@ -4735,7 +5267,7 @@
       const versionData = await batchVersionLookup(projectsData, loader, gameVersion);
 
       // Step 6: Combine results
-      return await combineResults(uncachedJobs, hashResults, projectsData, authorData, versionData);
+      return await combineResults(uncachedJobs, hashResults, projectsData, authorData, versionData, gameVersion);
     }
 
     // --- Batch Hash Lookup Function ---
@@ -4851,11 +5383,18 @@
     }
 
     // --- Batch Version Lookup Function ---
+    // Modrinth has no batch endpoint that returns *all* versions for a list of
+    // projects, so we do still issue one request per project. Previously these
+    // were fired with a single `Promise.all`, which fanned out N parallel
+    // connections and trivially blew through the 300 req/min rate limit on
+    // larger modpacks. We now process them in fixed-size waves so the burstiness
+    // is bounded regardless of input size.
+    const VERSION_LOOKUP_CONCURRENCY = 8;
     async function batchVersionLookup(projectsData, loader, gameVersion) {
       const projectIds = Object.keys(projectsData);
       if (projectIds.length === 0) return {};
 
-      const versionPromises = projectIds.map(async (projectId) => {
+      const lookupOne = async (projectId) => {
         const project = projectsData[projectId];
         const isMod = project.project_type === 'mod';
 
@@ -4902,9 +5441,15 @@
           hasGameVersion,
           hasLoader
         };
-      });
+      };
 
-      const results = await Promise.all(versionPromises);
+      // Process project IDs in fixed-size waves to cap concurrency.
+      const results = [];
+      for (let i = 0; i < projectIds.length; i += VERSION_LOOKUP_CONCURRENCY) {
+        const chunk = projectIds.slice(i, i + VERSION_LOOKUP_CONCURRENCY);
+        const chunkResults = await Promise.all(chunk.map(lookupOne));
+        results.push(...chunkResults);
+      }
 
       return results.reduce((acc, result) => {
         acc[result.projectId] = result;
@@ -4913,7 +5458,7 @@
     }
 
     // --- Results Combination Function ---
-    async function combineResults(jobs, hashResults, projectsData, authorData, versionData) {
+    async function combineResults(jobs, hashResults, projectsData, authorData, versionData, gameVersion) {
       const results = [];
 
       for (const job of jobs) {
@@ -4924,6 +5469,21 @@
 
           // Find project details based on job type
           let fileHash = null; // Track hash for caching
+
+          // Determine artifact type ONCE at the input boundary
+          let artifactType = null;
+          if (job.type === "file") {
+            if (job.data.name.endsWith(".zip")) {
+              artifactType = await detectZipContentType(job.data);
+            } else if (job.data.name.endsWith(".jar")) {
+              artifactType = "mod";
+            }
+          } else if (job.type === "mrpack") {
+            artifactType = "modpack";
+          } else if (job.type === "id") {
+            artifactType = job.artifactType || null;
+          }
+
           if (job.type === "hash" || job.type === "file" || job.type === "mrpack") {
             const hashResult = hashResults.find(hr => hr.job === job);
             if (hashResult?.versionData) {
@@ -4945,6 +5505,11 @@
             projectDetails = projectsData[job.data];
           }
 
+          // Fall back to Modrinth's project_type if we couldn't determine artifact type
+          if (!artifactType && projectDetails) {
+            artifactType = projectDetails.project_type;
+          }
+
           if (!projectDetails) {
             results.push({
               status: "failure",
@@ -4954,16 +5519,34 @@
             continue;
           }
 
+          // Get compatible versions and compatibility analysis
+          const versionInfo = versionData[projectDetails.id] || { versions: [], compatibilityStatus: 'no-versions' };
+          let versions = versionInfo.versions || [];
+          let compatibilityStatus = versionInfo.compatibilityStatus;
+
+          // For loader-agnostic artifact types, bypass the user-selected mod loader
+          // filter but still constrain versions to those whose Modrinth `loaders`
+          // tag matches the artifact kind. A single Modrinth project can ship
+          // multiple artifact types (e.g. Veinminer publishes both a Fabric mod
+          // and a datapack); without the `loaderTags` filter a datapack upload's
+          // version dropdown would surface the mod versions too.
+          if (artifactType && ARTIFACT_CONFIG[artifactType] && !ARTIFACT_CONFIG[artifactType].needsLoader) {
+            const loaderTags = ARTIFACT_CONFIG[artifactType].loaderTags;
+            versions = (versionInfo.allVersions || []).filter(v => {
+              if (!v.game_versions.includes(gameVersion)) return false;
+              if (!loaderTags) return true;
+              return v.loaders.some(l => loaderTags.includes(l));
+            });
+            compatibilityStatus = versions.length > 0 ? 'compatible' : 'no-versions';
+          }
+
           // Get author details
           const author = getAuthorFromBatchData(projectDetails, authorData);
 
-          // Get compatible versions and compatibility analysis
-          const versionInfo = versionData[projectDetails.id] || { versions: [], compatibilityStatus: 'no-versions' };
-          const versions = versionInfo.versions || [];
-          const release = versions.find(v => v.version_type === "release");
-          const beta = versions.find(v => v.version_type === "beta");
-          const alpha = versions.find(v => v.version_type === "alpha");
-          const latestVersion = release || beta || alpha;
+          // Pick best version (already filtered to artifact-compatible versions)
+          const latestVersion = versions.find(v => v.version_type === "release") ||
+                                versions.find(v => v.version_type === "beta") ||
+                                versions.find(v => v.version_type === "alpha");
 
           if (!latestVersion) {
             // Generate precise error message based on compatibility analysis
@@ -4971,7 +5554,7 @@
             const loader = modLoaderSelect.value;
             const gameVersion = mcVersionSelect.value;
 
-            switch (versionInfo.compatibilityStatus) {
+            switch (compatibilityStatus) {
               case 'wrong-loader':
                 reason = `Compatible with MC ${gameVersion}, but not available for ${loader.charAt(0).toUpperCase() + loader.slice(1)}.`;
                 break;
@@ -4993,36 +5576,7 @@
 
             results.push({
               status: "warning",
-              title: projectDetails.title,
-              projectId: projectDetails.id,
-              hash: fileHash, // Add hash for caching
-              author_name: author.name,
-              author_url: author.url,
-              description: projectDetails.description,
-              icon_url: projectDetails.icon_url,
-              project_url: `https://modrinth.com/project/${projectDetails.slug}`,
-              client_side: projectDetails.client_side,
-              server_side: projectDetails.server_side,
-              downloads: projectDetails.downloads,
-              followers: projectDetails.followers,
-              categories: projectDetails.categories,
-              project_type: projectDetails.project_type,
-              reason: reason,
-              supportedVersions,
-              supportedLoaders
-            });
-            continue;
-          }
-
-          let primaryFile = latestVersion.files.find(f => f.primary);
-          if (!primaryFile && latestVersion.files.length > 0) {
-            primaryFile = latestVersion.files[0];
-          }
-          if (!primaryFile) {
-            const supportedVersions = [...new Set(versionInfo.allVersions?.flatMap(v => v.game_versions) || [])];
-            const supportedLoaders = [...new Set(versionInfo.allVersions?.flatMap(v => v.loaders) || [])];
-            results.push({
-              status: "warning",
+              modId: projectDetails.slug,
               title: projectDetails.title,
               projectId: projectDetails.id,
               hash: fileHash,
@@ -5036,10 +5590,41 @@
               downloads: projectDetails.downloads,
               followers: projectDetails.followers,
               categories: projectDetails.categories,
-              project_type: projectDetails.project_type,
+              project_type: artifactType,
+              reason: reason,
+              supportedVersions,
+              supportedLoaders,
+              installedVersion: originalModInfo.version || null,
+            });
+            continue;
+          }
+
+          // Select the correct file from the version based on artifact type
+          const primaryFile = selectArtifactFile(latestVersion, artifactType);
+          if (!primaryFile) {
+            const supportedVersions = [...new Set(versionInfo.allVersions?.flatMap(v => v.game_versions) || [])];
+            const supportedLoaders = [...new Set(versionInfo.allVersions?.flatMap(v => v.loaders) || [])];
+            results.push({
+              status: "warning",
+              modId: projectDetails.slug,
+              title: projectDetails.title,
+              projectId: projectDetails.id,
+              hash: fileHash,
+              author_name: author.name,
+              author_url: author.url,
+              description: projectDetails.description,
+              icon_url: projectDetails.icon_url,
+              project_url: `https://modrinth.com/project/${projectDetails.slug}`,
+              client_side: projectDetails.client_side,
+              server_side: projectDetails.server_side,
+              downloads: projectDetails.downloads,
+              followers: projectDetails.followers,
+              categories: projectDetails.categories,
+              project_type: artifactType,
               reason: "No primary file found for latest version.",
               supportedVersions,
-              supportedLoaders
+              supportedLoaders,
+              installedVersion: originalModInfo.version || null,
             });
             continue;
           }
@@ -5054,29 +5639,23 @@
             ))
           );
 
-          // Gather download info for .mrpack file
-          // Define the folder path based on project type
-          let folderPath = "mods/";
-          if (projectDetails.project_type === "resourcepack") {
-            folderPath = "resourcepacks/";
-          } else if (projectDetails.project_type === "shader") {
-            folderPath = "shaderpacks/";
-          }
-
+          // Folder path driven by artifact type via single helper
           const downloadInfo = {
             url: primaryFile.url,
             filename: primaryFile.filename,
             hashes: primaryFile.hashes,
-            path: `${folderPath}${primaryFile.filename}`,
+            path: buildArtifactPath(artifactType, primaryFile.filename),
             fileSize: primaryFile.size,
             client_side: projectDetails.client_side,
             server_side: projectDetails.server_side,
-            projectId: projectDetails.id, // Add project ID for ignore functionality
-            isMrpackFile: job.type === "mrpack" || job.isMrpackFile === true // Transfer the mrpack flag
+            projectId: projectDetails.id,
+            artifactType: artifactType,
+            isMrpackFile: job.type === "mrpack" || job.isMrpackFile === true,
           };
 
-          // Add to successful downloads if not already tracked
-          if (!renderedModIds.has(projectDetails.slug)) {
+          // Check if this download info is already in the array (avoid duplicates per artifact type)
+          const isDuplicate = successfulDownloads.some(dl => dl.projectId === projectDetails.id && dl.artifactType === artifactType);
+          if (!isDuplicate) {
             successfulDownloads.push(downloadInfo);
           }
 
@@ -5084,8 +5663,8 @@
           results.push({
             status: "success",
             modId: projectDetails.slug,
-            projectId: projectDetails.id, // Add project ID for dependency tracking
-            hash: fileHash, // Add hash for caching (null for dependency lookups)
+            projectId: projectDetails.id,
+            hash: fileHash,
             isUpToDate: isUpToDate,
             categories: projectDetails.categories,
             title: projectDetails.title,
@@ -5098,14 +5677,15 @@
             server_side: projectDetails.server_side,
             followers: projectDetails.followers,
             downloads: projectDetails.downloads,
-            project_type: projectDetails.project_type,
-            all_versions: versions,
+            project_type: artifactType,
+            all_versions: versions, // Already filtered to artifact-compatible versions
             dependencies: latestVersion.dependencies,
+            targetVersion: latestVersion.version_number, // Version user is updating TO (primary context for conflicts)
             isDependency: job.isDependencyJob === true,
-            // Flag if this is the actual .mrpack file (not the extracted mods)
             isMrpackFile: job.type === "mrpack" || job.isMrpackFile === true,
             gallery: projectDetails.gallery || [],
-            body: projectDetails.body || ""
+            body: projectDetails.body || "",
+            installedVersion: originalModInfo.version || null,
           });
 
         } catch (error) {
@@ -5148,33 +5728,40 @@
     }
 
     // --- Get Mod ID from JAR ---
+    // Returns: { id, name, version }
+    // We only consume `version` downstream (for the up-to-date comparison and as a fallback
+    // for warning results where no target version exists). `id`/`name` are kept because they
+    // come for free from the same parse and are useful for debugging.
     async function getModIdFromJar(jarFile) {
       try {
         const zip = await JSZip.loadAsync(jarFile);
+
+        // --- Fabric ---
         const fabricFile = zip.file("fabric.mod.json");
         if (fabricFile) {
-          const content = await fabricFile.async("string");
-          const manifest = JSON.parse(content);
-          // Also return the version property
+          const manifest = JSON.parse(await fabricFile.async("string"));
+          return { id: manifest.id, name: manifest.name, version: manifest.version };
+        }
+
+        // --- Quilt ---
+        const quiltFile = zip.file("quilt.mod.json");
+        if (quiltFile) {
+          const manifest = JSON.parse(await quiltFile.async("string"));
+          const loader = manifest.quilt_loader || {};
           return {
-            id: manifest.id,
-            name: manifest.name,
-            version: manifest.version,
+            id: loader.id,
+            name: (manifest.metadata && manifest.metadata.name) || loader.id,
+            version: loader.version,
           };
         }
 
-        const forgeFile = zip.file("META-INF/mods.toml");
+        // --- Forge / NeoForge ---
+        const forgeFile = zip.file("META-INF/mods.toml") || zip.file("META-INF/neoforge.mods.toml");
         if (forgeFile) {
-          const content = await forgeFile.async("string");
-          const manifest = toml.parse(content);
+          const manifest = toml.parse(await forgeFile.async("string"));
           const modInfo = manifest.mods && manifest.mods[0];
           if (modInfo) {
-            // Also return the version property
-            return {
-              id: modInfo.modId,
-              name: modInfo.displayName,
-              version: modInfo.version,
-            };
+            return { id: modInfo.modId, name: modInfo.displayName, version: modInfo.version };
           }
         }
         throw new Error("Could not find a valid manifest file.");
@@ -5183,136 +5770,338 @@
       }
     }
 
-    // --- Analyze Conflicts Function ---
-    function analyzeConflicts() {
-      const conflictResults = {
-        conflictPairs: [],
-        affectedMods: new Set(),
-        totalConflicts: 0
-      };
+    // --- Detect ZIP content type (mod, datapack, resourcepack, shader, or unknown) ---
+    async function detectZipContentType(file) {
+      try {
+        const zip = await JSZip.loadAsync(file);
 
-      // Get all uploaded mod project IDs (from successful results)
-      const uploadedModIds = new Set();
+        // `zip.folder()` always returns a truthy wrapper and `zip.file(/regex/)`
+        // always returns an array (truthy even when empty), so we check the real
+        // file map instead.
+        const paths = Object.keys(zip.files);
+        const hasAssets = paths.some(p => p.startsWith("assets/"));
+        const hasData = paths.some(p => p.startsWith("data/"));
+        const hasShaders = paths.some(p => p.startsWith("shaders/"));
+        const hasPackMcmeta = !!zip.file("pack.mcmeta");
 
-      // Collect all uploaded mod project IDs from rendered results
-      const successCards = document.querySelectorAll('#results-found .result-card');
-      successCards.forEach(card => {
-        const projectId = card.dataset.projectId;
-        if (projectId) {
-          uploadedModIds.add(projectId);
+        // Check for mod manifests FIRST. Users sometimes rename a mod `.jar`
+        // to `.zip`; without this check the `hasAssets` fallback below would
+        // misclassify any Fabric mod (which ships lang files under `assets/`)
+        // as a resource pack.
+        const hasModManifest =
+          !!zip.file("fabric.mod.json") ||
+          !!zip.file("quilt.mod.json") ||
+          !!zip.file("META-INF/mods.toml") ||
+          !!zip.file("META-INF/neoforge.mods.toml");
+        if (hasModManifest) {
+          return "mod";
         }
-      });
 
-      // Also check warning cards for uploaded mods
-      const warningCards = document.querySelectorAll('#results-warning .result-card');
-      warningCards.forEach(card => {
-        const projectId = card.dataset.projectId;
-        if (projectId) {
-          uploadedModIds.add(projectId);
+        // Resource packs and data packs BOTH have pack.mcmeta; the real
+        // discriminator is assets/ (resourcepack) vs data/ (datapack).
+        if (hasPackMcmeta && hasAssets && !hasData) {
+          return "resourcepack";
         }
-      });
-
-      // Cross-reference incompatible dependencies with uploaded mods
-      for (const [modId, incompatibleSet] of incompatibleMap.entries()) {
-        // Check if this mod is in our uploaded collection
-        if (uploadedModIds.has(modId)) {
-          // Check each incompatible dependency
-          for (const incompatibleModId of incompatibleSet) {
-            // If the incompatible mod is also in our uploaded collection, we have a conflict
-            if (uploadedModIds.has(incompatibleModId)) {
-              const mod1Name = modIdToNameMap.get(modId) || modId;
-              const mod2Name = modIdToNameMap.get(incompatibleModId) || incompatibleModId;
-
-              // Create conflict pair
-              const conflictPair = {
-                modId: modId,
-                conflictingModId: incompatibleModId,
-                mod1Name: mod1Name,
-                mod2Name: mod2Name,
-                reason: `${mod1Name} marks ${mod2Name} as incompatible`
-              };
-
-              conflictResults.conflictPairs.push(conflictPair);
-              conflictResults.affectedMods.add(modId);
-              conflictResults.affectedMods.add(incompatibleModId);
-              conflictResults.totalConflicts++;
-            }
-          }
+        if (hasPackMcmeta && hasData) {
+          return "datapack";
         }
+
+        // --- Shaderpack ---
+        if (hasShaders) {
+          return "shader";
+        }
+
+        // Fallbacks for unusual packs without pack.mcmeta. `data/` is a strong
+        // datapack signal; `assets/` alone is ambiguous but most commonly a
+        // resource pack at this point (mods were already caught above).
+        if (hasData) return "datapack";
+        if (hasAssets) return "resourcepack";
+
+        // --- Unknown ---
+        return null;
+      } catch (e) {
+        return null;
       }
-
-      return conflictResults;
     }
 
-    // --- Add Conflict Indicators to Existing Cards ---
-    function addConflictIndicatorsToCards() {
-      if (!conflictResults || conflictResults.totalConflicts === 0) {
-        return;
+    // --- Version Comparison Helpers ---
+    // Semver-aware: treats "1.0.0" > "1.0.0-rc1" > "1.0.0-beta" > "1.0.0-alpha".
+    // Build metadata after `+` is ignored per semver spec.
+    function compareVersions(a, b) {
+      const split = v => {
+        let s = String(v).toLowerCase().trim().replace(/^v/, '');
+        // Split off build metadata (semver `+...` is ignored for ordering).
+        const plusIdx = s.indexOf('+');
+        if (plusIdx !== -1) s = s.slice(0, plusIdx);
+        // Split into [main, prerelease]; prerelease is everything after the FIRST '-'.
+        const dashIdx = s.indexOf('-');
+        const main = dashIdx === -1 ? s : s.slice(0, dashIdx);
+        const pre = dashIdx === -1 ? '' : s.slice(dashIdx + 1);
+        return {
+          main: main.split(/[._]/),
+          pre: pre ? pre.split(/[._\-]/) : [],
+        };
+      };
+      const A = split(a);
+      const B = split(b);
+
+      // Compare the main release identifiers.
+      const mainLen = Math.max(A.main.length, B.main.length);
+      for (let i = 0; i < mainLen; i++) {
+        const pa = A.main[i] || '0';
+        const pb = B.main[i] || '0';
+        const na = parseInt(pa, 10);
+        const nb = parseInt(pb, 10);
+        const isNa = !isNaN(na) && String(na) === pa;
+        const isNb = !isNaN(nb) && String(nb) === pb;
+        if (isNa && isNb) {
+          if (na !== nb) return na - nb;
+        } else if (isNa) {
+          return 1;
+        } else if (isNb) {
+          return -1;
+        } else if (pa !== pb) {
+          return pa < pb ? -1 : 1;
+        }
       }
 
-      // Iterate through all affected mods
+      // Per semver: a version with a pre-release tag has LOWER precedence than the same without.
+      if (A.pre.length === 0 && B.pre.length === 0) return 0;
+      if (A.pre.length === 0) return 1;  // A is full release, B is pre-release
+      if (B.pre.length === 0) return -1;
+
+      // Compare pre-release identifiers element-wise: numerics numerically, otherwise lexically.
+      const preLen = Math.max(A.pre.length, B.pre.length);
+      for (let i = 0; i < preLen; i++) {
+        const pa = A.pre[i];
+        const pb = B.pre[i];
+        if (pa === undefined) return -1; // shorter pre-release set is "lower"
+        if (pb === undefined) return 1;
+        const na = parseInt(pa, 10);
+        const nb = parseInt(pb, 10);
+        const isNa = !isNaN(na) && String(na) === pa;
+        const isNb = !isNaN(nb) && String(nb) === pb;
+        if (isNa && isNb) {
+          if (na !== nb) return na - nb;
+        } else if (isNa) {
+          return -1; // numeric pre-id < alphanumeric pre-id (semver rule)
+        } else if (isNb) {
+          return 1;
+        } else if (pa !== pb) {
+          return pa < pb ? -1 : 1;
+        }
+      }
+      return 0;
+    }
+
+    // --- Analyze Conflicts Function ---
+    // Decoupled from DOM: takes the authoritative list of processed results.
+    // Each conflict pair carries severity ("breaks" | "conflicts") so the UI can color/sort them.
+    function analyzeConflicts(allInitialResults) {
+      const out = {
+        conflictPairs: [],
+        affectedMods: new Set(),
+        totalConflicts: 0,
+      };
+
+      // Build the set of project IDs that the user actually has installed/uploaded.
+      // (We deliberately exclude `failure` results since we have no JAR data for them.)
+      const uploadedModIds = new Set();
+      for (const r of allInitialResults || []) {
+        if ((r.status === "success" || r.status === "warning") && r.projectId) {
+          uploadedModIds.add(r.projectId);
+        }
+      }
+
+      // Cross-reference incompatible relationships with uploaded mods.
+      // Each unique unordered pair is reported once (sorted key).
+      const processedPairs = new Set();
+      for (const [srcId, incompatibleSet] of incompatibleMap.entries()) {
+        if (!uploadedModIds.has(srcId)) continue;
+        for (const tgtId of incompatibleSet) {
+          if (!uploadedModIds.has(tgtId)) continue;
+
+          const pairKey = [srcId, tgtId].sort().join('|');
+          if (processedPairs.has(pairKey)) continue;
+          processedPairs.add(pairKey);
+
+          const srcName = modIdToNameMap.get(srcId) || srcId;
+          const tgtName = modIdToNameMap.get(tgtId) || tgtId;
+
+          // Conflicts now come exclusively from each TARGET version's Modrinth metadata
+          // (`dependencies[].dependency_type === "incompatible"`), so every declaration here
+          // is a single forward-direction "modrinth-api" entry with default "breaks" severity.
+          // No version-range gating is needed because the target version itself was already
+          // resolved against the user's selected MC version and loader.
+          const declarations = [{
+            direction: 'forward',
+            bySeverity: 'breaks',
+            byMod: srcName,
+            targetMod: tgtName,
+            byProjectId: srcId,
+            targetProjectId: tgtId,
+            versionRange: '*',
+            targetInstalledVersion: installedModVersions.get(tgtId) || null,
+            source: 'modrinth-api',
+          }];
+
+          // Modrinth's project-level dependency metadata exposes only a single
+          // `incompatible` flag (no breaks/conflicts split), so every declaration
+          // produced above has bySeverity === 'breaks'. The previous branched
+          // pair-severity calculation could never reach the 'conflicts' arm —
+          // collapsed here to a constant for clarity. If we ever start ingesting
+          // a richer source, restore the `some(...) ? 'breaks' : 'conflicts'`.
+          const pairSeverity = 'breaks';
+
+          out.conflictPairs.push({
+            modId: srcId,
+            conflictingModId: tgtId,
+            mod1Name: srcName,
+            mod2Name: tgtName,
+            severity: pairSeverity,
+            declarations, // detailed per-direction metadata for the conflicts panel
+          });
+          out.affectedMods.add(srcId);
+          out.affectedMods.add(tgtId);
+          out.totalConflicts++;
+        }
+      }
+
+      return out;
+    }
+
+    // --- Add Conflict Indicators + "Conflicts" Toggle/Panel to Existing Cards ---
+    // For each affected mod we:
+    //   1. Insert a warning triangle next to the title (red if any conflict has severity "breaks",
+    //      yellow if all are soft "conflicts"). Tooltip shows ONLY the names of conflicting mods.
+    //   2. Insert a "Conflicts" toggle next to the existing "Changelog" / "Reason" link.
+    //   3. Inject a hidden `.conflicts-content` panel after the existing toggleable panels with the
+    //      detailed per-pair declarations (severity, who declared it, version range, installed version).
+    function addConflictIndicatorsToCards() {
+      if (!conflictResults || conflictResults.totalConflicts === 0) return;
+
+      // Helper: best-effort name lookup using both the mod-name map and rendered card titles.
+      function resolveModName(otherModId) {
+        let name = modIdToNameMap.get(otherModId);
+        if (!name) {
+          const otherCard = document.querySelector(`.result-card[data-project-id="${otherModId}"]`);
+          const titleLink = otherCard && otherCard.querySelector('.mod-title a');
+          if (titleLink) {
+            name = titleLink.textContent.trim();
+            modIdToNameMap.set(otherModId, name);
+          }
+        }
+        return name || 'Unknown mod';
+      }
+
+      // SVG: filled-style triangle whose stroke color comes from CSS (.conflict-icon.severity-*).
+      const triangleSvg = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+             class="warning-triangle-icon">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+          <line x1="12" y1="9" x2="12" y2="13"></line>
+          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>`;
+
       for (const modId of conflictResults.affectedMods) {
         const card = document.querySelector(`.result-card[data-project-id="${modId}"]`);
-        if (!card) {
-          continue;
-        }
+        if (!card) continue;
+        if (card.querySelector('.conflict-tooltip-container')) continue; // already injected
 
-        // Check if conflict indicator already exists
-        if (card.querySelector('.conflict-tooltip-container')) {
-          continue;
-        }
-
-        // Find conflicts involving this mod
         const modConflicts = conflictResults.conflictPairs.filter(pair =>
           pair.modId === modId || pair.conflictingModId === modId
         );
+        if (modConflicts.length === 0) continue;
 
-        if (modConflicts.length > 0) {
-          // Build tooltip text showing conflicting mods
-          const conflictingMods = modConflicts.map(pair => {
-            const otherModId = pair.modId === modId ? pair.conflictingModId : pair.modId;
+        // Pick the worst severity for this card; "breaks" wins.
+        const cardSeverity = modConflicts.some(p => p.severity === 'breaks') ? 'breaks' : 'conflicts';
 
-            // Try to get name from modIdToNameMap first
-            let modName = modIdToNameMap.get(otherModId);
+        // Tooltip: just the names of the other mods (no version ranges/installed versions per request).
+        const conflictNames = [...new Set(modConflicts.map(pair => {
+          const otherModId = pair.modId === modId ? pair.conflictingModId : pair.modId;
+          return resolveModName(otherModId);
+        }))].join(', ');
 
-            // If not found, try to get it from the card title
-            if (!modName) {
-              const otherCard = document.querySelector(`.result-card[data-project-id="${otherModId}"]`);
-              if (otherCard) {
-                const titleLink = otherCard.querySelector('.mod-title a');
-                if (titleLink) {
-                  modName = titleLink.textContent.trim();
-                  // Update the map for future use
-                  modIdToNameMap.set(otherModId, modName);
-                }
-              }
-            }
+        // Inject the warning triangle next to the title.
+        const indicator = document.createElement('span');
+        indicator.className = `conflict-tooltip-container conflict-severity-${cardSeverity}`;
+        indicator.innerHTML = `
+          <span class="conflict-icon severity-${cardSeverity}" aria-hidden="true">${triangleSvg}</span>
+          <span class="conflict-tooltip">Conflicts with: ${conflictNames}</span>
+        `;
+        const modTitleDiv = card.querySelector('.mod-title');
+        if (modTitleDiv) {
+          const firstTag = modTitleDiv.querySelector('.mod-title-tag, .dependency-tooltip-container');
+          if (firstTag) {
+            modTitleDiv.insertBefore(indicator, firstTag);
+          } else {
+            modTitleDiv.appendChild(indicator);
+          }
+        }
 
-            return modName || 'Unknown mod';
-          }).join(', ');
+        // Build the detailed conflicts panel HTML from each pair's declarations.
+        const panelRows = modConflicts.map(pair => {
+          const otherModId = pair.modId === modId ? pair.conflictingModId : pair.modId;
+          const otherName = resolveModName(otherModId);
+          const decls = (pair.declarations || []).map(d => {
+            const declaredByThis = d.byProjectId === modId;
+            const verb = 'is incompatible with';
+            const sentence = declaredByThis
+              ? `This mod ${verb} <strong>${otherName}</strong>`
+              : `<strong>${otherName}</strong> ${verb} this mod`;
+            const rangeText = (d.versionRange && d.versionRange !== '*')
+              ? ` at version <code>${d.versionRange}</code>`
+              : '';
+            const installedText = d.targetInstalledVersion
+              ? ` (updating to <code>${d.targetInstalledVersion}</code>)`
+              : '';
+            const sourceTag = '';
+            return `
+              <li class="conflict-declaration severity-${d.bySeverity}">
+                <span class="conflict-severity-pill severity-${d.bySeverity}">${d.bySeverity === 'breaks' ? 'BREAKS' : 'CONFLICTS'}</span>
+                <span class="conflict-sentence">${sentence}${rangeText}${installedText}${sourceTag}</span>
+              </li>`;
+          }).join('');
+          return `
+            <div class="conflict-pair severity-${pair.severity}">
+              <div class="conflict-pair-header">
+                <span class="conflict-pair-title">${otherName}</span>
+              </div>
+              <ul class="conflict-declaration-list">${decls}</ul>
+            </div>`;
+        }).join('');
 
-          // Create conflict indicator HTML
-          const conflictIndicator = document.createElement('span');
-          conflictIndicator.className = 'conflict-tooltip-container';
-          conflictIndicator.innerHTML = `
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--warning-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="warning-triangle-icon">
-                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                <line x1="12" y1="9" x2="12" y2="13"></line>
-                <line x1="12" y1="17" x2="12.01" y2="17"></line>
-              </svg>
-              <span class="conflict-tooltip">Conflicts with: ${conflictingMods}</span>
-            `;
+        // Inject (or update) the hidden conflicts panel inside the card.
+        let conflictsContent = card.querySelector('.conflicts-content');
+        if (!conflictsContent) {
+          conflictsContent = document.createElement('div');
+          conflictsContent.className = 'conflicts-content';
+          card.appendChild(conflictsContent);
+        }
+        conflictsContent.innerHTML = panelRows;
 
-          // Find the mod title and add the conflict indicator
-          const modTitleDiv = card.querySelector('.mod-title');
-          if (modTitleDiv) {
-            // Insert after any existing icons but before tags
-            const firstTag = modTitleDiv.querySelector('.mod-title-tag, .dependency-tooltip-container');
-            if (firstTag) {
-              modTitleDiv.insertBefore(conflictIndicator, firstTag);
-            } else {
-              modTitleDiv.appendChild(conflictIndicator);
-            }
+        // Inject a "Conflicts" toggle next to "Changelog" / "Reason".
+        if (!card.querySelector('.conflicts-toggle')) {
+          const toggle = document.createElement('div');
+          toggle.className = `mod-meta-item conflicts-toggle severity-${cardSeverity}`;
+          toggle.title = 'Click to view conflict details';
+          toggle.textContent = 'Conflicts';
+          toggle.addEventListener('click', () => {
+            conflictsContent.classList.toggle('visible');
+            toggle.classList.toggle('active');
+          });
+
+          const togglesHost = card.querySelector('.mod-meta-toggles');
+          const reasonToggle = card.querySelector('.changelog-toggle');
+          if (togglesHost) {
+            // Success card: append to the dedicated toggles row (after Changelog).
+            togglesHost.appendChild(toggle);
+          } else if (reasonToggle && reasonToggle.parentElement) {
+            // Warning card: insert immediately after the existing "Reason" toggle.
+            reasonToggle.parentElement.insertBefore(toggle, reasonToggle.nextSibling);
+          } else {
+            card.appendChild(toggle);
           }
         }
       }
@@ -5322,7 +6111,6 @@
     function setupResultSections() {
       const copyIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="m5 15-1 0c-1.1 0-2-.9-2-2l0-9c0-1.1.9-2 2-2l9 0c1.1 0 2 .9 2 2l0 1"></path></svg>`;
       const sortIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="7,10 12,5 17,10"></polyline><polyline points="7,14 12,19 17,14"></polyline></svg>`;
-      const ignoreIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M4.93 4.93l14.14 14.14"></path></svg>`;
       const checkboxIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><polyline points="9 11 12 14 16 10"></polyline></svg>`;
 
       resultsArea.innerHTML = `
@@ -5415,6 +6203,8 @@
                   <div class="sort-option" data-sort="project_type" data-filter="modpack">Modpacks</div>
                   <div class="sort-option" data-sort="project_type" data-filter="resourcepack">Resource Packs</div>
                   <div class="sort-option" data-sort="project_type" data-filter="shader">Shaders</div>
+                  <div class="sort-option" data-sort="project_type" data-filter="datapack">Data Packs</div>
+                  <div class="sort-option" data-sort="project_type" data-filter="plugin">Plugins</div>
                 </div>
               </div>
               <div class="sort-option has-submenu">
@@ -5525,6 +6315,8 @@
                   <div class="sort-option" data-sort="project_type" data-filter="modpack">Modpacks</div>
                   <div class="sort-option" data-sort="project_type" data-filter="resourcepack">Resource Packs</div>
                   <div class="sort-option" data-sort="project_type" data-filter="shader">Shaders</div>
+                  <div class="sort-option" data-sort="project_type" data-filter="datapack">Data Packs</div>
+                  <div class="sort-option" data-sort="project_type" data-filter="plugin">Plugins</div>
                 </div>
               </div>
             </div>
@@ -5540,164 +6332,23 @@
     </div>
   `;
 
-      // --- Ignore Mode Functionality (Global Scope) ---
-      let isIgnoreMode = false;
+      // --- Per-mod Ignore State (driven by Bulk Actions Mode) ---
+      // The legacy section-level "ignore mode" UI was removed; ignore status is now
+      // toggled per-mod through the bulk-actions bar, which writes directly to
+      // window.ignoredMods.
       let ignoredMods = new Set();
-      // Make ignoredMods globally accessible
       window.ignoredMods = ignoredMods;
 
-      // Function to handle download or ignore button clicks
+      // Gate download-link clicks: ignored mods do nothing, others proceed normally.
       window.handleDownloadOrIgnore = function (event, projectId) {
-        if (isIgnoreMode) {
-          // In ignore mode, always toggle ignore status, never download
-          event.preventDefault();
-          event.stopPropagation();
-          window.toggleIgnoreStatus(projectId);
-          return false;
-        } else if (!ignoredMods.has(projectId)) {
-          // In normal mode for non-ignored mods: allow normal download
-          // Don't prevent default - let the normal link behavior work
-          return true;
-        } else {
-          // Ignored mods in normal mode do nothing (button is disabled)
-          event.preventDefault();
-          event.stopPropagation();
-          return false;
-        }
-      };
-
-      // Function to toggle ignore status of a specific mod
-      window.toggleIgnoreStatus = function (projectId) {
-        const card = document.querySelector(`[data-project-id="${projectId}"]`);
-        const btn = card.querySelector('.download-link');
-
-        if (!card || !btn) {
-          console.error('Could not find card or button for project ID:', projectId);
-          return;
-        }
-
         if (ignoredMods.has(projectId)) {
-          // Un-ignore
-          ignoredMods.delete(projectId);
-          card.classList.remove('ignored');
-          btn.textContent = 'Download';
-          btn.classList.remove('ignored-state');
-        } else {
-          // Ignore
-          ignoredMods.add(projectId);
-          card.classList.add('ignored');
-          btn.textContent = 'Ignored';
-          btn.classList.add('ignored-state');
+          event.preventDefault();
+          event.stopPropagation();
+          return false;
         }
-
-        window.updateDownloadCounters();
+        return true;
       };
 
-      // Function to update download counters excluding ignored mods
-      window.updateDownloadCounters = function () {
-        try {
-          // Check if successfulDownloads exists and is accessible
-          if (typeof successfulDownloads !== 'undefined' && successfulDownloads) {
-            const nonIgnoredDownloads = successfulDownloads.filter(dl => {
-              // Exclude both ignored mods and .mrpack files from bulk downloads
-              const isIgnored = window.ignoredMods && window.ignoredMods.has(dl.projectId);
-              const isMrpackFile = dl.isMrpackFile === true;
-              return !isIgnored && !isMrpackFile;
-            });
-
-            // Update Download All button text more reliably
-            const downloadAllBtn = document.querySelector('.action-button');
-            if (downloadAllBtn) {
-              const svgContent = downloadAllBtn.querySelector('svg');
-              const svgHTML = svgContent ? svgContent.outerHTML : '';
-              downloadAllBtn.innerHTML = `Download All (${nonIgnoredDownloads.length})\n          ${svgHTML}`;
-            }
-
-            // Update all size info elements
-            const sizeInfoElements = document.querySelectorAll('.download-size-info');
-            if (sizeInfoElements.length > 0) {
-              if (nonIgnoredDownloads.length > 0) {
-                const totalSizeBytes = nonIgnoredDownloads.reduce(
-                  (sum, file) => sum + (file.fileSize || 0),
-                  0
-                );
-                const formattedSize = formatBytes(totalSizeBytes);
-
-                // Update Download All and Download ZIP size info (same size)
-                sizeInfoElements.forEach((sizeInfo, index) => {
-                  if (index < 2) { // First two are Download All and Download ZIP
-                    sizeInfo.textContent = formattedSize;
-                  }
-                  // The third one (.mrpack) keeps its original tiny size
-                });
-              } else {
-                // If no mods to download, show 0 bytes
-                sizeInfoElements.forEach((sizeInfo, index) => {
-                  if (index < 2) { // First two are Download All and Download ZIP
-                    sizeInfo.textContent = '0 Bytes';
-                  }
-                });
-              }
-            }
-          }
-        } catch (error) {
-          console.error('Error updating download counters:', error);
-        }
-      };
-
-      // Function to toggle ignore mode for the found section
-      function toggleIgnoreMode() {
-        isIgnoreMode = !isIgnoreMode;
-        const ignoreModeBtn = document.getElementById('ignore-found-btn');
-        const sectionElement = document.getElementById('results-found');
-
-        if (isIgnoreMode) {
-          ignoreModeBtn.classList.add('ignore-mode-active');
-          sectionElement.classList.add('ignore-mode-active');
-        } else {
-          ignoreModeBtn.classList.remove('ignore-mode-active');
-          sectionElement.classList.remove('ignore-mode-active');
-        }
-
-        // Transform all download buttons in the found section
-        const downloadLinks = document.querySelectorAll('#results-found .download-link');
-        downloadLinks.forEach(btn => {
-          const projectId = btn.dataset.projectId;
-          const isIgnored = ignoredMods.has(projectId);
-
-          if (isIgnoreMode) {
-            // In ignore mode: remove download functionality
-            btn.classList.add('ignore-mode');
-            btn.classList.remove('ignored-state');
-            btn.textContent = isIgnored ? 'Un-ignore' : 'Ignore';
-            if (isIgnored) btn.classList.add('ignored');
-
-            // Store original href and remove it to prevent accidental downloads
-            if (!btn.dataset.originalHref && btn.href !== '#') {
-              btn.dataset.originalHref = btn.href;
-            }
-            btn.href = '#';
-            btn.removeAttribute('download');
-          } else {
-            // In normal mode: restore download functionality
-            btn.classList.remove('ignore-mode', 'ignored');
-            if (isIgnored) {
-              btn.classList.add('ignored-state');
-              btn.textContent = 'Ignored';
-              btn.href = '#';
-              btn.removeAttribute('download');
-            } else {
-              btn.classList.remove('ignored-state');
-              btn.textContent = 'Download';
-
-              // Restore original href if it exists
-              if (btn.dataset.originalHref) {
-                btn.href = btn.dataset.originalHref;
-              }
-            }
-          }
-        });
-      }
 
 
 
@@ -5854,30 +6505,52 @@
             showCustomAlert('No mods selected. Please select mods to download.', 'notice');
             return;
           }
-          
-          // Filter out ignored mods
-          const modsToDownload = Array.from(window.selectedModsForBulk).filter(projectId => {
-            return !window.ignoredMods || !window.ignoredMods.has(projectId);
+
+          // Map the selection to actual downloadable entries. We exclude ignored mods
+          // and .mrpack files (those aren't individual downloads).
+          const downloadsToProcess = successfulDownloads.filter(dl => {
+            if (!window.selectedModsForBulk.has(dl.projectId)) return false;
+            if (dl.isMrpackFile === true) return false;
+            if (window.ignoredMods && window.ignoredMods.has(dl.projectId)) return false;
+            return true;
           });
-          
-          if (modsToDownload.length === 0) {
-            showCustomAlert('All selected mods are ignored. Please unignore them first or select different mods.', 'notice');
+
+          if (downloadsToProcess.length === 0) {
+            showCustomAlert('No downloadable files for the selected mods. They may all be ignored.', 'notice');
             return;
           }
-          
-          for (const projectId of modsToDownload) {
-            const card = document.querySelector(`.result-card[data-project-id="${projectId}"]`);
-            if (card) {
-              const downloadLink = card.querySelector('.download-link');
-              if (downloadLink && downloadLink.href && downloadLink.href !== '#') {
-                // Temporarily remove bulk mode to allow download
-                const wasBulkMode = window.isBulkActionsMode;
-                window.isBulkActionsMode = false;
-                downloadLink.click();
-                window.isBulkActionsMode = wasBulkMode;
-                await new Promise(resolve => setTimeout(resolve, 100));
-              }
+
+          // Reuse the status element under the Download All / ZIP / mrpack button group
+          // if it exists; otherwise just skip the status updates.
+          const statusEl = document.querySelector('#results-found .download-status-bar');
+          if (statusEl) {
+            statusEl.textContent = `Downloading ${downloadsToProcess.length} file${downloadsToProcess.length !== 1 ? 's' : ''}...`;
+            statusEl.classList.remove('success', 'error');
+          }
+
+          // Mirror the "Download All" pattern: create a fresh anchor for each file
+          // instead of .click()-ing the card's link. This avoids racing with the
+          // bulk-selection click listener (which previously required toggling
+          // window.isBulkActionsMode off mid-loop) and matches the pacing that
+          // browsers tolerate for multiple automatic downloads.
+          for (let i = 0; i < downloadsToProcess.length; i++) {
+            const dl = downloadsToProcess[i];
+            const link = document.createElement('a');
+            link.href = dl.url;
+            link.setAttribute('download', dl.filename);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            if (statusEl) {
+              statusEl.textContent = `Downloading ${i + 1} / ${downloadsToProcess.length}...`;
             }
+            await new Promise(resolve => setTimeout(resolve, 300));
+          }
+
+          if (statusEl) {
+            statusEl.textContent = `✓ Downloaded ${downloadsToProcess.length} file${downloadsToProcess.length !== 1 ? 's' : ''}`;
+            statusEl.classList.remove('error');
+            statusEl.classList.add('success');
           }
         });
       }
@@ -6088,25 +6761,11 @@
         otherDropdown.classList.remove('show'); // Close other dropdown
       }
 
-      // Close dropdowns when clicking outside
-      document.addEventListener('click', (e) => {
-        if (!e.target.closest('.sort-dropdown-container')) {
-          sortFoundDropdown.classList.remove('show');
-          sortWarningDropdown.classList.remove('show');
-        }
-      });
-
-      // Prevent dropdown from closing when hovering over submenus
-      [sortFoundDropdown, sortWarningDropdown].forEach(dropdown => {
-        dropdown.addEventListener('mouseleave', (e) => {
-          // Small delay to allow moving to submenu
-          setTimeout(() => {
-            if (!dropdown.matches(':hover') && !dropdown.querySelector('.sort-submenu:hover')) {
-              // Could add additional logic here if needed
-            }
-          }, 100);
-        });
-      });
+      // Close dropdowns when clicking outside. Registered once at startup
+      // (see registerGlobalSortDropdownCloser below) to avoid stacking a new
+      // listener on every Update run, which previously leaked handlers that
+      // referenced stale DOM nodes from prior runs.
+      registerGlobalSortDropdownCloser();
 
       // Sort button click handlers
       sortFoundBtn.addEventListener('click', (e) => {
@@ -6637,7 +7296,7 @@
       }
 
       // First, check for duplicates.
-      if (!(result.status === "success" && renderedModIds.has(result.modId))) {
+      if (!(result.status === "success" && renderedArtifactIds.has(result.modId + '|' + result.project_type))) {
         // If it's NOT a duplicate (or it's a warning/failure), then we render it.
         const section = document.getElementById(sectionId);
         if (section) {
@@ -6647,6 +7306,7 @@
         // And if it was a new success, we add it to our tracking set.
         if (result.status === "success") {
           renderedModIds.add(result.modId);
+          renderedArtifactIds.add(result.modId + '|' + result.project_type);
         }
       }
     }
@@ -6658,19 +7318,7 @@
 
       resultCards.forEach(card => {
         // Check if this card has dependencies that include the projectId
-        const titleLink = card.querySelector('.mod-title a');
-        if (!titleLink) return;
-
-        const modTitle = titleLink.textContent;
-        let cardProjectId = null;
-
-        // Find this card's projectId
-        for (const [id, name] of modIdToNameMap.entries()) {
-          if (name === modTitle) {
-            cardProjectId = id;
-            break;
-          }
-        }
+        const cardProjectId = card.dataset.projectId;
 
         if (!cardProjectId || !reverseDependencyMap.has(cardProjectId)) {
           return;
@@ -6703,7 +7351,7 @@
         sectionCounts.failure === 0
       ) {
         resultsArea.innerHTML = `
-      <div class="results-section visible" style="text-align: center;">
+      <div class="results-section visible">
         <h2>No Mods Found</h2>
         <p style="line-height: 1.6;">
           We couldn't find any mods matching your selected criteria. This can happen if the mods you uploaded don't have versions available for the selected Minecraft version and loader.
@@ -6727,6 +7375,13 @@
 
         const actionsContainer = document.createElement("div");
         actionsContainer.className = "results-actions";
+
+        // Shared download status bar referenced by every button's onclick. Declared
+        // up-front (instead of after the buttons) so the closures don't depend on
+        // TDZ timing — the original code worked only because user clicks fired
+        // after the synchronous block finished.
+        const downloadStatusBar = document.createElement("p");
+        downloadStatusBar.className = "download-status-bar";
 
         // --- Create a dedicated container for the "Download All" button and its size ---
         const downloadAllGroup = document.createElement("div");
@@ -6766,7 +7421,7 @@
           }
 
           downloadStatusBar.textContent = `Downloading ${downloadsToProcess.length} file${downloadsToProcess.length !== 1 ? 's' : ''}...`;
-          downloadStatusBar.className = "download-status-bar";
+          downloadStatusBar.classList.remove('success', 'error');
 
           let i = 0;
           function downloadNext() {
@@ -6783,7 +7438,8 @@
               setTimeout(downloadNext, 300);
             } else {
               downloadStatusBar.textContent = `✓ Downloaded ${downloadsToProcess.length} file${downloadsToProcess.length !== 1 ? 's' : ''}`;
-              downloadStatusBar.className = "download-status-bar success";
+              downloadStatusBar.classList.remove('error');
+              downloadStatusBar.classList.add('success');
             }
           }
           downloadNext();
@@ -6834,10 +7490,7 @@
         actionsContainer.appendChild(downloadZipGroup);
         actionsContainer.appendChild(downloadPackGroup);
         foundSection.appendChild(actionsContainer);
-
-        // Shared download status bar (shown below all buttons after any download action)
-        const downloadStatusBar = document.createElement("p");
-        downloadStatusBar.className = "download-status-bar";
+        // Status bar (declared above) goes below the action buttons.
         foundSection.appendChild(downloadStatusBar);
 
         // --- Calculate and add the size info to all button groups ---
@@ -6883,21 +7536,20 @@
               minecraft: mcVersionSelect.value,
               [officialLoaderName]: "*",
             },
-            files: nonIgnoredDownloads.map((dl) => ({
-              path: dl.path,
-              files: successfulDownloads.map(file => ({
-                path: file.path,
-                hashes: file.hashes,
-                env: {
-                  client: file.client_side,
-                  server: file.server_side,
-                },
-                downloads: [file.url],
-                fileSize: file.fileSize,
-              })),
-              env: {}
-            })),
-          };
+          // Use the same shape as createModpack() so the displayed size matches the
+          // actual .mrpack the user will download. The previous nested-files form
+          // produced an N x N manifest and inflated the displayed size dramatically.
+          files: nonIgnoredDownloads.map((dl) => ({
+            path: dl.path,
+            hashes: dl.hashes,
+            env: {
+              client: dl.client_side,
+              server: dl.server_side,
+            },
+            downloads: [dl.url],
+            fileSize: dl.fileSize,
+          })),
+        };
 
           // Calculate actual manifest size
           const manifestJson = JSON.stringify(manifest, null, 2);
@@ -6923,20 +7575,6 @@
         const failureSection = document.getElementById("results-failure");
         if (failureSection) failureSection.style.display = "none";
       }
-    }
-
-    // Check if all sections are empty after processing
-    if (
-      sectionCounts.found === 0 &&
-      sectionCounts.warning === 0 &&
-      sectionCounts.failure === 0
-    ) {
-      resultsArea.innerHTML = `
-            <div class="results-section visible">
-              <h2>Search Complete</h2>
-              <p>We couldn't find any information for the mods in your list on Modrinth. They may be from another source like CurseForge, or the files may be corrupt.</p>
-            </div>
-          `;
     }
 
     // --- Update Dependency Chain on Existing Card ---
@@ -7012,7 +7650,7 @@
         }" target="_blank" rel="noopener noreferrer" class="mod-icon-link">
         <img src="${mod.icon_url || DEFAULT_MOD_ICON
         }" alt="${mod.title
-        } icon" class="mod-icon" onerror="this.src=DEFAULT_MOD_ICON">
+        } icon" class="mod-icon" onerror="this.src=window.DEFAULT_MOD_ICON">
       </a>
       <div class="mod-details">
         <div class="mod-title">
@@ -7021,7 +7659,7 @@
 
           ${mod.isDependency
           ? `<span class="dependency-tooltip-container">
-                   <span class="mod-title-tag dependency-tag"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="puzzle-dependency-icon"><path d="M15.39 4.39a1 1 0 0 0 1.68-.474 2.5 2.5 0 1 1 3.014 3.015 1 1 0 0 0-.474 1.68l1.683 1.682a2.414 2.414 0 0 1 0 3.414L19.61 15.39a1 1 0 0 1-1.68-.474 2.5 2.5 0 1 0-3.014 3.015 1 1 0 0 1 .474 1.68l-1.683 1.682a2.414 2.414 0 0 1-3.414 0L8.61 19.61a1 1 0 0 0-1.68.474 2.5 2.5 0 1 1-3.014-3.015 1 1 0 0 0 .474-1.68l-1.683-1.682a2.414 2.414 0 0 1 0-3.414L4.39 8.61a1 1 0 0 1 1.68.474 2.5 2.5 0 1 0 3.014-3.015 1 1 0 0 1-.474-1.68l1.683-1.682a2.414 2.414 0 0 1 3.414 0z"/></svg></span>
+                   <span class="mod-title-tag dependency-tag"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="puzzle-dependency-icon"><path d="M15.39 4.39a1 1 0 0 0 1.68-.474 2.5 2.5 0 1 1 3.014 3.015 1 1 0 0 0-.474 1.68l1.683 1.682a2.414 2.414 0 0 1 0 3.414L19.61 15.39a1 1 0 0 0-1.68-.474 2.5 2.5 0 1 0-3.014 3.015 1 1 0 0 0 .474 1.68l-1.683 1.682a2.414 2.414 0 0 1-3.414 0L8.61 19.61a1 1 0 0 0-1.68.474 2.5 2.5 0 1 1-3.014-3.015 1 1 0 0 0 .474-1.68l-1.683-1.682a2.414 2.414 0 0 1 0-3.414L4.39 8.61a1 1 0 0 1 1.68.474 2.5 2.5 0 1 0 3.014-3.015 1 1 0 0 1-.474-1.68l1.683-1.682a2.414 2.414 0 0 1 3.414 0z"/></svg></span>
                    <span class="dependency-tooltip">Required by: ${(() => {
             // Look up which mod requires this dependency
             return dependencyMap.get(mod.projectId) || 'Unknown';
@@ -7114,13 +7752,10 @@
         );
         if (!selectedVersion) return;
 
-        let primaryFile = selectedVersion.files.find((f) => f.primary);
-        if (!primaryFile && selectedVersion.files.length > 0) {
-          primaryFile = selectedVersion.files[0];
-        }
+        const primaryFile = selectArtifactFile(selectedVersion, mod.project_type);
 
         // Remove previous version from downloads list if it exists
-        const existingDownloadIndex = successfulDownloads.findIndex(dl => dl.projectId === mod.projectId);
+        const existingDownloadIndex = successfulDownloads.findIndex(dl => dl.projectId === mod.projectId && dl.artifactType === mod.project_type);
         if (existingDownloadIndex > -1) {
           successfulDownloads.splice(existingDownloadIndex, 1);
         }
@@ -7129,24 +7764,16 @@
           downloadLink.href = primaryFile.url;
           downloadLink.setAttribute("download", primaryFile.filename);
 
-          // Define the folder path based on project type
-          let folderPath = "mods/";
-          if (mod.project_type === "resourcepack") {
-            folderPath = "resourcepacks/";
-          } else if (mod.project_type === "shader") {
-            folderPath = "shaderpacks/";
-          }
-
           // --- Add new version to the list for bulk downloads ---
           successfulDownloads.push({
             projectId: mod.projectId,
             url: primaryFile.url,
             filename: primaryFile.filename,
-            projectType: mod.project_type,
+            artifactType: mod.project_type,
             fileSize: primaryFile.size,
             isMrpackFile: mod.isMrpackFile,
             // --- Data for .mrpack manifest ---
-            path: `${folderPath}${primaryFile.filename}`,
+            path: buildArtifactPath(mod.project_type, primaryFile.filename),
             hashes: primaryFile.hashes,
             client_side: mod.client_side,
             server_side: mod.server_side,
@@ -7160,7 +7787,7 @@
         // Hide all channel link containers first
         Object.values(listLinks).forEach((link) => (link.parentElement.style.display = "none"));
 
-        const versionUrl = `${mod.project_url}/version/${selectedVersion.version_number}`;
+        const versionUrl = `${mod.project_url}/version/${selectedVersion.id}`;
         const versionType = selectedVersion.version_type; // 'release', 'beta', or 'alpha'
 
         // Update the correct link
@@ -7212,7 +7839,7 @@
 
       updateDynamicContent();
 
-      // --- Add ignore mode event handler to download link ---
+      // --- Block download clicks on ignored mods ---
       downloadLink.addEventListener('click', (event) => {
         window.handleDownloadOrIgnore(event, mod.projectId);
       });
@@ -7465,7 +8092,7 @@
       card.innerHTML = `
     <div class="result-card-main">
       <a href="${mod.project_url}" target="_blank" rel="noopener noreferrer" class="mod-icon-link">
-        <img src="${mod.icon_url || DEFAULT_MOD_ICON}" alt="${mod.title} icon" class="mod-icon" onerror="this.src=DEFAULT_MOD_ICON">
+        <img src="${mod.icon_url || DEFAULT_MOD_ICON}" alt="${mod.title} icon" class="mod-icon" onerror="this.src=window.DEFAULT_MOD_ICON">
       </a>
       <div class="mod-details">
         <div class="mod-title">
@@ -7649,8 +8276,11 @@
     }
 
     // Extract probable mod name from a filename like "appleskin-fabric-mc1.20.3-2.5.1"
+    // Returns "" for missing input — never throws — because failure-result rendering
+    // depends on this and a single throw here previously aborted the entire results pass.
     function cleanModFileName(filename) {
-      return filename
+      if (!filename) return "";
+      return String(filename)
         .replace(/\.(jar|zip)$/i, "")
         .replace(/-(fabric|forge|neoforge|quilt)(-mc)?[\d.]+.*$/i, "")
         .replace(/-v?[\d.]+(-[\w]+)?$/i, "")
@@ -7703,7 +8333,7 @@
       const both =
         '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h8"/><path d="M10 19v-3.96 3.15"/><path d="M7 19h5"/><rect width="6" height="10" x="16" y="12" rx="2"/></svg>';
       const clientIcon =
-        '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" xmlns="http://www.w3.org/2000/svg" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>';
+        '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" xmlns="http://www.w3.org/2000/svg" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 002 2z" /></svg>';
       const serverIcon =
         '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" x2="2" y1="12" y2="12" /><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" /><line x1="6" x2="6.01" y1="16" y2="16" /><line x1="10" x2="10.01" y1="16" y2="16" /></svg>';
 
@@ -7771,6 +8401,9 @@
         }
       };
 
+      if (!icons[projectType]) {
+        console.warn(`Unknown project_type: "${projectType}". Falling back to mod icon.`);
+      }
       return icons[projectType] || icons.mod; // Default to mod icon if type not found
     }
 
@@ -7813,18 +8446,12 @@
 
       if (statusEl) {
         statusEl.textContent = `Downloading ${downloadsToProcess.length} file${downloadsToProcess.length !== 1 ? 's' : ''}...`;
-        statusEl.className = 'download-status-info';
+        statusEl.classList.remove('success', 'error');
       }
 
       try {
         zipButton.innerHTML = 'Creating ZIP...';
         zipButton.disabled = true;
-
-        const folderMap = {
-          'mod': 'mods',
-          'resourcepack': 'resourcepacks',
-          'shader': 'shaderpacks'
-        };
 
         let failedCount = 0;
         for (let i = 0; i < downloadsToProcess.length; i++) {
@@ -7836,8 +8463,8 @@
             const response = await fetch(dl.url);
             if (response.ok) {
               const blob = await response.blob();
-              const folderName = folderMap[dl.projectType] || 'mods'; // Default to 'mods'
-              zip.file(`${folderName}/${dl.filename}`, blob);
+              const entryPath = buildArtifactPath(dl.artifactType || dl.projectType, dl.filename);
+              zip.file(entryPath, blob);
             } else {
               failedCount++;
               console.warn(`Failed to download ${dl.filename}`, response.status, response.statusText);
@@ -7867,14 +8494,16 @@
           } else {
             statusEl.textContent = `✓ Downloaded ${succeeded} file${succeeded !== 1 ? 's' : ''} • ${zipSizeMB}`;
           }
-          statusEl.className = 'download-status-info success';
+          statusEl.classList.remove('error');
+          statusEl.classList.add('success');
         }
 
       } catch (error) {
         console.error("Error creating ZIP:", error);
         if (statusEl) {
           statusEl.textContent = 'Error creating ZIP file.';
-          statusEl.className = 'download-status-info error';
+          statusEl.classList.remove('success');
+          statusEl.classList.add('error');
         }
         showCustomAlert("Error creating ZIP file. Please check the console for details.", 'error');
       } finally {
@@ -7884,12 +8513,22 @@
         }
       }
     } // --- Create Modpack ---
-    function createModpack(statusEl) {
-      // Get custom modpack name and version from user
-      const packName = prompt("Enter modpack name:", "My Awesome Pack");
+    async function createModpack(statusEl) {
+      // Get custom modpack name and version from user via the custom prompt
+      // modal (replaces native `prompt()` for consistent UX with the rest of
+      // the app's modals).
+      const packName = await showCustomPrompt(
+        "Enter modpack name:",
+        "My Awesome Pack",
+        "Modpack Name"
+      );
       if (packName === null) return; // User cancelled
 
-      const packVersion = prompt("Enter modpack version:", "1.0.0");
+      const packVersion = await showCustomPrompt(
+        "Enter modpack version:",
+        "1.0.0",
+        "Modpack Version"
+      );
       if (packVersion === null) return; // User cancelled
 
       // Clean the pack name for filename (remove invalid characters, keep spaces)
@@ -7914,7 +8553,7 @@
       });
 
       if (filteredDownloads.length === 0) {
-        alert('No mods to include in modpack. All mods are currently ignored.');
+        showCustomAlert('No mods to include in modpack. All mods are currently ignored.', 'notice');
         return;
       }
 
@@ -7954,7 +8593,8 @@
 
         if (statusEl) {
           statusEl.textContent = `✓ Created ${filename} • ${filteredDownloads.length} mod${filteredDownloads.length !== 1 ? 's' : ''} included`;
-          statusEl.className = 'download-status-info success';
+          statusEl.classList.remove('error');
+          statusEl.classList.add('success');
         }
       });
     }
