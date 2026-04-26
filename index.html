@@ -3050,14 +3050,8 @@
       });
     }
 
-    // Artifact type configuration: single source of truth for folder path, file extensions,
-    // whether the user-selected mod loader gates compatibility, and (for loader-agnostic
-    // types) which Modrinth loader tags a version must declare to count as that artifact.
-    //
-    // `loaderTags` is important because a single Modrinth project can ship multiple
-    // artifact types under one project id (e.g. Veinminer publishes both a Fabric mod and
-    // a datapack). Without a tag filter, a datapack upload's version dropdown would show
-    // the mod versions too (and vice versa). Set to `null` for types we don't restrict.
+    // Artifact configuration: defines folder, extensions, loader requirements, and tags.
+    // loaderTags filter versions by type (e.g., datapack vs mod) for projects with multiple artifacts.
     const ARTIFACT_CONFIG = {
       mod:          { folder: 'mods',          exts: ['.jar'],    needsLoader: true,  loaderTags: null },
       plugin:       { folder: 'plugins',       exts: ['.jar'],    needsLoader: true,  loaderTags: null },
@@ -3072,11 +3066,7 @@
       .filter(([_, cfg]) => !cfg.needsLoader)
       .map(([type]) => type);
 
-    // Returns the destination folder for an artifact type, or `null` for types
-    // that should be placed at the archive root (modpacks). Unknown types fall
-    // back to 'mods' for safety. Note: do NOT use `||` here — modpack's folder
-    // is explicitly `null`, and `null || 'mods'` would route modpacks into the
-    // mods folder, which is not what we want.
+    // Returns the destination folder for an artifact type, or null for root placement (modpacks). Unknown types fall back to 'mods'.
     function getArtifactFolder(type) {
       const cfg = ARTIFACT_CONFIG[type];
       if (!cfg) return 'mods';
@@ -4074,14 +4064,7 @@
       event.target.value = null;
     });
 
-    // Detects and extracts "container" .zip archives — the same shape produced
-    // by our own "Download .zip" button (flat top-level folders: mods/, plugins/,
-    // datapacks/, resourcepacks/, shaderpacks/). When a container is detected,
-    // each inner .jar/.zip is returned as a fresh `File` object so the rest of
-    // the upload pipeline can treat it like an individually dropped file.
-    //
-    // Returns `File[]` if `file` is a container, `null` otherwise (including
-    // single-artifact zips — those are handled by `detectZipContentType`).
+    // Detects container .zip archives (flat folders: mods/, plugins/, datapacks/, resourcepacks/, shaderpacks/). Extracts inner files as File objects if container, otherwise returns null.
     async function extractContainerZip(file) {
       try {
         const zip = await JSZip.loadAsync(file);
@@ -4100,9 +4083,7 @@
           return null;
         }
 
-        // Derive allowed folder prefixes from the single source of truth so
-        // adding a new artifact type (e.g., "kubejs") in ARTIFACT_CONFIG is enough
-        // to teach this extractor about it automatically.
+        // Derive allowed folders from ARTIFACT_CONFIG for automatic support of new artifact types.
         const allowedFolders = new Set(
           Object.values(ARTIFACT_CONFIG)
             .map(cfg => cfg.folder)
@@ -4144,9 +4125,7 @@
         return;
       }
 
-      // Pre-pass: expand any "container" .zip files (the shape our own
-      // "Download .zip" button produces) into their inner artifacts. Loose
-      // .jar/.zip uploads mixed in alongside a container are preserved.
+      // Expand container .zip files into their inner artifacts.
       const containerCandidates = Array.from(files).filter(f => f.name.endsWith(".zip"));
       const expandedFiles = [];
       const expansionSummary = []; // [{ name, count }] for user-facing feedback
@@ -4353,12 +4332,35 @@
     document.getElementById("current-year").textContent =
       new Date().getFullYear();
     async function populateMcVersions() {
+      // Cache Minecraft versions for 24h to avoid unnecessary API calls
+      const MC_VERSIONS_CACHE_KEY = "modrinth_game_versions_cache";
+      const MC_VERSIONS_TTL = 1000 * 60 * 60 * 24; // 24 hours
+
       try {
-        const response = await fetchWithRetry(
-          "https://api.modrinth.com/v2/tag/game_version"
-        );
-        if (!response.ok) throw new Error("Failed to fetch MC versions after retries");
-        const versions = await response.json();
+        let versions = null;
+
+        // 1. Try the cache first. A fresh hit lets us skip the network call
+        try {
+          const cached = JSON.parse(localStorage.getItem(MC_VERSIONS_CACHE_KEY));
+          if (cached && Array.isArray(cached.versions) && Date.now() - cached.ts < MC_VERSIONS_TTL) {
+            versions = cached.versions;
+          }
+        } catch (_) { /* ignore corrupt cache */ }
+
+        // 2. Fall back to the network if the cache was missing or stale.
+        if (!versions) {
+          const response = await fetchWithRetry(
+            "https://api.modrinth.com/v2/tag/game_version"
+          );
+          if (!response.ok) throw new Error("Failed to fetch MC versions after retries");
+          versions = await response.json();
+          try {
+            localStorage.setItem(
+              MC_VERSIONS_CACHE_KEY,
+              JSON.stringify({ versions, ts: Date.now() })
+            );
+          } catch (_) { /* quota exceeded — non-fatal, dropdown still renders */ }
+        }
 
         // Filter for release versions and sort them numerically descending
         const releaseVersions = versions
@@ -4460,10 +4462,7 @@
         if (modalVersionSelect.options.length > 1) {
           modalVersionSelect.options[1].selected = true;
         }
-        // Sync modal selects with the main page selects now that the option lists
-        // are populated. (The DOMContentLoaded handler does this synchronously,
-        // but populateMcVersions is async so the modal select would otherwise
-        // still be empty when the sync runs there.)
+        // Sync modal selects with main page selects after options are populated
         modalLoaderSelect.value = modLoaderSelect.value;
         if (mcVersionSelect.value) modalVersionSelect.value = mcVersionSelect.value;
       } catch (error) {
@@ -4480,13 +4479,15 @@
 
     async function fetchModrinthStats() {
       const cacheKey = "modrinth_stats_cache";
-      const ttl = 1000 * 60 * 60 * 6; // 6 hours
+      const ttl = 1000 * 60 * 60 * 24; // 24 hours — stats banner is decorative;
+      // a same-day stale value is fine and saves an API call on every reload.
       const elProjects = document.getElementById("stat-projects");
       const elVersions = document.getElementById("stat-versions");
       const elFiles = document.getElementById("stat-files");
       const elAuthors = document.getElementById("stat-authors");
 
-      // 1. Show cached values immediately so the user never sees "—"
+      // Show cached stats immediately; skip refresh if cache is fresh
+      let cacheFresh = false;
       try {
         const cached = JSON.parse(localStorage.getItem(cacheKey));
         if (cached && Date.now() - cached.ts < ttl) {
@@ -4494,8 +4495,11 @@
           if (cached.versions != null) elVersions.textContent = cached.versions;
           if (cached.files != null) elFiles.textContent = cached.files;
           if (cached.authors != null) elAuthors.textContent = cached.authors;
+          cacheFresh = true;
         }
       } catch (_) { /* ignore corrupt cache */ }
+
+      if (cacheFresh) return;
 
       // 2. Refresh in background using the shared fetchWithRetry
       try {
@@ -4668,17 +4672,9 @@
     updateButton.addEventListener("click", handleUpdate);
 
     async function handleUpdate() {
-      // Combine jobs from both sources first.
-      //
-      // `.mrpack` files are *containers*: `processMrpack` already pulled out
-      // every inner mod's SHA1 and pushed them into `mrpackMods`, which the
-      // `mrpackJobs` block below turns into real hash lookups. The .mrpack
-      // file itself has no Modrinth-side identity for locally-generated packs
-      // (its hash won't match anything), so processing it as a separate job
-      // produced a misleading "Mod not found" failure card AND — because that
-      // failure result had no `title` — crashed `createFailureCard` mid-render,
-      // killing the entire results pass. We simply drop .mrpack entries from
-      // the job list; the user-visible pill stays since it's purely UI.
+      // .mrpack files are containers; processMrpack already extracted their inner mods.
+      // The .mrpack file itself has no Modrinth identity, so we exclude it from jobs
+      // to avoid "not found" failures and rendering crashes.
       const fileJobs = Array.from(uploadedFiles.values())
         .filter((file) => !file.name.endsWith(".mrpack"))
         .map((file) => ({
@@ -4769,11 +4765,7 @@
             processedProjectIds.add(result.projectId || result.modId);
             allInitialResults.push(result);
 
-            // Track the TARGET version (the one the user is updating to) for conflict context.
-            // We intentionally prefer `targetVersion` over the uploaded `installedVersion` because
-            // conflicts should reflect the post-update world, not the pre-update one. For warning
-            // results (no compatible target version) we still fall back to the installed version so
-            // the panel has *something* to show.
+            // Store target version for conflict context (fallback to installed for warnings)
             if ((result.status === "success" || result.status === "warning") && result.projectId) {
               const contextVersion = result.targetVersion || result.installedVersion;
               if (contextVersion) {
@@ -4861,10 +4853,6 @@
           const progressPercentage = Math.min((completedJobs / jobs.length) * 50, 50);
           progressBar.style.width = `${progressPercentage}%`;
 
-          // Add a small delay to let the UI update and show the new results
-          if (allJobs.length > 0) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-          }
         }
 
         // Complete the progress bar and create summary
@@ -4876,9 +4864,12 @@
         const totalInitialDependencies = dependencyQueue.length;
         let dependenciesProcessed = 0;
 
+        let depthLevel = 0;
         while (dependencyQueue.length > 0) {
-          const currentBatchIds = dependencyQueue.splice(0, 25); // Process in batches
-          statusMessage.textContent = `Resolving dependencies... (${dependenciesProcessed}/${totalInitialDependencies} initial, ${dependencyQueue.length} in queue)`;
+          // Process entire dependency queue per depth level to minimize API calls
+          const currentBatchIds = dependencyQueue.splice(0);
+          depthLevel++;
+          statusMessage.textContent = `Resolving dependencies... (depth ${depthLevel}, ${currentBatchIds.length} in this wave, ${dependenciesProcessed}/${totalInitialDependencies} initial processed)`;
 
           const dependencyJobs = currentBatchIds.map(depId => ({
             type: 'id',
@@ -4952,18 +4943,11 @@
           const processedDependencyCount = Array.from(allDependencies).filter(id => processedProjectIds.has(id)).length;
           const depProgressPercentage = 50 + (Math.min(processedDependencyCount / (totalDependencies || 1), 1) * 45);
           progressBar.style.width = `${depProgressPercentage}%`;
-
-          if (dependencyQueue.length > 0) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-          }
         }
 
-        // Conflict detection is driven purely by each mod's TARGET-version Modrinth metadata
-        // (version-level `dependencies[].dependency_type === "incompatible"`). Uploaded-JAR
-        // `breaks`/`conflicts`/`incompatible` declarations are intentionally ignored because
-        // the user is moving AWAY from those JARs, so their declarations describe a world the
-        // user isn't staying in. incompatibleMap is populated above and again during the
-        // dependency-resolution pass below.
+        // Conflict detection uses only target-version Modrinth metadata (incompatible dependencies)
+        // Uploaded JAR declarations are ignored since users are moving away from those versions
+        // incompatibleMap is populated during dependency resolution
 
         // Phase 3: Analyze conflicts after all mods are processed
         statusMessage.textContent = "Analyzing mod conflicts...";
@@ -5196,8 +5180,10 @@
         return cachedResults;
       }
 
-      // Process uncached jobs through normal pipeline
-      const freshResults = await processBatchUncached(uncachedJobs, loader, gameVersion);
+      // Process uncached jobs through normal pipeline. Thread the pre-computed
+      // hashMap through so `processBatchUncached` can reuse hashes instead of
+      // re-running SHA1 over every uploaded JAR a second time.
+      const freshResults = await processBatchUncached(uncachedJobs, loader, gameVersion, hashMap);
 
       // Cache the fresh results
       for (const result of freshResults) {
@@ -5220,23 +5206,28 @@
       return [...cachedResults, ...freshResults];
     }
 
-    async function processBatchUncached(uncachedJobs, loader, gameVersion) {
+    async function processBatchUncached(uncachedJobs, loader, gameVersion, hashMap = null) {
       // Step 1: Collect all hashes and project IDs
       const hashJobs = [];
       const projectIdJobs = [];
       const fileJobs = [];
 
+      // Compute any missing hashes in parallel for performance
+      const jobsNeedingHash = uncachedJobs.filter(job =>
+        (job.type === "file" || job.type === "mrpack") &&
+        !(hashMap && hashMap.has(job))
+      );
+      const fallbackHashes = await Promise.all(
+        jobsNeedingHash.map(async job => ({ job, hash: await calculateFileHash(job.data) }))
+      );
+      const fallbackHashMap = new Map(fallbackHashes.map(fh => [fh.job, fh.hash]));
+
+      const getHash = (job) =>
+        (hashMap && hashMap.get(job)) || fallbackHashMap.get(job) || null;
+
       for (const job of uncachedJobs) {
-        if (job.type === "file") {
-          const hash = await calculateFileHash(job.data);
-          if (hash) {
-            hashJobs.push({ job, hash });
-          } else {
-            fileJobs.push(job);
-          }
-        } else if (job.type === "mrpack") {
-          // For .mrpack files, we want to look up the modpack itself as a project
-          const hash = await calculateFileHash(job.data);
+        if (job.type === "file" || job.type === "mrpack") {
+          const hash = getHash(job);
           if (hash) {
             hashJobs.push({ job, hash });
           } else {
@@ -5260,11 +5251,12 @@
 
       const projectsData = await batchProjectLookup(allProjectIds);
 
-      // Step 4: Batch author lookups
-      const authorData = await batchAuthorLookup(projectsData);
-
-      // Step 5: Batch version lookups for compatible versions
-      const versionData = await batchVersionLookup(projectsData, loader, gameVersion);
+      // Steps 4 + 5: Parallel batch lookups for authors and versions.
+      // Both depend only on `projectsData`, so running concurrently reduces latency.
+      const [authorData, versionData] = await Promise.all([
+        batchAuthorLookup(projectsData),
+        batchVersionLookup(projectsData, loader, gameVersion),
+      ]);
 
       // Step 6: Combine results
       return await combineResults(uncachedJobs, hashResults, projectsData, authorData, versionData, gameVersion);
@@ -5383,36 +5375,82 @@
     }
 
     // --- Batch Version Lookup Function ---
-    // Modrinth has no batch endpoint that returns *all* versions for a list of
-    // projects, so we do still issue one request per project. Previously these
-    // were fired with a single `Promise.all`, which fanned out N parallel
-    // connections and trivially blew through the 300 req/min rate limit on
-    // larger modpacks. We now process them in fixed-size waves so the burstiness
-    // is bounded regardless of input size.
-    const VERSION_LOOKUP_CONCURRENCY = 8;
+    // Flattens all version IDs from projectsData and looks them up via batch /v2/versions endpoint.
+    // This reduces N per-project requests to ~N/500 chunked requests.
+    // Note: Downloads all versions (no server filtering) and sorts by date_published to maintain latest-first order.
+    const VERSION_LOOKUP_CHUNK_SIZE = 500; // URL-safe batch size for /v2/versions
+    const VERSION_LOOKUP_CONCURRENCY = 16;  // chunks in flight at a time
     async function batchVersionLookup(projectsData, loader, gameVersion) {
       const projectIds = Object.keys(projectsData);
       if (projectIds.length === 0) return {};
 
-      const lookupOne = async (projectId) => {
+      // Collect every known version ID across every project. We prime the
+      // per-project bucket map up front so projects with zero versions still
+      // get a defined entry (downstream code expects `allVersions: []`, not
+      // `undefined`).
+      const versionsByProject = new Map();
+      const allVersionIds = [];
+      for (const projectId of projectIds) {
+        versionsByProject.set(projectId, []);
+        const vids = Array.isArray(projectsData[projectId]?.versions)
+          ? projectsData[projectId].versions
+          : [];
+        for (const vid of vids) allVersionIds.push(vid);
+      }
+
+      // Chunk the version IDs into URL-safe groups and fetch them in waves.
+      const chunks = [];
+      for (let i = 0; i < allVersionIds.length; i += VERSION_LOOKUP_CHUNK_SIZE) {
+        chunks.push(allVersionIds.slice(i, i + VERSION_LOOKUP_CHUNK_SIZE));
+      }
+
+      const fetchChunk = async (chunk) => {
+        if (chunk.length === 0) return [];
+        const idsParam = JSON.stringify(chunk);
+        const response = await fetchWithRetry(
+          `https://api.modrinth.com/v2/versions?ids=${encodeURIComponent(idsParam)}`
+        );
+        if (!response.ok) return [];
+        return await response.json();
+      };
+
+      for (let i = 0; i < chunks.length; i += VERSION_LOOKUP_CONCURRENCY) {
+        const wave = chunks.slice(i, i + VERSION_LOOKUP_CONCURRENCY);
+        const waveResults = await Promise.all(wave.map(fetchChunk));
+        for (const versions of waveResults) {
+          for (const v of versions) {
+            if (!v || !v.project_id) continue;
+            const bucket = versionsByProject.get(v.project_id);
+            if (bucket) bucket.push(v);
+          }
+        }
+      }
+
+      // Sort each project's versions newest-first. The old per-project
+      // endpoint returned them in that order implicitly; downstream consumers
+      // (e.g. `versions.find(v => v.version_type === "release")` used as the
+      // "latest release" picker) depend on it.
+      for (const bucket of versionsByProject.values()) {
+        bucket.sort((a, b) => {
+          const da = Date.parse(a.date_published) || 0;
+          const db = Date.parse(b.date_published) || 0;
+          return db - da;
+        });
+      }
+
+      // Apply the same per-project compatibility-status logic as the old
+      // implementation so the return shape is byte-for-byte identical.
+      const out = {};
+      for (const projectId of projectIds) {
         const project = projectsData[projectId];
         const isMod = project.project_type === 'mod';
+        const allVersions = versionsByProject.get(projectId) || [];
 
-        const allVersionsUrl = `https://api.modrinth.com/v2/project/${projectId}/version`;
-        const response = await fetchWithRetry(allVersionsUrl);
-
-        let allVersions = [];
-        if (response.ok) {
-          allVersions = await response.json();
-        }
-
-        // Filter for compatible versions based on project type
         const compatibleVersions = allVersions.filter(v => {
           const gameVersionMatch = v.game_versions.includes(gameVersion);
           return isMod ? (v.loaders.includes(loader) && gameVersionMatch) : gameVersionMatch;
         });
 
-        // Analyze what's available for precise error messages
         const hasGameVersion = allVersions.some(v => v.game_versions.includes(gameVersion));
         // For non-mods, we can pretend the loader is always compatible to avoid wrong errors.
         const hasLoader = !isMod || allVersions.some(v => v.loaders.includes(loader));
@@ -5433,28 +5471,17 @@
           }
         }
 
-        return {
+        out[projectId] = {
           projectId,
           versions: compatibleVersions,
           allVersions,
           compatibilityStatus,
           hasGameVersion,
-          hasLoader
+          hasLoader,
         };
-      };
-
-      // Process project IDs in fixed-size waves to cap concurrency.
-      const results = [];
-      for (let i = 0; i < projectIds.length; i += VERSION_LOOKUP_CONCURRENCY) {
-        const chunk = projectIds.slice(i, i + VERSION_LOOKUP_CONCURRENCY);
-        const chunkResults = await Promise.all(chunk.map(lookupOne));
-        results.push(...chunkResults);
       }
 
-      return results.reduce((acc, result) => {
-        acc[result.projectId] = result;
-        return acc;
-      }, {});
+      return out;
     }
 
     // --- Results Combination Function ---
@@ -5524,12 +5551,7 @@
           let versions = versionInfo.versions || [];
           let compatibilityStatus = versionInfo.compatibilityStatus;
 
-          // For loader-agnostic artifact types, bypass the user-selected mod loader
-          // filter but still constrain versions to those whose Modrinth `loaders`
-          // tag matches the artifact kind. A single Modrinth project can ship
-          // multiple artifact types (e.g. Veinminer publishes both a Fabric mod
-          // and a datapack); without the `loaderTags` filter a datapack upload's
-          // version dropdown would surface the mod versions too.
+          // For loader-agnostic artifacts, filter versions by matching loader tags to the correct artifact type.
           if (artifactType && ARTIFACT_CONFIG[artifactType] && !ARTIFACT_CONFIG[artifactType].needsLoader) {
             const loaderTags = ARTIFACT_CONFIG[artifactType].loaderTags;
             versions = (versionInfo.allVersions || []).filter(v => {
@@ -5727,11 +5749,8 @@
       return { name: "unknown", url: "#" };
     }
 
-    // --- Get Mod ID from JAR ---
-    // Returns: { id, name, version }
-    // We only consume `version` downstream (for the up-to-date comparison and as a fallback
-    // for warning results where no target version exists). `id`/`name` are kept because they
-    // come for free from the same parse and are useful for debugging.
+    // Extracts mod metadata from JAR files.
+    // Returns { id, name, version } - only version is used downstream.
     async function getModIdFromJar(jarFile) {
       try {
         const zip = await JSZip.loadAsync(jarFile);
@@ -5775,19 +5794,14 @@
       try {
         const zip = await JSZip.loadAsync(file);
 
-        // `zip.folder()` always returns a truthy wrapper and `zip.file(/regex/)`
-        // always returns an array (truthy even when empty), so we check the real
-        // file map instead.
+        // `zip.folder()` and `zip.file(/regex/)` are unreliable; check the file map directly.
         const paths = Object.keys(zip.files);
         const hasAssets = paths.some(p => p.startsWith("assets/"));
         const hasData = paths.some(p => p.startsWith("data/"));
         const hasShaders = paths.some(p => p.startsWith("shaders/"));
         const hasPackMcmeta = !!zip.file("pack.mcmeta");
 
-        // Check for mod manifests FIRST. Users sometimes rename a mod `.jar`
-        // to `.zip`; without this check the `hasAssets` fallback below would
-        // misclassify any Fabric mod (which ships lang files under `assets/`)
-        // as a resource pack.
+        // Prioritize mod manifests to avoid misclassifying mods as resource packs when renamed to .zip
         const hasModManifest =
           !!zip.file("fabric.mod.json") ||
           !!zip.file("quilt.mod.json") ||
@@ -5811,9 +5825,7 @@
           return "shader";
         }
 
-        // Fallbacks for unusual packs without pack.mcmeta. `data/` is a strong
-        // datapack signal; `assets/` alone is ambiguous but most commonly a
-        // resource pack at this point (mods were already caught above).
+        // Fallback: prioritize datapack if data/ exists, otherwise resourcepack
         if (hasData) return "datapack";
         if (hasAssets) return "resourcepack";
 
@@ -5825,6 +5837,7 @@
     }
 
     // --- Version Comparison Helpers ---
+
     // Semver-aware: treats "1.0.0" > "1.0.0-rc1" > "1.0.0-beta" > "1.0.0-alpha".
     // Build metadata after `+` is ignored per semver spec.
     function compareVersions(a, b) {
@@ -5895,6 +5908,7 @@
     }
 
     // --- Analyze Conflicts Function ---
+
     // Decoupled from DOM: takes the authoritative list of processed results.
     // Each conflict pair carries severity ("breaks" | "conflicts") so the UI can color/sort them.
     function analyzeConflicts(allInitialResults) {
@@ -5928,11 +5942,8 @@
           const srcName = modIdToNameMap.get(srcId) || srcId;
           const tgtName = modIdToNameMap.get(tgtId) || tgtId;
 
-          // Conflicts now come exclusively from each TARGET version's Modrinth metadata
-          // (`dependencies[].dependency_type === "incompatible"`), so every declaration here
-          // is a single forward-direction "modrinth-api" entry with default "breaks" severity.
-          // No version-range gating is needed because the target version itself was already
-          // resolved against the user's selected MC version and loader.
+          // All conflicts are derived from target version metadata (Modrinth API),
+          // representing forward "breaks" declarations without version range gating.
           const declarations = [{
             direction: 'forward',
             bySeverity: 'breaks',
@@ -5945,12 +5956,7 @@
             source: 'modrinth-api',
           }];
 
-          // Modrinth's project-level dependency metadata exposes only a single
-          // `incompatible` flag (no breaks/conflicts split), so every declaration
-          // produced above has bySeverity === 'breaks'. The previous branched
-          // pair-severity calculation could never reach the 'conflicts' arm —
-          // collapsed here to a constant for clarity. If we ever start ingesting
-          // a richer source, restore the `some(...) ? 'breaks' : 'conflicts'`.
+          // Modrinth only provides a single `incompatible` flag, so all declarations are 'breaks'.
           const pairSeverity = 'breaks';
 
           out.conflictPairs.push({
@@ -5971,12 +5977,8 @@
     }
 
     // --- Add Conflict Indicators + "Conflicts" Toggle/Panel to Existing Cards ---
-    // For each affected mod we:
-    //   1. Insert a warning triangle next to the title (red if any conflict has severity "breaks",
-    //      yellow if all are soft "conflicts"). Tooltip shows ONLY the names of conflicting mods.
-    //   2. Insert a "Conflicts" toggle next to the existing "Changelog" / "Reason" link.
-    //   3. Inject a hidden `.conflicts-content` panel after the existing toggleable panels with the
-    //      detailed per-pair declarations (severity, who declared it, version range, installed version).
+
+    // For each affected mod, add conflict indicators, toggle, and detailed panel
     function addConflictIndicatorsToCards() {
       if (!conflictResults || conflictResults.totalConflicts === 0) return;
 
@@ -6333,9 +6335,8 @@
   `;
 
       // --- Per-mod Ignore State (driven by Bulk Actions Mode) ---
-      // The legacy section-level "ignore mode" UI was removed; ignore status is now
-      // toggled per-mod through the bulk-actions bar, which writes directly to
-      // window.ignoredMods.
+
+      // Ignore status is now toggled per-mod through the bulk-actions bar.
       let ignoredMods = new Set();
       window.ignoredMods = ignoredMods;
 
@@ -6528,11 +6529,7 @@
             statusEl.classList.remove('success', 'error');
           }
 
-          // Mirror the "Download All" pattern: create a fresh anchor for each file
-          // instead of .click()-ing the card's link. This avoids racing with the
-          // bulk-selection click listener (which previously required toggling
-          // window.isBulkActionsMode off mid-loop) and matches the pacing that
-          // browsers tolerate for multiple automatic downloads.
+          // Create fresh anchors for each file to avoid bulk-selection listener conflicts
           for (let i = 0; i < downloadsToProcess.length; i++) {
             const dl = downloadsToProcess[i];
             const link = document.createElement('a');
@@ -6745,6 +6742,7 @@
       }
 
       // --- Sort functionality ---
+
       const sortFoundBtn = document.getElementById("sort-found-btn");
       const sortFoundDropdown = document.getElementById("sort-found-dropdown");
       const sortWarningBtn = document.getElementById("sort-warning-btn");
@@ -6761,10 +6759,8 @@
         otherDropdown.classList.remove('show'); // Close other dropdown
       }
 
-      // Close dropdowns when clicking outside. Registered once at startup
-      // (see registerGlobalSortDropdownCloser below) to avoid stacking a new
-      // listener on every Update run, which previously leaked handlers that
-      // referenced stale DOM nodes from prior runs.
+      // Close dropdowns when clicking outside. Registered once at startup to prevent
+      // memory leaks from stacking listeners on each Update run.
       registerGlobalSortDropdownCloser();
 
       // Sort button click handlers
@@ -7376,10 +7372,7 @@
         const actionsContainer = document.createElement("div");
         actionsContainer.className = "results-actions";
 
-        // Shared download status bar referenced by every button's onclick. Declared
-        // up-front (instead of after the buttons) so the closures don't depend on
-        // TDZ timing — the original code worked only because user clicks fired
-        // after the synchronous block finished.
+        // Shared download status bar for all download button clicks.
         const downloadStatusBar = document.createElement("p");
         downloadStatusBar.className = "download-status-bar";
 
@@ -7536,9 +7529,7 @@
               minecraft: mcVersionSelect.value,
               [officialLoaderName]: "*",
             },
-          // Use the same shape as createModpack() so the displayed size matches the
-          // actual .mrpack the user will download. The previous nested-files form
-          // produced an N x N manifest and inflated the displayed size dramatically.
+          // Match manifest structure to createModpack() for accurate size display
           files: nonIgnoredDownloads.map((dl) => ({
             path: dl.path,
             hashes: dl.hashes,
@@ -8275,9 +8266,7 @@
       return card;
     }
 
-    // Extract probable mod name from a filename like "appleskin-fabric-mc1.20.3-2.5.1"
-    // Returns "" for missing input — never throws — because failure-result rendering
-    // depends on this and a single throw here previously aborted the entire results pass.
+    // Extract probable mod name from filename, return empty string if input is missing
     function cleanModFileName(filename) {
       if (!filename) return "";
       return String(filename)
@@ -8514,9 +8503,7 @@
       }
     } // --- Create Modpack ---
     async function createModpack(statusEl) {
-      // Get custom modpack name and version from user via the custom prompt
-      // modal (replaces native `prompt()` for consistent UX with the rest of
-      // the app's modals).
+      // Prompt user for modpack name and version
       const packName = await showCustomPrompt(
         "Enter modpack name:",
         "My Awesome Pack",
