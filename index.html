@@ -7123,7 +7123,8 @@
                 <div class="sort-submenu">
                   <div class="sort-option" data-sort="clientserver" data-filter="client">Client Only</div>
                   <div class="sort-option" data-sort="clientserver" data-filter="server">Server Only</div>
-                  <div class="sort-option" data-sort="clientserver" data-filter="both">Client & Server</div>
+                  <div class="sort-option" data-sort="clientserver" data-filter="both_required">Client &amp; Server</div>
+                  <div class="sort-option" data-sort="clientserver" data-filter="both_optional">Client or Server</div>
                 </div>
               </div>
               <div class="sort-option has-submenu">
@@ -7243,7 +7244,8 @@
                 <div class="sort-submenu">
                   <div class="sort-option" data-sort="clientserver" data-filter="client">Client Only</div>
                   <div class="sort-option" data-sort="clientserver" data-filter="server">Server Only</div>
-                  <div class="sort-option" data-sort="clientserver" data-filter="both">Client & Server</div>
+                  <div class="sort-option" data-sort="clientserver" data-filter="both_required">Client &amp; Server</div>
+                  <div class="sort-option" data-sort="clientserver" data-filter="both_optional">Client or Server</div>
                 </div>
               </div>
               <div class="sort-option has-submenu">
@@ -8167,7 +8169,8 @@
 
         for (let span of metaItems) {
           const text = span.textContent.trim().toLowerCase();
-          if (text === 'client & server') return 'both';
+          if (text === 'client & server') return 'both_required';
+          if (text === 'client or server') return 'both_optional';
           if (text === 'client-side') return 'client';
           if (text === 'server-side') return 'server';
         }
@@ -9560,9 +9563,9 @@
       else if (server === "required" && (client === "optional" || client === "unsupported")) {
         return { text: "Server-side", svg: serverIcon };
       }
-      // Both are optional (rare case, but treat as both supported)
+      // Both are optional (can run on either side, not required on both)
       else if (client === "optional" && server === "optional") {
-        return { text: "Client & Server", svg: both };
+        return { text: "Client or Server", svg: both };
       }
       // Client is optional, server is unsupported
       else if (client === "optional" && server === "unsupported") {
