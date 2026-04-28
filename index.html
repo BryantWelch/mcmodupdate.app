@@ -430,10 +430,14 @@
       margin: 0 1.5rem;
       /* Larger side margins */
       box-sizing: border-box;
-      overflow-x: hidden;
+      overflow: hidden;
       max-height: calc(100vh - 320px);
       /* Ensure it doesn't go beyond viewport, accounting for top position */
-      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      padding: 0;
+      background-color: #181829;
+      box-shadow: 0 14px 38px rgba(0, 0, 0, 0.34), 0 2px 10px rgba(0, 0, 0, 0.26);
     }
 
     .modal-overlay.visible {
@@ -471,16 +475,106 @@
       position: absolute;
       top: 1rem;
       right: 1rem;
-      background: none;
-      border: none;
-      font-size: 2rem;
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      font-size: 1.7rem;
       color: var(--secondary-text);
       cursor: pointer;
-      line-height: 1;
+      line-height: 0.9;
+      width: 2.35rem;
+      height: 2.35rem;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
     }
 
     .modal-close-button:hover {
       color: var(--primary-text);
+      background-color: var(--dropzone-hover-bg);
+      border-color: var(--gradient-start);
+      box-shadow: none;
+    }
+
+    .modal-close-button svg {
+      width: 17px;
+      height: 17px;
+      display: block;
+      stroke: currentColor;
+      stroke-width: 2.4;
+      stroke-linecap: round;
+      fill: none;
+    }
+
+    #info-modal .modal-content {
+      max-width: 760px;
+      width: min(760px, calc(100% - 2rem));
+      max-height: 84vh;
+      padding: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      background-color: #1e1e2f;
+      box-shadow: 0 14px 38px rgba(0, 0, 0, 0.34), 0 2px 10px rgba(0, 0, 0, 0.26);
+    }
+
+    #info-modal .info-modal-header {
+      position: relative;
+      padding: 1.6rem 4rem 1rem 1.75rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      background: #1e1e2f;
+    }
+
+    #info-modal .info-modal-header h2 {
+      margin: 0;
+      color: var(--primary-text);
+      font-size: 2rem;
+      line-height: 1.2;
+    }
+
+    #info-modal .info-modal-body {
+      padding: 1.15rem 1.75rem 1.5rem;
+      overflow-y: auto;
+      min-height: 0;
+      line-height: 1.58;
+      color: var(--secondary-text);
+      scrollbar-gutter: stable;
+    }
+
+    #info-modal .info-modal-body h3 {
+      margin: 1.45rem 0 0.65rem;
+      color: var(--primary-text);
+      font-size: 1.45rem;
+      font-weight: 650;
+    }
+
+    #info-modal .info-modal-body h3:not(:first-of-type) {
+      padding-top: 1rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    #info-modal .info-modal-body p {
+      margin: 0.5rem 0 0.95rem;
+    }
+
+    #info-modal .info-modal-body ul {
+      margin: 0.35rem 0 0.95rem;
+      padding-left: 1.35rem;
+    }
+
+    #info-modal .info-modal-body li {
+      margin-bottom: 0.12rem;
+      line-height: 1.25;
+    }
+
+    #info-modal #modal-close-button {
+      top: 1rem;
+      right: 1rem;
+      z-index: 2;
+      font-size: 0;
+      line-height: 0;
     }
 
     #alert-icon {
@@ -700,6 +794,7 @@
       /* Purple gradient color for search results */
       transition: all 0.2s ease;
       position: relative;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22);
     }
 
     .result-card.search:hover {
@@ -1168,6 +1263,11 @@
       flex-shrink: 0;
     }
 
+    /* Keep action controls aligned across cards in main results. */
+    #results-area .mod-actions {
+      width: 160px;
+    }
+
     .version-select {
       background-color: var(--pill-bg);
       border: 1px solid var(--border-color);
@@ -1211,6 +1311,19 @@
       text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
       box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
       transition: background-color 0.2s ease, border-color 0.2s ease;
+    }
+
+    #results-area .mod-actions .version-select,
+    #results-area .mod-actions .download-link {
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    #results-area .mod-actions .download-link {
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
     }
 
     .download-link:not(.bulk-select-mode):not(.ignored-state):hover {
@@ -1403,13 +1516,48 @@
     }
 
     #search-results-container {
-      margin-top: 1.5rem;
+      margin-top: 0;
       display: flex;
       flex-direction: column;
       gap: 1rem;
       /* Match the spacing used in main results sections */
       width: 100%;
       box-sizing: border-box;
+      padding: 1rem 1.25rem 0.5rem;
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+    }
+
+    #search-modal .modal-search-header {
+      position: relative !important;
+      z-index: 11;
+      background: #1e1e2f;
+      margin-bottom: 0 !important;
+      padding: 1.5rem 1.25rem 1rem !important;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.11) !important;
+    }
+
+    #search-modal .search-filter-controls {
+      gap: 0.55rem !important;
+    }
+
+    #search-modal .search-filter-controls select {
+      max-width: 128px !important;
+    }
+
+    #search-modal .modal-actions {
+      margin: 0;
+      padding: 0.5rem 1.25rem 1.25rem;
+    }
+
+    #search-modal #search-x-close-button {
+      top: 0.75rem;
+      right: 0.75rem;
+      z-index: 12;
+      transform: none;
+      font-size: 0;
+      line-height: 0;
     }
 
     /* Style for the "Add" button on search result cards */
@@ -1709,6 +1857,22 @@
     .bulk-actions-bar button.danger:hover {
       background-color: #d32f2f;
       border-color: #d32f2f;
+    }
+
+    #toggle-select-all-bulk-btn {
+      width: 96px;
+      text-align: center;
+    }
+
+    .bulk-actions-bar button.undo {
+      background-color: #2563eb;
+      color: white;
+      border-color: #2563eb;
+    }
+
+    .bulk-actions-bar button.undo:hover {
+      background-color: #1d4ed8;
+      border-color: #1d4ed8;
     }
 
     .bulk-actions-bar .bulk-selection-count {
@@ -2542,6 +2706,13 @@
       color: var(--error-color);
     }
 
+    .found-empty-inline-message {
+      display: none;
+      margin-top: 0.75rem;
+      color: var(--secondary-text);
+      font-size: 0.95rem;
+    }
+
     /* --- Info Button Styles --- */
     #info-button {
       /* Make the button larger without changing its shape */
@@ -2681,18 +2852,25 @@
   <!-- Info Modal -->
   <div id="info-modal" class="modal-overlay">
     <div class="modal-content">
-      <button id="modal-close-button" class="modal-close-button" title="Close help dialog">&times;</button>
+      <div class="info-modal-header">
+        <button id="modal-close-button" class="modal-close-button" title="Close help dialog" aria-label="Close help dialog">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M6 6L18 18M18 6L6 18"></path>
+          </svg>
+        </button>
+        <h2>Minecraft Mod Updater &amp; Builder</h2>
+      </div>
 
-      <h2>MC Mod Updater &amp; Builder</h2>
-      <p>
-        This tool helps you update your existing Minecraft mods or build a brand new mod list from scratch. It uses the
-        Modrinth API to find the latest compatible versions and can export your list as a standard Modrinth modpack.
-        Note: This tool only searches Modrinth - mods from CurseForge or other sources won't be found. Dependencies are
-        automatically detected and added to ensure your modpack works properly.
-      </p>
+      <div class="info-modal-body">
+        <p>
+          This tool helps you update your existing Minecraft mods or build a brand new mod list from scratch. It uses
+          the Modrinth API to find the latest compatible versions and can export your list as a standard Modrinth
+          modpack. Note: This tool only searches Modrinth - mods from CurseForge or other sources won't be found.
+          Dependencies are automatically detected and added to ensure your modpack works properly.
+        </p>
 
-      <h3>How to Use:</h3>
-      <ul>
+        <h3>How to Use:</h3>
+        <ul>
         <li><b>Loader / Version:</b> Select your desired mod loader (Fabric, Forge, NeoForge, Quilt) and target
           Minecraft version.</li>
         <li><b>Upload Files:</b> Drop a <code>.mrpack</code> file to load a modpack, or drag and drop your local
@@ -2784,13 +2962,14 @@
         <li><b>Version Selection:</b> Choose between Release, Beta, or Alpha versions for each mod</li>
         <li><b>Download Options:</b> Download individual mods or get everything as a ready-to-use <code>.mrpack</code>
           file</li>
-      </ul>
+        </ul>
 
-      <h3>Attributions:</h3>
-      <p>
-        This tool relies on the Modrinth API for all mod data. Please be aware of their ratelimits. The ratelimit is
-        currently 300 requests per minute. The application will automatically pause and resume to respect these limits.
-      </p>
+        <h3>Attributions:</h3>
+        <p>
+          This tool relies on the Modrinth API for all mod data. Please be aware of their ratelimits. The ratelimit is
+          currently 300 requests per minute. The application will automatically pause and resume to respect these limits.
+        </p>
+      </div>
     </div>
   </div>
 
@@ -2836,7 +3015,11 @@
   <!-- SEARCH MODAL BLOCK -->
   <div id="search-modal" class="modal-overlay">
     <div class="modal-content">
-      <button id="search-x-close-button" class="modal-close-button" title="Close search dialog">&times;</button>
+      <button id="search-x-close-button" class="modal-close-button" title="Close search dialog" aria-label="Close search dialog">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M6 6L18 18M18 6L6 18"></path>
+        </svg>
+      </button>
 
       <!-- Search header section with centered layout -->
       <div class="modal-search-header"
@@ -2855,7 +3038,7 @@
         <div class="search-filter-controls"
           style="display: flex; gap: 0.75rem; justify-content: center; margin-top: 1rem; flex-wrap: wrap;">
           <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
-            <label for="modal-loader-select" style="font-size: 0.9rem; color: var(--secondary-text);">Loader</label>
+            <label id="modal-loader-label" for="modal-loader-select" style="font-size: 0.9rem; color: var(--secondary-text);">Loader</label>
             <select id="modal-loader-select" autocomplete="off"
               title="Filter search results by mod loader compatibility"
               style="background-color: var(--bg-color); color: var(--primary-text); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.4rem 0.6rem; font-size: 0.9rem; max-width: 140px;">
@@ -2864,6 +3047,13 @@
               <option value="forge">Forge</option>
               <option value="neoforge">NeoForge</option>
               <option value="quilt">Quilt</option>
+            </select>
+          </div>
+          <div id="plugin-platform-filter" style="display: none; flex-direction: column; align-items: center; gap: 0.5rem;">
+            <label for="modal-platform-select" style="font-size: 0.9rem; color: var(--secondary-text);">Platform</label>
+            <select id="modal-platform-select" autocomplete="off"
+              title="Filter plugin search results by proxy platform compatibility"
+              style="background-color: var(--bg-color); color: var(--primary-text); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.4rem 0.6rem; font-size: 0.9rem; max-width: 140px;">
             </select>
           </div>
           <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
@@ -3008,6 +3198,20 @@
     // --- Global State ---
     let uploadedFiles = new Map();
     let successfulDownloads = [];
+    let successfulDownloadKeys = new Set();
+    let dependencyDependents = new Map(); // dependencyProjectId -> Set(parentProjectId)
+
+    function getSuccessfulDownloadKey(projectId, artifactType) {
+      return `${projectId}|${artifactType || "unknown"}`;
+    }
+
+    function trackDependencyParent(depId, parentProjectId) {
+      if (!depId || !parentProjectId) return;
+      if (!dependencyDependents.has(depId)) {
+        dependencyDependents.set(depId, new Set());
+      }
+      dependencyDependents.get(depId).add(parentProjectId);
+    }
     let sectionCounts = {};
     let renderedModIds = new Set();
     let renderedArtifactIds = new Set(); // Tracks (slug, artifactType) to allow multiple artifact types per project
@@ -3017,6 +3221,7 @@
     let welcomeMessageSnapshot = null; // Store the welcome message snapshot
     let apiCallCount = 0; // Track total API calls made
     let processingStartTime = 0; // Track when processing started
+    let pipelineMetrics = null; // Lightweight per-run metrics for fetch/resolve phases
     let resultsSectionsSetup = false; // Track if result sections have been set up
     let dependencyMap = new Map(); // Track which mod requires each dependency
     let reverseDependencyMap = new Map(); // Track what dependencies each mod has
@@ -3024,6 +3229,20 @@
     let modIdToNameMap = new Map(); // Track mod ID to name mapping
     let installedModVersions = new Map(); // Track installed version of each uploaded mod (projectId -> versionString)
     let conflictResults = null; // Populated by analyzeConflicts(); read by addConflictIndicatorsToCards() (top-level fn)
+
+    function trackDependencyRequirement(projectId, parentTitle) {
+      if (!projectId || !parentTitle) return;
+      if (!dependencyMap.has(projectId)) {
+        dependencyMap.set(projectId, new Set());
+      }
+      dependencyMap.get(projectId).add(parentTitle);
+    }
+
+    function getDependencyRequiredByText(projectId) {
+      const parents = dependencyMap.get(projectId);
+      if (!parents || parents.size === 0) return "Unknown";
+      return Array.from(parents).join(", ");
+    }
 
     // Default mod icon as a data URL
     const DEFAULT_MOD_ICON = 'data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGcgaWQ9Ik1pbmVjcmFmdCI+PHBhdGggZD0ibTIxIDFoLTE4YTIgMiAwIDAgMCAtMiAydjE4YTIgMiAwIDAgMCAyIDJoMThhMiAyIDAgMCAwIDItMnYtMThhMiAyIDAgMCAwIC0yLTJ6bS0xNSA4LjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYzYS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV6bTExIDhhLjUuNSAwIDAgMSAtLjUuNWgtMmEuNS41IDAgMCAxIC0uNS0uNXYtMS41aC00djEuNWEuNS41IDAgMCAxIC0uNS41aC0yYS41LjUgMCAwIDEgLS41LS41di01YS41LjUgMCAwIDEgLjUtLjVoMi41di0xLjVhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYxLjVoMi41YS41LjUgMCAwIDEgLjUuNXptMS04YS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXoiIGZpbGw9IiMzMDNjNDIiLz48L2c+PC9zdmc+';
@@ -3058,7 +3277,8 @@
       datapack:     { folder: 'datapacks',     exts: ['.zip'],    needsLoader: false, loaderTags: ['datapack'] },
       resourcepack: { folder: 'resourcepacks', exts: ['.zip'],    needsLoader: false, loaderTags: ['minecraft'] },
       shader:       { folder: 'shaderpacks',   exts: ['.zip'],    needsLoader: false, loaderTags: ['iris', 'optifine', 'canvas', 'vanilla'] },
-      modpack:      { folder: null,            exts: ['.mrpack'], needsLoader: false, loaderTags: null },
+      // Modpacks are still loader/version specific and should honor those filters.
+      modpack:      { folder: null,            exts: ['.mrpack'], needsLoader: true,  loaderTags: null },
     };
 
     // Backward-compatible: types that skip loader filtering
@@ -3066,10 +3286,11 @@
       .filter(([_, cfg]) => !cfg.needsLoader)
       .map(([type]) => type);
 
-    // Returns the destination folder for an artifact type, or null for root placement (modpacks). Unknown types fall back to 'mods'.
+    // Returns the destination folder for an artifact type, or null for root placement.
+    // Unknown types default to root to avoid silently placing ambiguous files in `mods/`.
     function getArtifactFolder(type) {
       const cfg = ARTIFACT_CONFIG[type];
-      if (!cfg) return 'mods';
+      if (!cfg) return null;
       return cfg.folder; // may be null for modpack — caller must handle
     }
 
@@ -3084,10 +3305,36 @@
     function selectArtifactFile(version, artifactType) {
       const cfg = ARTIFACT_CONFIG[artifactType];
       if (!cfg) return version.files.find(f => f.primary) || version.files[0];
-      const primaryMatch = version.files.find(f => f.primary && cfg.exts.some(ext => f.filename.endsWith(ext)));
+      const primaryMatch = version.files.find((f) => {
+        const lowerName = String(f.filename || "").toLowerCase();
+        return f.primary && cfg.exts.some((ext) => lowerName.endsWith(ext));
+      });
       if (primaryMatch) return primaryMatch;
-      const anyMatch = version.files.find(f => cfg.exts.some(ext => f.filename.endsWith(ext)));
+      const anyMatch = version.files.find((f) => {
+        const lowerName = String(f.filename || "").toLowerCase();
+        return cfg.exts.some((ext) => lowerName.endsWith(ext));
+      });
       return anyMatch || version.files[0];
+    }
+
+    function inferArtifactTypeFromVersionLoaders(currentType, versionLoaders = []) {
+      if (currentType !== "mod" || !Array.isArray(versionLoaders) || versionLoaders.length === 0) {
+        return currentType;
+      }
+
+      const modLoaderSet = new Set(MOD_LOADERS.map(l => l.value));
+      const pluginLoaderSet = new Set(PLUGIN_LOADERS.map(l => l.value));
+      const pluginPlatformSet = new Set(PLUGIN_PLATFORMS.map(l => l.value));
+
+      const hasModLoader = versionLoaders.some(l => modLoaderSet.has(l));
+      const hasPluginLoader = versionLoaders.some(l => pluginLoaderSet.has(l) || pluginPlatformSet.has(l));
+
+      // Reclassify only when this specific file version is plugin-only.
+      if (hasPluginLoader && !hasModLoader) {
+        return "plugin";
+      }
+
+      return currentType;
     }
 
     // --- DOM Element References ---
@@ -3124,8 +3371,241 @@
     const sortSelect = document.getElementById("sort-select");
     const projectTypeSelect = document.getElementById("project-type-select");
     const clearResultsButton = document.getElementById("clear-results-button");
+    const modalLoaderLabel = document.getElementById("modal-loader-label");
+    const pluginPlatformFilter = document.getElementById("plugin-platform-filter");
     const modalLoaderSelect = document.getElementById("modal-loader-select");
+    const modalPlatformSelect = document.getElementById("modal-platform-select");
     const modalVersionSelect = document.getElementById("modal-version-select");
+
+    const MOD_LOADERS = [
+      { value: "fabric", label: "Fabric" },
+      { value: "forge", label: "Forge" },
+      { value: "neoforge", label: "NeoForge" },
+      { value: "quilt", label: "Quilt" },
+    ];
+
+    const PLUGIN_LOADERS = [
+      { value: "paper", label: "Paper" },
+      { value: "spigot", label: "Spigot" },
+      { value: "purpur", label: "Purpur" },
+      { value: "bukkit", label: "Bukkit" },
+      { value: "folia", label: "Folia" },
+      { value: "sponge", label: "Sponge" },
+    ];
+
+    const PLUGIN_PLATFORMS = [
+      { value: "velocity", label: "Velocity" },
+      { value: "waterfall", label: "Waterfall" },
+      { value: "bungeecord", label: "BungeeCord" },
+      { value: "geyser", label: "Geyser Extension" },
+    ];
+
+    function hasLoaderOption(selectElement, value) {
+      return Array.from(selectElement.options).some(option => option.value === value);
+    }
+
+    function renderLoaderOptions(selectElement, options, allLabel = "All Loaders") {
+      selectElement.innerHTML = "";
+
+      const allOption = document.createElement("option");
+      allOption.value = "";
+      allOption.textContent = allLabel;
+      selectElement.appendChild(allOption);
+
+      options.forEach(({ value, label }) => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = label;
+        selectElement.appendChild(option);
+      });
+    }
+
+    function updateModalLoaderOptions(projectType, preferredLoaderValue = null, preferredPlatformValue = null) {
+      const isPluginSearch = projectType === "plugin";
+      const loaderOptions = isPluginSearch ? PLUGIN_LOADERS : MOD_LOADERS;
+      const previousLoaderValue = modalLoaderSelect.value;
+      const previousPlatformValue = modalPlatformSelect ? modalPlatformSelect.value : "";
+      const fallbackValue = isPluginSearch ? "" : modLoaderSelect.value;
+      const desiredLoaderValue = preferredLoaderValue ?? previousLoaderValue ?? "";
+      const desiredPlatformValue = preferredPlatformValue ?? previousPlatformValue ?? "";
+
+      renderLoaderOptions(modalLoaderSelect, loaderOptions, "All Loaders");
+
+      if (desiredLoaderValue && hasLoaderOption(modalLoaderSelect, desiredLoaderValue)) {
+        modalLoaderSelect.value = desiredLoaderValue;
+      } else if (fallbackValue && hasLoaderOption(modalLoaderSelect, fallbackValue)) {
+        modalLoaderSelect.value = fallbackValue;
+      } else {
+        modalLoaderSelect.value = "";
+      }
+
+      if (isPluginSearch) {
+        modalLoaderLabel.textContent = "Loader";
+        modalLoaderSelect.title = "Filter plugin search results by server loader compatibility";
+        if (pluginPlatformFilter && modalPlatformSelect) {
+          pluginPlatformFilter.style.display = "flex";
+          renderLoaderOptions(modalPlatformSelect, PLUGIN_PLATFORMS, "All Platforms");
+          if (desiredPlatformValue && hasLoaderOption(modalPlatformSelect, desiredPlatformValue)) {
+            modalPlatformSelect.value = desiredPlatformValue;
+          } else {
+            modalPlatformSelect.value = "";
+          }
+        }
+      } else {
+        modalLoaderLabel.textContent = "Loader";
+        modalLoaderSelect.title = "Filter search results by mod loader compatibility";
+        if (pluginPlatformFilter && modalPlatformSelect) {
+          pluginPlatformFilter.style.display = "none";
+          modalPlatformSelect.value = "";
+          modalPlatformSelect.innerHTML = "";
+        }
+      }
+    }
+
+    function getPluginCompatibilitySets() {
+      return {
+        pluginLoaderValues: new Set(PLUGIN_LOADERS.map(p => p.value)),
+        pluginPlatformValues: new Set(PLUGIN_PLATFORMS.map(p => p.value)),
+      };
+    }
+
+    function buildResolutionContext(job, artifactType, versionDetails, gameVersion) {
+      const { pluginLoaderValues, pluginPlatformValues } = getPluginCompatibilitySets();
+      const inferredVersionLoaders = versionDetails?.loaders || [];
+      const inferredPluginLoader = inferredVersionLoaders.find(l => pluginLoaderValues.has(l)) || null;
+      const inferredPluginPlatform = inferredVersionLoaders.find(l => pluginPlatformValues.has(l)) || null;
+      const selectedLoader = job?.constraints?.loader || (artifactType === "plugin" ? inferredPluginLoader : modLoaderSelect.value);
+      const selectedPlatform = job?.constraints?.platform || (artifactType === "plugin" ? inferredPluginPlatform : "");
+
+      return {
+        artifactType,
+        gameVersion,
+        selectedLoader,
+        selectedPlatform,
+        loaderDisplay: [selectedLoader, selectedPlatform].filter(Boolean).join(" + "),
+        pluginLoaderValues,
+        pluginPlatformValues,
+      };
+    }
+
+    async function fetchSearchEnvironmentSupport(projectId) {
+      try {
+        const response = await fetchWithRetry(
+          `https://api.modrinth.com/v2/search?query=&limit=1&facets=${encodeURIComponent(
+            JSON.stringify([[`project_id:${projectId}`]])
+          )}`
+        );
+        if (!response.ok) return null;
+        const data = await response.json();
+        const hit = data?.hits?.[0];
+        if (!hit) return null;
+        return {
+          client_side: hit.client_side || "unknown",
+          server_side: hit.server_side || "unknown",
+        };
+      } catch (_) {
+        return null;
+      }
+    }
+
+    async function resolveEnvironmentSupport(projectDetails, artifactType, job, versionDetails, envCache) {
+      let clientSide = projectDetails?.client_side || "unknown";
+      let serverSide = projectDetails?.server_side || "unknown";
+      if (clientSide !== "unknown" || serverSide !== "unknown") {
+        return { client_side: clientSide, server_side: serverSide };
+      }
+
+      // Search hits often carry accurate environment support even when project
+      // detail endpoints return unknown.
+      const hintedClient = job?.environmentHints?.client_side;
+      const hintedServer = job?.environmentHints?.server_side;
+      if (
+        (hintedClient && hintedClient !== "unknown") ||
+        (hintedServer && hintedServer !== "unknown")
+      ) {
+        return {
+          client_side: hintedClient || "unknown",
+          server_side: hintedServer || "unknown",
+        };
+      }
+
+      const projectId = projectDetails?.id;
+      if (projectId && envCache) {
+        if (!envCache.has(projectId)) {
+          envCache.set(projectId, fetchSearchEnvironmentSupport(projectId));
+        }
+        const searchEnv = await envCache.get(projectId);
+        if (searchEnv && (searchEnv.client_side !== "unknown" || searchEnv.server_side !== "unknown")) {
+          return searchEnv;
+        }
+      }
+
+      return { client_side: clientSide, server_side: serverSide };
+    }
+
+    function resolveVersionsForContext(versionInfo, context) {
+      const allVersions = versionInfo.allVersions || [];
+      let versions = versionInfo.versions || [];
+      let compatibilityStatus = versionInfo.compatibilityStatus;
+      const {
+        artifactType,
+        gameVersion,
+        selectedLoader,
+        selectedPlatform,
+        pluginLoaderValues,
+        pluginPlatformValues,
+      } = context;
+
+      // Loader-agnostic artifacts rely on artifact-specific loader tags.
+      if (artifactType && ARTIFACT_CONFIG[artifactType] && !ARTIFACT_CONFIG[artifactType].needsLoader) {
+        const loaderTags = ARTIFACT_CONFIG[artifactType].loaderTags;
+        versions = allVersions.filter(v => {
+          if (!v.game_versions.includes(gameVersion)) return false;
+          if (!loaderTags) return true;
+          return v.loaders.some(l => loaderTags.includes(l));
+        });
+        compatibilityStatus = versions.length > 0 ? 'compatible' : 'no-versions';
+        return { versions, compatibilityStatus };
+      }
+
+      // Plugins must stay within plugin ecosystem variants only.
+      if (artifactType === "plugin") {
+        const isPluginVariant = (v) => v.loaders.some(
+          l => pluginLoaderValues.has(l) || pluginPlatformValues.has(l)
+        );
+
+        versions = allVersions.filter(v => {
+          if (!v.game_versions.includes(gameVersion)) return false;
+          if (!isPluginVariant(v)) return false;
+          if (selectedLoader && !v.loaders.includes(selectedLoader)) return false;
+          if (selectedPlatform && !v.loaders.includes(selectedPlatform)) return false;
+          return true;
+        });
+
+        const pluginCandidateVersions = allVersions.filter(isPluginVariant);
+        const hasGameVersion = pluginCandidateVersions.some(v => v.game_versions.includes(gameVersion));
+        const hasLoader = !selectedLoader || pluginCandidateVersions.some(v => v.loaders.includes(selectedLoader));
+        const hasPlatform = !selectedPlatform || pluginCandidateVersions.some(v => v.loaders.includes(selectedPlatform));
+        const hasCombined = pluginCandidateVersions.some(v => {
+          if (!v.game_versions.includes(gameVersion)) return false;
+          if (selectedLoader && !v.loaders.includes(selectedLoader)) return false;
+          if (selectedPlatform && !v.loaders.includes(selectedPlatform)) return false;
+          return true;
+        });
+
+        if (hasCombined) {
+          compatibilityStatus = 'compatible';
+        } else if (!hasGameVersion) {
+          compatibilityStatus = 'wrong-version';
+        } else if (!hasLoader || !hasPlatform) {
+          compatibilityStatus = 'wrong-loader';
+        } else {
+          compatibilityStatus = 'separate-versions';
+        }
+      }
+
+      return { versions, compatibilityStatus };
+    }
 
     // --- UI LOGIC ---
     helpLink.addEventListener("click", () => {
@@ -3374,6 +3854,7 @@
     let currentFeaturedSort = "";
     let currentFeaturedProjectType = "";
     let hasRandomizedInitialFeatured = false;
+    let activeSearchRequestId = 0;
     const searchResultsPerPage = 20;
 
     function debounce(func, delay) {
@@ -3385,8 +3866,119 @@
       };
     }
 
+    function hasAnyExtension(filename, extensions) {
+      const lower = String(filename || "").toLowerCase();
+      return extensions.some((ext) => lower.endsWith(ext));
+    }
+
+    function getUploadFileKey(file) {
+      if (!file) return "";
+      if (file.__uploadKey) return file.__uploadKey;
+      const name = String(file.name || "unnamed");
+      const size = Number.isFinite(file.size) ? file.size : 0;
+      const lastModified = Number.isFinite(file.lastModified) ? file.lastModified : 0;
+      return `${name}|${size}|${lastModified}`;
+    }
+
+    function assignUploadFileKey(file, explicitKey = null) {
+      if (!file) return "";
+      const key = explicitKey || getUploadFileKey(file);
+      try {
+        Object.defineProperty(file, "__uploadKey", {
+          value: key,
+          writable: true,
+          configurable: true,
+        });
+      } catch (_) {
+        file.__uploadKey = key;
+      }
+      return key;
+    }
+
+    function normalizeUploadFilename(filename) {
+      return String(filename || "").trim().toLowerCase();
+    }
+
+    function isUploadedFileDuplicate(file) {
+      const incomingKey = getUploadFileKey(file);
+      if (uploadedFiles.has(incomingKey)) return true;
+
+      const incomingName = normalizeUploadFilename(file?.name);
+      const incomingSize = Number.isFinite(file?.size) ? file.size : null;
+      if (!incomingName) return false;
+
+      for (const existingFile of uploadedFiles.values()) {
+        const existingName = normalizeUploadFilename(existingFile?.name);
+        const existingSize = Number.isFinite(existingFile?.size) ? existingFile.size : null;
+
+        if (existingName !== incomingName) continue;
+
+        // Prefer exact name+size matching to avoid false positives when two
+        // different files share a basename.
+        if (incomingSize !== null && existingSize !== null) {
+          if (incomingSize === existingSize) return true;
+          continue;
+        }
+
+        // Fallback for edge cases where size metadata is unavailable.
+        if (existingName === incomingName) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function extractModrinthProjectIdFromUrl(url) {
+      if (!url) return null;
+      try {
+        const parsed = new URL(url);
+        const pathParts = parsed.pathname.split("/").filter(Boolean);
+
+        // Common CDN format: /data/{projectId}/versions/{versionId}/file.jar
+        const dataIdx = pathParts.findIndex((p) => p.toLowerCase() === "data");
+        if (dataIdx !== -1 && pathParts[dataIdx + 1]) {
+          return pathParts[dataIdx + 1];
+        }
+
+        // API/detail fallback: /v2/project/{idOrSlug} or /project/{idOrSlug}
+        const projectIdx = pathParts.findIndex((p) => p.toLowerCase() === "project");
+        if (projectIdx !== -1 && pathParts[projectIdx + 1]) {
+          return pathParts[projectIdx + 1];
+        }
+
+        // Query fallback used by some mirrors/proxies.
+        const queryId =
+          parsed.searchParams.get("project_id") ||
+          parsed.searchParams.get("projectId") ||
+          parsed.searchParams.get("id");
+        return queryId || null;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function buildMrpackSearchCandidates(filename) {
+      const base = String(filename || "")
+        .replace(/\.(jar|zip)$/i, "")
+        .toLowerCase();
+      const rawTokens = base.split(/[^a-z0-9]+/).filter(Boolean);
+      const ignoredTokens = new Set([
+        "fabric", "forge", "neoforge", "quilt", "paper", "spigot", "purpur", "bukkit", "folia",
+        "velocity", "waterfall", "bungeecord", "plugin", "modrinth", "release", "snapshot", "client", "server", "loader"
+      ]);
+      const isVersionLike = (token) =>
+        /^v?\d+(\.\d+)+([a-z0-9+\-\.]*)?$/i.test(token) ||
+        /^mc\d+(\.\d+)*$/i.test(token);
+      const filtered = rawTokens.filter((token) => !ignoredTokens.has(token) && !isVersionLike(token));
+      return {
+        slugCandidate: filtered[0] || null,
+        query: (filtered.slice(0, 3).join(" ") || rawTokens.slice(0, 2).join(" ")).trim(),
+      };
+    }
+
     async function performSearch(query, isLoadMore = false) {
       if (!query) {
+        activeSearchRequestId++;
         searchResultsContainer.innerHTML = "<p>Start typing to find mods.</p>";
         currentSearchQuery = "";
         currentSearchOffset = 0;
@@ -3396,10 +3988,12 @@
 
       // If this is a new search (not load more), reset everything
       if (!isLoadMore) {
+        activeSearchRequestId++;
         currentSearchQuery = query;
         currentSearchOffset = 0;
         searchResultsContainer.innerHTML = "<p>Searching...</p>";
       }
+      const requestId = activeSearchRequestId;
 
       // Build search URL with facets for loader and version filtering
       let searchUrl = `https://api.modrinth.com/v2/search?query=${encodeURIComponent(query)}&limit=${searchResultsPerPage}&offset=${currentSearchOffset}`;
@@ -3430,6 +4024,11 @@
         if (modalLoaderSelect.value) {
           facets.push(`["categories:${modalLoaderSelect.value}"]`);
         }
+
+        // For plugin searches, allow additional proxy/platform filtering.
+        if (projectType === "plugin" && modalPlatformSelect && modalPlatformSelect.value) {
+          facets.push(`["categories:${modalPlatformSelect.value}"]`);
+        }
         
         // Add version facet
         if (modalVersionSelect.value) {
@@ -3443,11 +4042,13 @@
       
       try {
         const response = await fetchWithRetry(searchUrl);
+        if (requestId !== activeSearchRequestId) return;
         const data = await response.json();
+        if (requestId !== activeSearchRequestId) return;
 
         // Enrich hits with full project details for unknown environments
         const enrichedHits = await enrichSearchHits(data.hits);
-
+        if (requestId !== activeSearchRequestId) return;
         // Store total results count
         totalSearchResults = data.total_hits;
 
@@ -3464,6 +4065,7 @@
         updateLoadMoreButton();
 
       } catch (error) {
+        if (requestId !== activeSearchRequestId) return;
         if (!isLoadMore) {
           searchResultsContainer.innerHTML = "<p>Error fetching search results.</p>";
         }
@@ -3476,12 +4078,14 @@
       try {
         // If this is a new featured load (not load more), reset everything
         if (!isLoadMore) {
+          activeSearchRequestId++;
           currentSearchOffset = 0;
           searchResultsContainer.innerHTML = "<p>Loading featured content...</p>";
           isShowingFeatured = true;
           currentFeaturedSort = sortBy;
           currentFeaturedProjectType = projectType;
         }
+        const requestId = activeSearchRequestId;
 
         // Build the API URL
         let searchUrl = `https://api.modrinth.com/v2/search?limit=${searchResultsPerPage}&offset=${currentSearchOffset}`;
@@ -3507,6 +4111,11 @@
           if (modalLoaderSelect.value) {
             facets.push(`["categories:${modalLoaderSelect.value}"]`);
           }
+
+          // For plugin featured results, allow additional proxy/platform filtering.
+          if (projectType === "plugin" && modalPlatformSelect && modalPlatformSelect.value) {
+            facets.push(`["categories:${modalPlatformSelect.value}"]`);
+          }
           
           // Add version facet from modal select
           if (modalVersionSelect.value) {
@@ -3520,11 +4129,13 @@
         }
 
         const response = await fetchWithRetry(searchUrl);
+        if (requestId !== activeSearchRequestId) return;
         const data = await response.json();
+        if (requestId !== activeSearchRequestId) return;
 
         // Enrich hits with full project details for unknown environments
         const enrichedHits = await enrichSearchHits(data.hits);
-
+        if (requestId !== activeSearchRequestId) return;
         // Store total results count
         totalSearchResults = data.total_hits;
 
@@ -3541,6 +4152,7 @@
         updateLoadMoreButton();
 
       } catch (error) {
+        if (requestId !== activeSearchRequestId) return;
         if (!isLoadMore) {
           searchResultsContainer.innerHTML = "<p>Error loading featured content.</p>";
         }
@@ -3733,6 +4345,7 @@
           const randomProjectType = getRandomProjectType();
           sortSelect.value = randomSort;
           projectTypeSelect.value = randomProjectType;
+          updateModalLoaderOptions(projectTypeSelect.value, modLoaderSelect.value);
           currentFeaturedSort = randomSort;
           currentFeaturedProjectType = randomProjectType;
           hasRandomizedInitialFeatured = true;
@@ -3762,6 +4375,7 @@
     });
 
     projectTypeSelect.addEventListener("change", () => {
+      updateModalLoaderOptions(projectTypeSelect.value);
       if (currentSearchQuery) {
         // If there's an active search, re-run the search with the new project type filter
         currentSearchOffset = 0;
@@ -4004,7 +4618,18 @@
         const artifactType = projectTypeSelect.value || mod.project_type;
 
         if (!searchedMods.has(projectId)) {
-          searchedMods.set(projectId, { title: title, artifactType: artifactType });
+          searchedMods.set(projectId, {
+            title: title,
+            artifactType: artifactType,
+            // Preserve plugin-specific filters so update resolution can pick
+            // the correct server artifact instead of falling back to page loader.
+            loaderFilter: artifactType === "plugin" ? (modalLoaderSelect.value || null) : null,
+            platformFilter: artifactType === "plugin" ? (modalPlatformSelect?.value || null) : null,
+            environmentHints: {
+              client_side: mod.client_side || "unknown",
+              server_side: mod.server_side || "unknown",
+            },
+          });
           createFilePill({ name: `${title} (Searched)` }, () => {
             searchedMods.delete(projectId);
             const btn = document.querySelector(`.add-mod-button[data-project-id="${projectId}"]`);
@@ -4068,17 +4693,19 @@
     async function extractContainerZip(file) {
       try {
         const zip = await JSZip.loadAsync(file);
+        const paths = Object.keys(zip.files);
+        const hasPath = (suffix) => paths.some(p => p.toLowerCase().endsWith(suffix.toLowerCase()));
 
         // Bail if this is a single-artifact zip: mod .jar renamed to .zip, or a
         // resource/data pack (pack.mcmeta at root). `detectZipContentType`
         // handles those cases downstream.
         if (
-          zip.file("fabric.mod.json") ||
-          zip.file("quilt.mod.json") ||
-          zip.file("META-INF/mods.toml") ||
-          zip.file("META-INF/neoforge.mods.toml") ||
-          zip.file("pack.mcmeta") ||
-          zip.file("modrinth.index.json") // .mrpack payload misnamed as .zip
+          hasPath("/fabric.mod.json") || hasPath("fabric.mod.json") ||
+          hasPath("/quilt.mod.json") || hasPath("quilt.mod.json") ||
+          hasPath("/meta-inf/mods.toml") || hasPath("meta-inf/mods.toml") ||
+          hasPath("/meta-inf/neoforge.mods.toml") || hasPath("meta-inf/neoforge.mods.toml") ||
+          hasPath("/pack.mcmeta") || hasPath("pack.mcmeta") ||
+          hasPath("/modrinth.index.json") || hasPath("modrinth.index.json") // .mrpack payload misnamed as .zip
         ) {
           return null;
         }
@@ -4089,17 +4716,41 @@
             .map(cfg => cfg.folder)
             .filter(Boolean)
         );
+        const allowedFoldersLower = new Set(Array.from(allowedFolders).map((f) => f.toLowerCase()));
+        // Common launcher/export wrappers that place artifacts under one extra root.
+        const knownLeadingWrappers = new Set(["overrides", ".minecraft", "minecraft", "instance"]);
 
         const extracted = [];
         for (const [path, entry] of Object.entries(zip.files)) {
           if (entry.dir) continue;
-          const parts = path.split("/");
-          if (parts.length !== 2) continue; // only accept exactly <folder>/<filename>
-          const [folder, innerName] = parts;
-          if (!allowedFolders.has(folder)) continue;
-          if (!innerName.endsWith(".jar") && !innerName.endsWith(".zip")) continue;
+          const parts = path.split("/").filter(Boolean);
+          if (parts.length < 2) continue;
+
+          // Safe acceptance shapes:
+          // - <folder>/<filename>
+          // - <wrapper>/<folder>/<filename> where wrapper is known
+          // - .../<folder>/<filename> under known wrappers (nested internals)
+          let folder = null;
+          let innerName = null;
+
+          if (parts.length === 2) {
+            [folder, innerName] = parts;
+          } else {
+            const first = parts[0].toLowerCase();
+            if (!knownLeadingWrappers.has(first)) continue;
+            const candidateFolder = parts[parts.length - 2];
+            const candidateName = parts[parts.length - 1];
+            folder = candidateFolder;
+            innerName = candidateName;
+          }
+
+          if (!allowedFoldersLower.has(String(folder).toLowerCase())) continue;
+          if (!hasAnyExtension(innerName, [".jar", ".zip"])) continue;
           const blob = await entry.async("blob");
-          extracted.push(new File([blob], innerName, { type: "application/octet-stream" }));
+          const extractedFile = new File([blob], innerName, { type: "application/octet-stream" });
+          // Preserve uniqueness even when different folders contain same basename.
+          assignUploadFileKey(extractedFile, `${file.name}::${path.toLowerCase()}`);
+          extracted.push(extractedFile);
         }
         return extracted.length > 0 ? extracted : null;
       } catch (e) {
@@ -4113,20 +4764,20 @@
 
       // Check if a .mrpack file is among the dropped files
       const mrpackFile = Array.from(files).find((file) =>
-        file.name.endsWith(".mrpack")
+        hasAnyExtension(file.name, [".mrpack"])
       );
 
       if (mrpackFile) {
         // If a modpack is found, clear everything and process only the pack.
         clearDropzone();
         // Add the .mrpack file itself to uploadedFiles so it can be updated as a whole package
-        uploadedFiles.set(mrpackFile.name, mrpackFile);
+        uploadedFiles.set(assignUploadFileKey(mrpackFile), mrpackFile);
         processMrpack(mrpackFile);
         return;
       }
 
       // Expand container .zip files into their inner artifacts.
-      const containerCandidates = Array.from(files).filter(f => f.name.endsWith(".zip"));
+      const containerCandidates = Array.from(files).filter((f) => hasAnyExtension(f.name, [".zip"]));
       const expandedFiles = [];
       const expansionSummary = []; // [{ name, count }] for user-facing feedback
       const processingPills = []; // temp UI pills shown during extraction
@@ -4164,10 +4815,10 @@
       ];
 
       // Separate validation for better error messages
-      const acceptedFiles = effectiveFiles.filter(file => file.name.endsWith('.jar') || file.name.endsWith('.zip'));
-      const duplicateFiles = acceptedFiles.filter(file => uploadedFiles.has(file.name));
-      const validFiles = acceptedFiles.filter(file => !uploadedFiles.has(file.name));
-      const invalidFiles = effectiveFiles.filter(file => !file.name.endsWith('.jar') && !file.name.endsWith('.zip'));
+      const acceptedFiles = effectiveFiles.filter((file) => hasAnyExtension(file.name, [".jar", ".zip"]));
+      const duplicateFiles = acceptedFiles.filter((file) => isUploadedFileDuplicate(file));
+      const validFiles = acceptedFiles.filter((file) => !isUploadedFileDuplicate(file));
+      const invalidFiles = effectiveFiles.filter((file) => !hasAnyExtension(file.name, [".jar", ".zip"]));
 
       if (validFiles.length > 0) {
         // Only update UI if we have valid files
@@ -4176,7 +4827,7 @@
         clearAllButton.style.display = "inline-flex";
 
         for (const file of validFiles) {
-          uploadedFiles.set(file.name, file);
+          uploadedFiles.set(assignUploadFileKey(file), file);
           createFilePill(file);
         }
 
@@ -4215,8 +4866,9 @@
         clearAllButton.style.display = "inline-flex";
         // Create a pill for the .mrpack file itself (to be updated as a whole)
         createFilePill(packFile);
-        // Also create a temporary processing pill
-        createFilePill({ name: `Processing: ${packFile.name}...` }); // Temporary pill
+        // Show processing state in the status line instead of a temporary pill.
+        statusMessage.textContent = `Processing modpack: ${packFile.name}...`;
+        statusMessage.classList.add("visible");
 
         const zip = await JSZip.loadAsync(packFile);
         const manifestFile = zip.file("modrinth.index.json");
@@ -4226,23 +4878,19 @@
             "The uploaded file is not a valid Modrinth modpack (missing modrinth.index.json).",
             "error"
           );
-          clearDropzone(); // Clear the "Processing..." pill
+          clearDropzone();
           return;
         }
 
         const content = await manifestFile.async("string");
         const manifest = JSON.parse(content);
 
-        // Clear only the temporary "Processing..." pill but keep the .mrpack pill
-        const processingPill = Array.from(fileListContainer.children).find(pill =>
-          pill.querySelector('span').textContent.startsWith('Processing:'));
-        if (processingPill) {
-          processingPill.remove();
-        }
-
         // --- Informational Message: Get Source Version and Loader ---
         let sourceVersion = "unknown";
         let sourceLoader = "unknown";
+        const packDisplayName = (manifest.name && String(manifest.name).trim())
+          ? String(manifest.name).trim()
+          : String(packFile.name || "").replace(/\.mrpack$/i, "");
 
         if (manifest.dependencies) {
           if (manifest.dependencies.minecraft) {
@@ -4262,24 +4910,65 @@
           }
         }
 
-        statusMessage.textContent = `Detected: ${sourceLoader} pack for MC ${sourceVersion}. Ready to find updates for your selected version.`;
-        statusMessage.classList.add("visible");
-        // --- END of Informational Message: Get Source Version and Loader ---
-
         // The manifest.files array contains the list of mods
+        let parsedModsCount = 0;
         if (manifest.files && manifest.files.length > 0) {
+          let skippedWithoutSha1 = 0;
+          let addedByProjectId = 0;
           for (const modFile of manifest.files) {
             // The path often looks like "mods/fabric-api-0.91.0.jar"
             const filename = modFile.path.split("/").pop();
-            const sha1Hash = modFile.hashes.sha1;
+            const sha1Hash = modFile.hashes?.sha1 || null;
+            const projectIdFromUrl = (Array.isArray(modFile.downloads) ? modFile.downloads : [])
+              .map(extractModrinthProjectIdFromUrl)
+              .find(Boolean);
 
             if (sha1Hash && filename) {
               // Use the hash as the unique key and store the filename for display.
               // This uses the new `mrpackMods` map to keep them separate.
-              mrpackMods.set(sha1Hash, { title: filename });
+              mrpackMods.set(`${filename}|${sha1Hash}`, {
+                title: filename,
+                lookupType: "hash",
+                identifier: sha1Hash,
+                projectIdHint: projectIdFromUrl || null,
+              });
               createFilePill({ name: filename });
+              parsedModsCount++;
+            } else if (projectIdFromUrl && filename) {
+              mrpackMods.set(`${filename}|id:${projectIdFromUrl}`, {
+                title: filename,
+                lookupType: "id",
+                identifier: projectIdFromUrl,
+                artifactType: "mod",
+              });
+              addedByProjectId++;
+              createFilePill({ name: filename });
+              parsedModsCount++;
+            } else if (filename) {
+              skippedWithoutSha1++;
             }
           }
+          const linkResolvedNote =
+            addedByProjectId > 0
+              ? ` ${addedByProjectId} file${addedByProjectId !== 1 ? "s were" : " was"} resolved by project link.`
+              : "";
+          const skippedNote =
+            skippedWithoutSha1 > 0
+              ? ` ${skippedWithoutSha1} file${skippedWithoutSha1 !== 1 ? "s were" : " was"} skipped (missing SHA-1 and project link).`
+              : "";
+
+          statusMessage.textContent =
+            `Detected modpack: ${packDisplayName} [${sourceLoader}] for Minecraft ${sourceVersion}. ` +
+            `Parsed ${parsedModsCount} mod${parsedModsCount !== 1 ? "s" : ""}. ` +
+            `Checking updates for both the modpack and its included mods.` +
+            linkResolvedNote +
+            skippedNote;
+          statusMessage.classList.add("visible");
+        } else {
+          statusMessage.textContent =
+            `Detected modpack: ${packDisplayName} [${sourceLoader}] for Minecraft ${sourceVersion}. ` +
+            `Parsed 0 mods. Checking updates for the modpack.`;
+          statusMessage.classList.add("visible");
         }
       } catch (error) {
         console.error("Error processing .mrpack file:", error);
@@ -4307,7 +4996,9 @@
       removeButton.setAttribute("aria-label", "Remove " + file.name);
       removeButton.onclick = function (event) {
         event.stopPropagation();
-        uploadedFiles.delete(file.name);
+        if (file instanceof File) {
+          uploadedFiles.delete(getUploadFileKey(file));
+        }
         filePill.remove();
         if (onRemove) onRemove();
         if (uploadedFiles.size === 0 && searchedMods.size === 0 && mrpackMods.size === 0) {
@@ -4527,7 +5218,9 @@
 
     // Sync modal loader/version selects with main page selects
     modLoaderSelect.addEventListener("change", () => {
-      modalLoaderSelect.value = modLoaderSelect.value;
+      if (projectTypeSelect.value !== "plugin") {
+        updateModalLoaderOptions(projectTypeSelect.value, modLoaderSelect.value);
+      }
     });
 
     mcVersionSelect.addEventListener("change", () => {
@@ -4543,6 +5236,17 @@
         loadFeaturedContent(currentFeaturedSort, currentFeaturedProjectType);
       }
     });
+
+    if (modalPlatformSelect) {
+      modalPlatformSelect.addEventListener("change", () => {
+        if (currentSearchQuery) {
+          currentSearchOffset = 0; // Reset offset for new search
+          performSearch(currentSearchQuery);
+        } else if (isShowingFeatured) {
+          loadFeaturedContent(currentFeaturedSort, currentFeaturedProjectType);
+        }
+      });
+    }
 
     modalVersionSelect.addEventListener("change", () => {
       if (currentSearchQuery) {
@@ -4566,8 +5270,8 @@
       // Capture the welcome message snapshot
       welcomeMessageSnapshot = resultsArea.innerHTML;
 
-      // Sync modal selects with main page selects on load
-      modalLoaderSelect.value = modLoaderSelect.value;
+      // Configure modal loader options based on active project type
+      updateModalLoaderOptions(projectTypeSelect.value, modLoaderSelect.value);
       modalVersionSelect.value = mcVersionSelect.value;
     });
 
@@ -4597,6 +5301,8 @@
 
       // Reset the data arrays
       successfulDownloads = [];
+      successfulDownloadKeys.clear();
+      dependencyDependents.clear();
       sectionCounts = { found: 0, warning: 0, failure: 0 };
 
       // Reset mod tracking for search modal
@@ -4668,34 +5374,103 @@
       }
     }
 
+    function createResolutionJob({
+      source = "unknown",
+      type = "id",
+      data = null,
+      title = "",
+      artifactType = null,
+      loaderFilter = null,
+      platformFilter = null,
+      isDependencyJob = false,
+      isMrpackFile = false,
+      environmentHints = null,
+    }) {
+      return {
+        source,
+        type, // legacy lookup kind used by existing pipeline
+        lookupType: type,
+        data, // legacy identifier/file payload used by existing pipeline
+        identifier: data,
+        title,
+        artifactType, // legacy artifact hint
+        artifactIntent: artifactType || null,
+        constraints: {
+          loader: loaderFilter || null,
+          platform: platformFilter || null,
+        },
+        environmentHints: environmentHints || null,
+        isDependencyJob: isDependencyJob === true,
+        isMrpackFile: isMrpackFile === true,
+      };
+    }
+
+    function getJobLookupType(job) {
+      return job?.lookupType || job?.type;
+    }
+
+    function getJobIdentifier(job) {
+      return job?.identifier ?? job?.data;
+    }
+
+    function resetPipelineMetrics() {
+      pipelineMetrics = {
+        fallbackLookups: 0,
+        endpointCalls: {
+          versionFiles: 0,
+          projects: 0,
+          versionsBatch: 0,
+          versionsDirect: 0,
+          teams: 0,
+          organizations: 0,
+          search: 0,
+          other: 0,
+        },
+        phaseMs: {
+          hashLookup: 0,
+          projectLookup: 0,
+          authorLookup: 0,
+          versionLookup: 0,
+          combine: 0,
+        },
+      };
+    }
+
     // --- Main Update Logic with Live Rendering and Dependency Resolution ---
     updateButton.addEventListener("click", handleUpdate);
 
     async function handleUpdate() {
-      // .mrpack files are containers; processMrpack already extracted their inner mods.
-      // The .mrpack file itself has no Modrinth identity, so we exclude it from jobs
-      // to avoid "not found" failures and rendering crashes.
       const fileJobs = Array.from(uploadedFiles.values())
-        .filter((file) => !file.name.endsWith(".mrpack"))
-        .map((file) => ({
+        .map((file) => createResolutionJob({
+          source: "upload",
           type: "file",
           data: file,
+          title: file.name,
+          artifactType: hasAnyExtension(file.name, [".mrpack"]) ? "modpack" : null,
         }));
       const searchJobs = Array.from(searchedMods.entries()).map(
         ([key, modInfo]) => {
           const isHash = /^[a-f0-9]{40}$/.test(key);
-          return {
+          return createResolutionJob({
+            source: "search",
             type: isHash ? "hash" : "id",
             data: key,
             title: modInfo.title,
             artifactType: modInfo.artifactType || null,
-          };
+            loaderFilter: modInfo.loaderFilter || null,
+            platformFilter: modInfo.platformFilter || null,
+            environmentHints: modInfo.environmentHints || null,
+          });
         }
       );
-      const mrpackJobs = Array.from(mrpackMods.entries()).map(([key, modInfo]) => ({
-        type: "hash", // .mrpack mods are always identified by hash
-        data: key,
+      const mrpackJobs = Array.from(mrpackMods.entries()).map(([key, modInfo]) => createResolutionJob({
+        source: "mrpack",
+        type: modInfo.lookupType || "hash",
+        data: modInfo.identifier || key,
         title: modInfo.title,
+        artifactType: modInfo.artifactType || "mod",
+        // These are mods extracted from the pack manifest, not the .mrpack container.
+        isMrpackFile: false,
       }));
 
       const jobs = [...fileJobs, ...searchJobs, ...mrpackJobs];
@@ -4716,12 +5491,14 @@
         renderedArtifactIds.clear();
         dependencyMap.clear(); // Reset dependency tracking
         reverseDependencyMap.clear(); // Reset reverse dependency tracking
+        dependencyDependents.clear();
         incompatibleMap.clear(); // Reset incompatible dependency tracking
         modIdToNameMap.clear(); // Reset mod name mapping
         installedModVersions.clear(); // Reset installed version tracking
         conflictResults = null; // Reset conflict results from prior run
         apiCallCount = 0; // Reset API call counter
         processingStartTime = Date.now(); // Start timing
+        resetPipelineMetrics();
         cacheStats = { hits: 0, misses: 0, stores: 0 }; // Reset cache stats for this run
         resultsSectionsSetup = false; // Reset flag for new search
         updateButton.disabled = true;
@@ -4736,6 +5513,7 @@
         // Reset other UI state after showing skeleton
         progressBarContainer.style.display = "block";
         successfulDownloads = [];
+        successfulDownloadKeys.clear();
         sectionCounts = { found: 0, warning: 0, failure: 0 };
 
         const processedIds = new Set();
@@ -4781,9 +5559,10 @@
                 if (dep.dependency_type === "required") {
                   allDependencies.add(dep.project_id);
                   // Track which mod requires this dependency
-                  dependencyMap.set(dep.project_id, result.title);
+                  trackDependencyRequirement(dep.project_id, result.title);
                   // Track dependencies for this mod (reverse mapping)
                   requiredDeps.push(dep.project_id);
+                  trackDependencyParent(dep.project_id, result.projectId);
                 } else if (dep.dependency_type === "incompatible") {
                   // Track incompatible dependencies
                   if (!incompatibleMap.has(result.projectId)) {
@@ -4809,14 +5588,13 @@
                 modIdToNameMap.set(result.projectId, result.title);
 
                 // Update any parent cards that were waiting for this dependency name
-                updateDependencyChainTooltip(result.projectId, result.title);
+                updateDependencyChainTooltip(result.projectId);
 
                 // Add to successfulDownloads if it has the required download info
                 // This handles both cached and fresh results
                 if (result.all_versions && result.all_versions.length > 0) {
-                  const latestVersion = result.all_versions.find(v => v.version_type === "release") ||
-                    result.all_versions.find(v => v.version_type === "beta") ||
-                    result.all_versions.find(v => v.version_type === "alpha");
+                  // Newest-first compatible list: default to index 0 without channel preference.
+                  const latestVersion = result.all_versions[0];
 
                   if (latestVersion) {
                     const primaryFile = selectArtifactFile(latestVersion, result.project_type);
@@ -4835,9 +5613,9 @@
                         isMrpackFile: result.isMrpackFile === true,
                       };
 
-                      // Check if this download info is already in the array (avoid duplicates per artifact type)
-                      const isDuplicate = successfulDownloads.some(dl => dl.projectId === result.projectId && dl.artifactType === result.project_type);
-                      if (!isDuplicate) {
+                      const dlKey = getSuccessfulDownloadKey(result.projectId, result.project_type);
+                      if (!successfulDownloadKeys.has(dlKey)) {
+                        successfulDownloadKeys.add(dlKey);
                         successfulDownloads.push(downloadInfo);
                       }
                     }
@@ -4860,6 +5638,7 @@
 
         // Phase 2: Recursively process dependencies
         let dependencyQueue = Array.from(allDependencies).filter(depId => !processedProjectIds.has(depId));
+        const dependencyQueued = new Set(dependencyQueue);
         let actualDependenciesAdded = 0;
         const totalInitialDependencies = dependencyQueue.length;
         let dependenciesProcessed = 0;
@@ -4872,11 +5651,12 @@
           statusMessage.textContent = `Resolving dependencies... (depth ${depthLevel}, ${currentBatchIds.length} in this wave, ${dependenciesProcessed}/${totalInitialDependencies} initial processed)`;
 
           const dependencyJobs = currentBatchIds.map(depId => ({
-            type: 'id',
+            source: "dependency",
+            type: "id",
             data: depId,
             title: `Dependency: ${depId}`,
             isDependencyJob: true,
-          }));
+          })).map(createResolutionJob);
 
           const results = await getModUpdateInfoBatch(dependencyJobs, dependencyJobs.length);
 
@@ -4885,7 +5665,7 @@
 
             if (processedIds.has(key)) {
               if (result.status === "success" && result.projectId) {
-                updateDependencyChainTooltip(result.projectId, result.title);
+                updateDependencyChainTooltip(result.projectId);
               }
               continue;
             }
@@ -4903,17 +5683,18 @@
               modIdToNameMap.set(result.projectId, result.title);
 
               // Update any parent cards that were waiting for this dependency name
-              updateDependencyChainTooltip(result.projectId, result.title);
+              updateDependencyChainTooltip(result.projectId);
 
               // Check for nested dependencies
               if (result.dependencies) {
                 for (const dep of result.dependencies) {
                   if (dep.dependency_type === "required") {
                     const depKey = dep.project_id;
-                    if (!processedProjectIds.has(depKey) && !dependencyQueue.includes(depKey)) {
+                    if (!processedProjectIds.has(depKey) && !dependencyQueued.has(depKey)) {
                       dependencyQueue.push(depKey); // Add new dependency to the queue
+                      dependencyQueued.add(depKey);
                       allDependencies.add(depKey); // Keep track of all unique dependencies
-                      dependencyMap.set(depKey, result.title); // Track who requires this
+                      trackDependencyRequirement(depKey, result.title); // Track who requires this
 
                       // A new dependency relationship was found, so we might need to update the parent's card
                       const parentProjectId = result.projectId;
@@ -4923,6 +5704,7 @@
                           reverseDependencyMap.set(parentProjectId, []);
                         }
                         reverseDependencyMap.get(parentProjectId).push(depKey);
+                        trackDependencyParent(depKey, parentProjectId);
                         updateDependencyChainOnCard(parentProjectId);
                       }
                     }
@@ -4992,7 +5774,11 @@
 
         summaryText += `<br>Processing time: ${processingTime}s, API calls used: ${apiCallCount}`;
         if (cachedModCount + freshModCount > 0) {
-          summaryText += `<br>Cached lookups: ${cachedModCount}, Fresh lookups: ${freshModCount}`;
+          let lookupSummary = `Cached lookups: ${cachedModCount}, Fresh lookups: ${freshModCount}`;
+          if (pipelineMetrics && pipelineMetrics.fallbackLookups > 0) {
+            lookupSummary += `, Fallback lookups: ${pipelineMetrics.fallbackLookups}`;
+          }
+          summaryText += `<br>${lookupSummary}`;
         }
 
         // Store the summary for the finally block
@@ -5058,7 +5844,11 @@
 
           let fallbackSummary = `Processing completed<br>Processing time: ${fallbackTime}s, API calls used: ${apiCallCount}`;
           if (cachedModCount + freshModCount > 0) {
-            fallbackSummary += `<br>Cached lookups: ${cachedModCount}, Fresh lookups: ${freshModCount}`;
+            let lookupSummary = `Cached lookups: ${cachedModCount}, Fresh lookups: ${freshModCount}`;
+            if (pipelineMetrics && pipelineMetrics.fallbackLookups > 0) {
+              lookupSummary += `, Fallback lookups: ${pipelineMetrics.fallbackLookups}`;
+            }
+            fallbackSummary += `<br>${lookupSummary}`;
           }
           statusMessage.innerHTML = fallbackSummary;
           statusMessage.classList.add("visible");
@@ -5083,6 +5873,17 @@
         // Count successful API calls (including retries)
         if (response.ok) {
           apiCallCount++;
+          if (pipelineMetrics) {
+            const lowerUrl = String(url).toLowerCase();
+            if (lowerUrl.includes("/v2/version_files")) pipelineMetrics.endpointCalls.versionFiles++;
+            else if (lowerUrl.includes("/v2/projects?")) pipelineMetrics.endpointCalls.projects++;
+            else if (lowerUrl.includes("/v2/versions?ids=")) pipelineMetrics.endpointCalls.versionsBatch++;
+            else if (lowerUrl.includes("/v2/project/") && lowerUrl.includes("/version?")) pipelineMetrics.endpointCalls.versionsDirect++;
+            else if (lowerUrl.includes("/v3/teams?")) pipelineMetrics.endpointCalls.teams++;
+            else if (lowerUrl.includes("/v3/organizations?")) pipelineMetrics.endpointCalls.organizations++;
+            else if (lowerUrl.includes("/v2/search?")) pipelineMetrics.endpointCalls.search++;
+            else pipelineMetrics.endpointCalls.other++;
+          }
         }
 
         if (response.status === 429) {
@@ -5124,6 +5925,27 @@
     async function processBatch(jobs) {
       const loader = modLoaderSelect.value;
       const gameVersion = mcVersionSelect.value;
+      const getJobCacheScope = (job) => {
+        const artifactHint = job?.artifactIntent || job?.artifactType || "auto";
+        const scopedLoader = job?.constraints?.loader || (artifactHint === "plugin" ? "" : loader);
+        const scopedPlatform = job?.constraints?.platform || "";
+        return `a=${artifactHint}|l=${scopedLoader || "*"}|p=${scopedPlatform || "*"}`;
+      };
+      const getMatchingJobsForResult = (result, candidates, resolvedHashMap) => {
+        if (result.hash) {
+          return candidates.filter((job) => {
+            if (getJobLookupType(job) === "hash") return getJobIdentifier(job) === result.hash;
+            const jobHash = resolvedHashMap.get(job);
+            return !!jobHash && jobHash === result.hash;
+          });
+        }
+        if (result.projectId) {
+          return candidates.filter(
+            (job) => getJobLookupType(job) === "id" && getJobIdentifier(job) === result.projectId
+          );
+        }
+        return [];
+      };
 
       // Step 0: Check cache for complete results first
       const cachedResults = [];
@@ -5132,7 +5954,7 @@
 
       // Pre-calculate all hashes in parallel for uploaded files and mrpack files
       const fileHashPromises = jobs
-        .filter(job => job.type === "file" || job.type === "mrpack")
+        .filter(job => getJobLookupType(job) === "file")
         .map(async job => {
           const hash = await calculateFileHash(job.data);
           return { job, hash };
@@ -5143,25 +5965,24 @@
 
       for (const job of jobs) {
         let cacheKey;
-        if (job.type === "file") {
+        const lookupType = getJobLookupType(job);
+        const identifier = getJobIdentifier(job);
+        if (lookupType === "file") {
           const hash = hashMap.get(job);
           if (hash) {
-            cacheKey = getCacheKey(hash, loader, gameVersion, 'hash');
+            cacheKey = getCacheKey(hash, getJobCacheScope(job), gameVersion, 'hash');
           }
-        } else if (job.type === "mrpack") {
-          // For .mrpack files, we want to look up the modpack itself as a project
-          const hash = hashMap.get(job);
-          if (hash) {
-            // Use the hash to look up the modpack
-            cacheKey = getCacheKey(hash, loader, gameVersion, 'hash');
-          }
-        } else if (job.type === "hash") {
-          cacheKey = getCacheKey(job.data, loader, gameVersion, 'hash');
-        } else if (job.type === "id") {
-          cacheKey = getCacheKey(job.data, loader, gameVersion, 'id');
+        } else if (lookupType === "hash") {
+          cacheKey = getCacheKey(identifier, getJobCacheScope(job), gameVersion, 'hash');
+        } else if (lookupType === "id") {
+          cacheKey = getCacheKey(identifier, getJobCacheScope(job), gameVersion, 'id');
         }
 
-        if (cacheKey && !processedCacheKeys.has(cacheKey)) {
+        if (cacheKey) {
+          if (processedCacheKeys.has(cacheKey)) {
+            // We already handled this exact lookup in the current run.
+            continue;
+          }
           processedCacheKeys.add(cacheKey);
           const cachedResult = getCachedResult(cacheKey);
           if (cachedResult) {
@@ -5187,18 +6008,23 @@
 
       // Cache the fresh results
       for (const result of freshResults) {
-        let cacheKey;
-        if (result.hash) {
-          cacheKey = getCacheKey(result.hash, loader, gameVersion, 'hash');
-        } else if (result.projectId) {
-          cacheKey = getCacheKey(result.projectId, loader, gameVersion, 'id');
+        const matchingJobs = getMatchingJobsForResult(result, uncachedJobs, hashMap);
+        const cacheKeys = new Set();
+        for (const matchingJob of matchingJobs) {
+          if (result.hash) {
+            cacheKeys.add(getCacheKey(result.hash, getJobCacheScope(matchingJob), gameVersion, 'hash'));
+          } else if (result.projectId) {
+            cacheKeys.add(getCacheKey(result.projectId, getJobCacheScope(matchingJob), gameVersion, 'id'));
+          }
         }
 
-        if (cacheKey) {
+        if (cacheKeys.size > 0) {
           // Don't cache the fromCache flag
           const resultToCache = { ...result };
           delete resultToCache.fromCache;
-          setCachedResult(cacheKey, resultToCache);
+          for (const cacheKey of cacheKeys) {
+            setCachedResult(cacheKey, resultToCache);
+          }
         }
       }
 
@@ -5210,12 +6036,10 @@
       // Step 1: Collect all hashes and project IDs
       const hashJobs = [];
       const projectIdJobs = [];
-      const fileJobs = [];
 
       // Compute any missing hashes in parallel for performance
-      const jobsNeedingHash = uncachedJobs.filter(job =>
-        (job.type === "file" || job.type === "mrpack") &&
-        !(hashMap && hashMap.has(job))
+      const jobsNeedingHash = uncachedJobs.filter(
+        (job) => getJobLookupType(job) === "file" && !(hashMap && hashMap.has(job))
       );
       const fallbackHashes = await Promise.all(
         jobsNeedingHash.map(async job => ({ job, hash: await calculateFileHash(job.data) }))
@@ -5226,40 +6050,54 @@
         (hashMap && hashMap.get(job)) || fallbackHashMap.get(job) || null;
 
       for (const job of uncachedJobs) {
-        if (job.type === "file" || job.type === "mrpack") {
+        const lookupType = getJobLookupType(job);
+        const identifier = getJobIdentifier(job);
+        if (lookupType === "file") {
           const hash = getHash(job);
           if (hash) {
             hashJobs.push({ job, hash });
-          } else {
-            fileJobs.push(job);
           }
-        } else if (job.type === "hash") {
-          hashJobs.push({ job, hash: job.data });
-        } else if (job.type === "id") {
+        } else if (lookupType === "hash") {
+          hashJobs.push({ job, hash: identifier });
+        } else if (lookupType === "id") {
           projectIdJobs.push(job);
         }
       }
 
       // Step 2: Batch hash lookups
+      const tHash = performance.now();
       const hashResults = await batchHashLookup(hashJobs);
+      if (pipelineMetrics) pipelineMetrics.phaseMs.hashLookup += Math.round(performance.now() - tHash);
 
       // Step 3: Batch project lookups
       const allProjectIds = [
         ...hashResults.map(r => r.versionData?.project_id).filter(Boolean),
-        ...projectIdJobs.map(j => j.data)
+        ...projectIdJobs.map(j => getJobIdentifier(j))
       ];
 
+      const tProjects = performance.now();
       const projectsData = await batchProjectLookup(allProjectIds);
+      if (pipelineMetrics) pipelineMetrics.phaseMs.projectLookup += Math.round(performance.now() - tProjects);
 
       // Steps 4 + 5: Parallel batch lookups for authors and versions.
       // Both depend only on `projectsData`, so running concurrently reduces latency.
+      const tAuthorVersion = performance.now();
       const [authorData, versionData] = await Promise.all([
         batchAuthorLookup(projectsData),
         batchVersionLookup(projectsData, loader, gameVersion),
       ]);
+      if (pipelineMetrics) {
+        const elapsed = Math.round(performance.now() - tAuthorVersion);
+        // Split combined timing proportionally isn't possible here; keep both with same elapsed as coarse signal.
+        pipelineMetrics.phaseMs.authorLookup += elapsed;
+        pipelineMetrics.phaseMs.versionLookup += elapsed;
+      }
 
       // Step 6: Combine results
-      return await combineResults(uncachedJobs, hashResults, projectsData, authorData, versionData, gameVersion);
+      const tCombine = performance.now();
+      const combined = await combineResults(uncachedJobs, hashResults, projectsData, authorData, versionData, gameVersion);
+      if (pipelineMetrics) pipelineMetrics.phaseMs.combine += Math.round(performance.now() - tCombine);
+      return combined;
     }
 
     // --- Batch Hash Lookup Function ---
@@ -5426,10 +6264,9 @@
         }
       }
 
-      // Sort each project's versions newest-first. The old per-project
-      // endpoint returned them in that order implicitly; downstream consumers
-      // (e.g. `versions.find(v => v.version_type === "release")` used as the
-      // "latest release" picker) depend on it.
+      // Sort each project's versions newest-first. Downstream code picks the
+      // newest compatible candidate with `versions[0]` after filtering, so this
+      // ordering must remain stable.
       for (const bucket of versionsByProject.values()) {
         bucket.sort((a, b) => {
           const da = Date.parse(a.date_published) || 0;
@@ -5443,17 +6280,20 @@
       const out = {};
       for (const projectId of projectIds) {
         const project = projectsData[projectId];
-        const isMod = project.project_type === 'mod';
+        const projectType = project.project_type;
+        // Keep batch-stage loader gating aligned with the global loader selector.
+        // Plugins use per-item loader/platform constraints later, so they should
+        // not be pre-filtered by the global mod loader here.
+        const requiresGlobalLoader = projectType === "mod" || projectType === "modpack";
         const allVersions = versionsByProject.get(projectId) || [];
 
         const compatibleVersions = allVersions.filter(v => {
           const gameVersionMatch = v.game_versions.includes(gameVersion);
-          return isMod ? (v.loaders.includes(loader) && gameVersionMatch) : gameVersionMatch;
+          return requiresGlobalLoader ? (v.loaders.includes(loader) && gameVersionMatch) : gameVersionMatch;
         });
 
         const hasGameVersion = allVersions.some(v => v.game_versions.includes(gameVersion));
-        // For non-mods, we can pretend the loader is always compatible to avoid wrong errors.
-        const hasLoader = !isMod || allVersions.some(v => v.loaders.includes(loader));
+        const hasLoader = !requiresGlobalLoader || allVersions.some(v => v.loaders.includes(loader));
 
         let compatibilityStatus = 'compatible';
         if (compatibleVersions.length === 0) {
@@ -5487,9 +6327,120 @@
     // --- Results Combination Function ---
     async function combineResults(jobs, hashResults, projectsData, authorData, versionData, gameVersion) {
       const results = [];
+      const hashResultByJob = new Map(hashResults.map((hr) => [hr.job, hr]));
+      const environmentSupportCache = new Map(); // projectId -> Promise<{client_side,server_side} | null>
+      const authorFallbackCache = new Map(); // projectId -> Promise<{name,url}>
+      const projectLookupFallbackCache = new Map(); // identifier -> Promise<project|null>
+
+      async function resolveMrpackHashMissByFilename(job) {
+        const { slugCandidate, query } = buildMrpackSearchCandidates(job?.title);
+        if (!query) return null;
+
+        try {
+          const facets = [[`project_type:mod`]];
+          if (gameVersion) facets.push([`versions:${gameVersion}`]);
+          const selectedLoader = job?.constraints?.loader || modLoaderSelect.value;
+          if (selectedLoader) facets.push([`categories:${selectedLoader}`]);
+          const response = await fetchWithRetry(
+            `https://api.modrinth.com/v2/search?query=${encodeURIComponent(query)}&limit=10&facets=${encodeURIComponent(JSON.stringify(facets))}`
+          );
+          if (!response.ok) return null;
+          const data = await response.json();
+          const hits = Array.isArray(data?.hits) ? data.hits : [];
+          if (hits.length === 0) return null;
+
+          const scored = hits
+            .filter((hit) => hit?.project_id)
+            .map((hit) => {
+              const slug = String(hit.slug || "").toLowerCase();
+              const title = String(hit.title || "").toLowerCase();
+              let score = 0;
+              if (slugCandidate && slug === slugCandidate) score += 100;
+              if (slugCandidate && slug.startsWith(slugCandidate)) score += 60;
+              if (slugCandidate && title.includes(slugCandidate)) score += 30;
+              return { hit, score };
+            })
+            .sort((a, b) => b.score - a.score);
+
+          const best = scored[0]?.hit;
+          if (!best) return null;
+
+          // Prefer already-batched project metadata when available.
+          if (projectsData[best.project_id]) return projectsData[best.project_id];
+
+          const projectResponse = await fetchWithRetry(`https://api.modrinth.com/v2/project/${best.project_id}`);
+          if (!projectResponse.ok) return null;
+          return await projectResponse.json();
+        } catch (_) {
+          return null;
+        }
+      }
+
+      async function fetchDirectCompatibleVersions(projectId, context) {
+        const params = new URLSearchParams();
+        params.set("game_versions", JSON.stringify([context.gameVersion]));
+        if (context.selectedLoader) {
+          params.set("loaders", JSON.stringify([context.selectedLoader]));
+        }
+        const response = await fetchWithRetry(
+          `https://api.modrinth.com/v2/project/${projectId}/version?${params.toString()}`
+        );
+        if (!response.ok) return [];
+        const directVersions = await response.json();
+        // Keep newest-first behavior consistent with batch lookup path.
+        return directVersions.sort((a, b) =>
+          (Date.parse(b.date_published) || 0) - (Date.parse(a.date_published) || 0)
+        );
+      }
+
+      async function resolveProjectDetailsByIdentifier(identifier) {
+        if (!identifier) return null;
+        if (!projectLookupFallbackCache.has(identifier)) {
+          projectLookupFallbackCache.set(identifier, (async () => {
+            try {
+              const response = await fetchWithRetry(
+                `https://api.modrinth.com/v2/project/${encodeURIComponent(identifier)}`
+              );
+              if (!response.ok) return null;
+              return await response.json();
+            } catch (_) {
+              return null;
+            }
+          })());
+        }
+        return await projectLookupFallbackCache.get(identifier);
+      }
+
+      async function resolveAuthorWithFallback(projectDetails) {
+        const fromBatch = getAuthorFromBatchData(projectDetails, authorData);
+        if (fromBatch.name !== "unknown") return fromBatch;
+
+        const projectId = projectDetails?.id;
+        if (!projectId) return fromBatch;
+        if (!authorFallbackCache.has(projectId)) {
+          authorFallbackCache.set(projectId, (async () => {
+            try {
+              const response = await fetchWithRetry(`https://api.modrinth.com/v2/project/${projectId}/members`);
+              if (!response.ok) return fromBatch;
+              const members = await response.json();
+              if (!Array.isArray(members) || members.length === 0) return fromBatch;
+
+              const owner = members.find((m) => m.role === "Owner") || members[0];
+              const username = owner?.user?.username || owner?.user?.name;
+              if (!username) return fromBatch;
+              return { name: username, url: `https://modrinth.com/user/${username}` };
+            } catch (_) {
+              return fromBatch;
+            }
+          })());
+        }
+        return await authorFallbackCache.get(projectId);
+      }
 
       for (const job of jobs) {
+        const lookupType = getJobLookupType(job);
         try {
+          const identifier = getJobIdentifier(job);
           let projectDetails = null;
           let versionDetails = null;
           let originalModInfo = {};
@@ -5499,28 +6450,31 @@
 
           // Determine artifact type ONCE at the input boundary
           let artifactType = null;
-          if (job.type === "file") {
-            if (job.data.name.endsWith(".zip")) {
+          if (lookupType === "file") {
+            if (hasAnyExtension(job.data.name, [".zip"])) {
               artifactType = await detectZipContentType(job.data);
-            } else if (job.data.name.endsWith(".jar")) {
+            } else if (hasAnyExtension(job.data.name, [".jar"])) {
               artifactType = "mod";
             }
-          } else if (job.type === "mrpack") {
-            artifactType = "modpack";
-          } else if (job.type === "id") {
-            artifactType = job.artifactType || null;
+          } else if (lookupType === "id") {
+            artifactType = job.artifactIntent || job.artifactType || null;
           }
 
-          if (job.type === "hash" || job.type === "file" || job.type === "mrpack") {
-            const hashResult = hashResults.find(hr => hr.job === job);
+          if (lookupType === "hash" || lookupType === "file") {
+            const hashResult = hashResultByJob.get(job);
             if (hashResult?.versionData) {
               projectDetails = projectsData[hashResult.versionData.project_id];
               versionDetails = hashResult.versionData;
               fileHash = hashResult.hash; // Preserve hash for caching
+
+              // Uploaded .jar files default to "mod", but some projects (e.g.
+              // Chunky) publish plugin artifacts under the same project.
+              // Use the matched file version loaders to classify per-item.
+              artifactType = inferArtifactTypeFromVersionLoaders(artifactType, versionDetails.loaders);
             }
 
             // Get original version from uploaded file if available
-            if (job.type === "file" || job.type === "mrpack") {
+            if (lookupType === "file") {
               try {
                 originalModInfo = await getModIdFromJar(job.data);
               } catch (e) {
@@ -5528,8 +6482,23 @@
                 originalModInfo = {};
               }
             }
-          } else if (job.type === "id") {
-            projectDetails = projectsData[job.data];
+
+            // Some .mrpack manifests reference mirrored files whose SHA1 does not
+            // map to Modrinth's version_files index. Fall back to filename search.
+            if (!projectDetails && lookupType === "hash" && job.source === "mrpack") {
+              const recoveredProject = await resolveMrpackHashMissByFilename(job);
+              if (recoveredProject) {
+                projectDetails = recoveredProject;
+                artifactType = artifactType || recoveredProject.project_type || "mod";
+              }
+            }
+          } else if (lookupType === "id") {
+            projectDetails = projectsData[identifier];
+            if (!projectDetails) {
+              // Batch /projects?ids works best with canonical IDs; fall back to
+              // direct lookup so slug-based identifiers from .mrpack hints still resolve.
+              projectDetails = await resolveProjectDetailsByIdentifier(identifier);
+            }
           }
 
           // Fall back to Modrinth's project_type if we couldn't determine artifact type
@@ -5540,7 +6509,7 @@
           if (!projectDetails) {
             results.push({
               status: "failure",
-              title: job.type === "file" ? job.data.name : job.title,
+              title: lookupType === "file" ? job.data.name : job.title,
               reason: "Mod not found on Modrinth"
             });
             continue;
@@ -5548,32 +6517,52 @@
 
           // Get compatible versions and compatibility analysis
           const versionInfo = versionData[projectDetails.id] || { versions: [], compatibilityStatus: 'no-versions' };
-          let versions = versionInfo.versions || [];
-          let compatibilityStatus = versionInfo.compatibilityStatus;
+          const resolutionContext = buildResolutionContext(job, artifactType, versionDetails, gameVersion);
+          const resolvedVersions = resolveVersionsForContext(versionInfo, resolutionContext);
+          let versions = resolvedVersions.versions;
+          const compatibilityStatus = resolvedVersions.compatibilityStatus;
+          const environmentSupport = await resolveEnvironmentSupport(
+            projectDetails,
+            artifactType,
+            job,
+            versionDetails,
+            environmentSupportCache
+          );
 
-          // For loader-agnostic artifacts, filter versions by matching loader tags to the correct artifact type.
-          if (artifactType && ARTIFACT_CONFIG[artifactType] && !ARTIFACT_CONFIG[artifactType].needsLoader) {
-            const loaderTags = ARTIFACT_CONFIG[artifactType].loaderTags;
-            versions = (versionInfo.allVersions || []).filter(v => {
-              if (!v.game_versions.includes(gameVersion)) return false;
-              if (!loaderTags) return true;
-              return v.loaders.some(l => loaderTags.includes(l));
-            });
-            compatibilityStatus = versions.length > 0 ? 'compatible' : 'no-versions';
+          // Fallback for false negatives when batch version aggregation misses
+          // some versions on large projects. We only do this for mods where
+          // project metadata says the selected loader/version should exist.
+          if (
+            versions.length === 0 &&
+            artifactType === "mod" &&
+            resolutionContext.selectedLoader
+          ) {
+            const hasSelectedLoader = projectDetails.loaders?.includes(resolutionContext.selectedLoader);
+            const hasSelectedGameVersion = projectDetails.game_versions?.includes(resolutionContext.gameVersion);
+            const hasLargeVersionHistory = (projectDetails.versions?.length || 0) >= 400;
+            const shouldTryDirectFallback =
+              hasSelectedLoader &&
+              (hasSelectedGameVersion || hasLargeVersionHistory);
+
+            if (shouldTryDirectFallback) {
+              if (pipelineMetrics) pipelineMetrics.fallbackLookups++;
+              const directVersions = await fetchDirectCompatibleVersions(projectDetails.id, resolutionContext);
+              if (directVersions.length > 0) {
+                versions = directVersions;
+              }
+            }
           }
 
           // Get author details
-          const author = getAuthorFromBatchData(projectDetails, authorData);
+          const author = await resolveAuthorWithFallback(projectDetails);
 
-          // Pick best version (already filtered to artifact-compatible versions)
-          const latestVersion = versions.find(v => v.version_type === "release") ||
-                                versions.find(v => v.version_type === "beta") ||
-                                versions.find(v => v.version_type === "alpha");
+          // Pick newest compatible version: list is already newest-first after filtering.
+          const latestVersion = versions[0];
 
           if (!latestVersion) {
             // Generate precise error message based on compatibility analysis
             let reason = "No compatible version found for selected loader/version.";
-            const loader = modLoaderSelect.value;
+            const loader = resolutionContext.loaderDisplay || modLoaderSelect.value;
             const gameVersion = mcVersionSelect.value;
 
             switch (compatibilityStatus) {
@@ -5607,8 +6596,8 @@
               description: projectDetails.description,
               icon_url: projectDetails.icon_url,
               project_url: `https://modrinth.com/project/${projectDetails.slug}`,
-              client_side: projectDetails.client_side,
-              server_side: projectDetails.server_side,
+              client_side: environmentSupport.client_side,
+              server_side: environmentSupport.server_side,
               downloads: projectDetails.downloads,
               followers: projectDetails.followers,
               categories: projectDetails.categories,
@@ -5637,8 +6626,8 @@
               description: projectDetails.description,
               icon_url: projectDetails.icon_url,
               project_url: `https://modrinth.com/project/${projectDetails.slug}`,
-              client_side: projectDetails.client_side,
-              server_side: projectDetails.server_side,
+              client_side: environmentSupport.client_side,
+              server_side: environmentSupport.server_side,
               downloads: projectDetails.downloads,
               followers: projectDetails.followers,
               categories: projectDetails.categories,
@@ -5668,16 +6657,16 @@
             hashes: primaryFile.hashes,
             path: buildArtifactPath(artifactType, primaryFile.filename),
             fileSize: primaryFile.size,
-            client_side: projectDetails.client_side,
-            server_side: projectDetails.server_side,
+            client_side: environmentSupport.client_side,
+            server_side: environmentSupport.server_side,
             projectId: projectDetails.id,
             artifactType: artifactType,
-            isMrpackFile: job.type === "mrpack" || job.isMrpackFile === true,
+            isMrpackFile: job.isMrpackFile === true,
           };
 
-          // Check if this download info is already in the array (avoid duplicates per artifact type)
-          const isDuplicate = successfulDownloads.some(dl => dl.projectId === projectDetails.id && dl.artifactType === artifactType);
-          if (!isDuplicate) {
+          const dlKey = getSuccessfulDownloadKey(projectDetails.id, artifactType);
+          if (!successfulDownloadKeys.has(dlKey)) {
+            successfulDownloadKeys.add(dlKey);
             successfulDownloads.push(downloadInfo);
           }
 
@@ -5695,8 +6684,8 @@
             description: projectDetails.description,
             icon_url: projectDetails.icon_url,
             project_url: `https://modrinth.com/project/${projectDetails.slug}`,
-            client_side: projectDetails.client_side,
-            server_side: projectDetails.server_side,
+            client_side: environmentSupport.client_side,
+            server_side: environmentSupport.server_side,
             followers: projectDetails.followers,
             downloads: projectDetails.downloads,
             project_type: artifactType,
@@ -5704,7 +6693,7 @@
             dependencies: latestVersion.dependencies,
             targetVersion: latestVersion.version_number, // Version user is updating TO (primary context for conflicts)
             isDependency: job.isDependencyJob === true,
-            isMrpackFile: job.type === "mrpack" || job.isMrpackFile === true,
+            isMrpackFile: job.isMrpackFile === true,
             gallery: projectDetails.gallery || [],
             body: projectDetails.body || "",
             installedVersion: originalModInfo.version || null,
@@ -5713,7 +6702,7 @@
         } catch (error) {
           results.push({
             status: "failure",
-            title: job.type === "file" ? job.data.name : job.title,
+            title: lookupType === "file" ? job.data.name : job.title,
             reason: error.message
           });
         }
@@ -5796,17 +6785,19 @@
 
         // `zip.folder()` and `zip.file(/regex/)` are unreliable; check the file map directly.
         const paths = Object.keys(zip.files);
-        const hasAssets = paths.some(p => p.startsWith("assets/"));
-        const hasData = paths.some(p => p.startsWith("data/"));
-        const hasShaders = paths.some(p => p.startsWith("shaders/"));
-        const hasPackMcmeta = !!zip.file("pack.mcmeta");
+        const lowerPaths = paths.map((p) => String(p).toLowerCase());
+        const hasPath = (suffix) => paths.some(p => p.toLowerCase().endsWith(suffix.toLowerCase()));
+        const hasAssets = lowerPaths.some((p) => p.startsWith("assets/"));
+        const hasData = lowerPaths.some((p) => p.startsWith("data/"));
+        const hasShaders = lowerPaths.some((p) => p.startsWith("shaders/"));
+        const hasPackMcmeta = hasPath("/pack.mcmeta") || hasPath("pack.mcmeta");
 
         // Prioritize mod manifests to avoid misclassifying mods as resource packs when renamed to .zip
         const hasModManifest =
-          !!zip.file("fabric.mod.json") ||
-          !!zip.file("quilt.mod.json") ||
-          !!zip.file("META-INF/mods.toml") ||
-          !!zip.file("META-INF/neoforge.mods.toml");
+          hasPath("/fabric.mod.json") || hasPath("fabric.mod.json") ||
+          hasPath("/quilt.mod.json") || hasPath("quilt.mod.json") ||
+          hasPath("/meta-inf/mods.toml") || hasPath("meta-inf/mods.toml") ||
+          hasPath("/meta-inf/neoforge.mods.toml") || hasPath("meta-inf/neoforge.mods.toml");
         if (hasModManifest) {
           return "mod";
         }
@@ -5834,77 +6825,6 @@
       } catch (e) {
         return null;
       }
-    }
-
-    // --- Version Comparison Helpers ---
-
-    // Semver-aware: treats "1.0.0" > "1.0.0-rc1" > "1.0.0-beta" > "1.0.0-alpha".
-    // Build metadata after `+` is ignored per semver spec.
-    function compareVersions(a, b) {
-      const split = v => {
-        let s = String(v).toLowerCase().trim().replace(/^v/, '');
-        // Split off build metadata (semver `+...` is ignored for ordering).
-        const plusIdx = s.indexOf('+');
-        if (plusIdx !== -1) s = s.slice(0, plusIdx);
-        // Split into [main, prerelease]; prerelease is everything after the FIRST '-'.
-        const dashIdx = s.indexOf('-');
-        const main = dashIdx === -1 ? s : s.slice(0, dashIdx);
-        const pre = dashIdx === -1 ? '' : s.slice(dashIdx + 1);
-        return {
-          main: main.split(/[._]/),
-          pre: pre ? pre.split(/[._\-]/) : [],
-        };
-      };
-      const A = split(a);
-      const B = split(b);
-
-      // Compare the main release identifiers.
-      const mainLen = Math.max(A.main.length, B.main.length);
-      for (let i = 0; i < mainLen; i++) {
-        const pa = A.main[i] || '0';
-        const pb = B.main[i] || '0';
-        const na = parseInt(pa, 10);
-        const nb = parseInt(pb, 10);
-        const isNa = !isNaN(na) && String(na) === pa;
-        const isNb = !isNaN(nb) && String(nb) === pb;
-        if (isNa && isNb) {
-          if (na !== nb) return na - nb;
-        } else if (isNa) {
-          return 1;
-        } else if (isNb) {
-          return -1;
-        } else if (pa !== pb) {
-          return pa < pb ? -1 : 1;
-        }
-      }
-
-      // Per semver: a version with a pre-release tag has LOWER precedence than the same without.
-      if (A.pre.length === 0 && B.pre.length === 0) return 0;
-      if (A.pre.length === 0) return 1;  // A is full release, B is pre-release
-      if (B.pre.length === 0) return -1;
-
-      // Compare pre-release identifiers element-wise: numerics numerically, otherwise lexically.
-      const preLen = Math.max(A.pre.length, B.pre.length);
-      for (let i = 0; i < preLen; i++) {
-        const pa = A.pre[i];
-        const pb = B.pre[i];
-        if (pa === undefined) return -1; // shorter pre-release set is "lower"
-        if (pb === undefined) return 1;
-        const na = parseInt(pa, 10);
-        const nb = parseInt(pb, 10);
-        const isNa = !isNaN(na) && String(na) === pa;
-        const isNb = !isNaN(nb) && String(nb) === pb;
-        if (isNa && isNb) {
-          if (na !== nb) return na - nb;
-        } else if (isNa) {
-          return -1; // numeric pre-id < alphanumeric pre-id (semver rule)
-        } else if (isNb) {
-          return 1;
-        } else if (pa !== pb) {
-          return pa < pb ? -1 : 1;
-        }
-      }
-      return 0;
     }
 
     // --- Analyze Conflicts Function ---
@@ -5982,6 +6902,22 @@
     function addConflictIndicatorsToCards() {
       if (!conflictResults || conflictResults.totalConflicts === 0) return;
 
+      // Pre-index once to avoid filtering all pairs for every affected mod.
+      const conflictPairsByModId = new Map();
+      for (const pair of conflictResults.conflictPairs) {
+        if (!conflictPairsByModId.has(pair.modId)) {
+          conflictPairsByModId.set(pair.modId, []);
+        }
+        conflictPairsByModId.get(pair.modId).push(pair);
+
+        if (pair.conflictingModId !== pair.modId) {
+          if (!conflictPairsByModId.has(pair.conflictingModId)) {
+            conflictPairsByModId.set(pair.conflictingModId, []);
+          }
+          conflictPairsByModId.get(pair.conflictingModId).push(pair);
+        }
+      }
+
       // Helper: best-effort name lookup using both the mod-name map and rendered card titles.
       function resolveModName(otherModId) {
         let name = modIdToNameMap.get(otherModId);
@@ -6011,9 +6947,7 @@
         if (!card) continue;
         if (card.querySelector('.conflict-tooltip-container')) continue; // already injected
 
-        const modConflicts = conflictResults.conflictPairs.filter(pair =>
-          pair.modId === modId || pair.conflictingModId === modId
-        );
+        const modConflicts = conflictPairsByModId.get(modId) || [];
         if (modConflicts.length === 0) continue;
 
         // Pick the worst severity for this card; "breaks" wins.
@@ -6311,6 +7245,15 @@
                 </div>
               </div>
               <div class="sort-option has-submenu">
+                Loaders <span class="submenu-arrow">▶</span>
+                <div class="sort-submenu">
+                  <div class="sort-option" data-sort="supported_loader" data-filter="fabric">Fabric</div>
+                  <div class="sort-option" data-sort="supported_loader" data-filter="forge">Forge</div>
+                  <div class="sort-option" data-sort="supported_loader" data-filter="neoforge">NeoForge</div>
+                  <div class="sort-option" data-sort="supported_loader" data-filter="quilt">Quilt</div>
+                </div>
+              </div>
+              <div class="sort-option has-submenu">
                 Project Type <span class="submenu-arrow">▶</span>
                 <div class="sort-submenu">
                   <div class="sort-option" data-sort="project_type" data-filter="mod">Mods</div>
@@ -6357,6 +7300,23 @@
       window.isBulkActionsMode = false;
       window.selectedModsForBulk = new Set();
       window.lastClickedModIndex = null; // Track last clicked mod for shift+click range selection
+      window.lastFullFoundRemovalState = null;
+
+      function setRemoveButtonMode(mode = 'remove') {
+        const removeSelectedBulkBtn = document.getElementById('remove-selected-bulk-btn');
+        if (!removeSelectedBulkBtn) return;
+
+        removeSelectedBulkBtn.dataset.mode = mode;
+        if (mode === 'undo') {
+          removeSelectedBulkBtn.textContent = 'Undo';
+          removeSelectedBulkBtn.classList.remove('danger');
+          removeSelectedBulkBtn.classList.add('undo');
+        } else {
+          removeSelectedBulkBtn.textContent = 'Remove';
+          removeSelectedBulkBtn.classList.remove('undo');
+          removeSelectedBulkBtn.classList.add('danger');
+        }
+      }
 
       function toggleBulkActionsMode() {
         window.isBulkActionsMode = !window.isBulkActionsMode;
@@ -6400,6 +7360,21 @@
       }
 
       function updateBulkSelectionCounts() {
+        const visibleCards = Array.from(document.querySelectorAll('#results-found .result-card'))
+          .filter(card => card.style.display !== 'none');
+        const visibleProjectIds = new Set(
+          visibleCards
+            .map(card => card.dataset.projectId)
+            .filter(Boolean)
+        );
+
+        // Keep selection scoped to currently visible cards when filters are active.
+        window.selectedModsForBulk.forEach(projectId => {
+          if (!visibleProjectIds.has(projectId)) {
+            window.selectedModsForBulk.delete(projectId);
+          }
+        });
+
         const count = window.selectedModsForBulk.size;
         const toggleSelectBtn = document.getElementById('toggle-select-all-bulk-btn');
         const countDisplay = document.getElementById('bulk-selection-count');
@@ -6411,8 +7386,7 @@
         
         // Update select all button text based on current state
         if (toggleSelectBtn) {
-          const allCards = document.querySelectorAll('#results-found .result-card');
-          const allSelected = allCards.length > 0 && Array.from(allCards).every(card => 
+          const allSelected = visibleCards.length > 0 && visibleCards.every(card =>
             window.selectedModsForBulk.has(card.dataset.projectId)
           );
           toggleSelectBtn.textContent = allSelected ? 'Clear All' : 'Select All';
@@ -6424,7 +7398,7 @@
 
       // Function to update Download All button count and file sizes
       function updateDownloadAllCount() {
-        const downloadAllBtn = document.querySelector('.action-button');
+        const downloadAllBtn = document.getElementById('download-all-btn');
         if (downloadAllBtn) {
           const nonIgnoredCards = document.querySelectorAll('#results-found .result-card:not(.ignored)');
           const svgContent = downloadAllBtn.querySelector('svg');
@@ -6454,6 +7428,8 @@
             sizeInfoElements[1].textContent = formattedSize; // Download ZIP
           }
         }
+
+        updateFoundSectionActionVisibility();
       }
       
       // Make globally accessible
@@ -6469,8 +7445,9 @@
       const toggleSelectAllBulkBtn = document.getElementById('toggle-select-all-bulk-btn');
       if (toggleSelectAllBulkBtn) {
         toggleSelectAllBulkBtn.addEventListener('click', () => {
-          const allCards = document.querySelectorAll('#results-found .result-card');
-          const allSelected = Array.from(allCards).every(card => 
+          const allCards = Array.from(document.querySelectorAll('#results-found .result-card'))
+            .filter(card => card.style.display !== 'none');
+          const allSelected = allCards.length > 0 && allCards.every(card =>
             window.selectedModsForBulk.has(card.dataset.projectId)
           );
           
@@ -6630,7 +7607,57 @@
       // Remove selected button
       const removeSelectedBulkBtn = document.getElementById('remove-selected-bulk-btn');
       if (removeSelectedBulkBtn) {
+        setRemoveButtonMode('remove');
         removeSelectedBulkBtn.addEventListener('click', async () => {
+          if (removeSelectedBulkBtn.dataset.mode === 'undo' && window.lastFullFoundRemovalState) {
+            const foundSection = document.getElementById('results-found');
+            const resultsList = foundSection ? foundSection.querySelector('.results-list') : null;
+            if (!resultsList) return;
+
+            const state = window.lastFullFoundRemovalState;
+            resultsList.innerHTML = '';
+            state.cards.forEach(card => resultsList.appendChild(card));
+
+            state.cards.forEach(card => {
+              const downloadLink = card.querySelector('.download-link');
+              if (!downloadLink) return;
+              downloadLink.classList.remove('selected');
+              if (window.isBulkActionsMode) {
+                downloadLink.classList.add('bulk-select-mode');
+                downloadLink.textContent = 'Select';
+                downloadLink.setAttribute('title', 'Select this mod for bulk actions');
+              } else if (downloadLink.classList.contains('ignored-state')) {
+                downloadLink.classList.remove('bulk-select-mode');
+                downloadLink.textContent = 'Ignored';
+                downloadLink.setAttribute('title', 'This mod is ignored');
+              } else {
+                downloadLink.classList.remove('bulk-select-mode');
+                downloadLink.textContent = 'Download';
+                downloadLink.setAttribute('title', 'Download this mod file');
+              }
+            });
+
+            successfulDownloads = state.successfulDownloads;
+            successfulDownloadKeys.clear();
+            state.successfulDownloadKeys.forEach(key => successfulDownloadKeys.add(key));
+
+            if (!window.ignoredMods) {
+              window.ignoredMods = new Set();
+            } else {
+              window.ignoredMods.clear();
+            }
+            state.ignoredMods.forEach(projectId => window.ignoredMods.add(projectId));
+
+            window.lastFullFoundRemovalState = null;
+            setRemoveButtonMode('remove');
+            syncSectionCountsFromDom();
+            updateBulkSelectionCounts();
+            if (typeof window.updateDownloadAllCount === "function") {
+              window.updateDownloadAllCount();
+            }
+            return;
+          }
+
           if (window.selectedModsForBulk.size === 0) {
             showCustomAlert('No mods selected. Please select mods to remove.', 'notice');
             return;
@@ -6642,13 +7669,43 @@
           );
           
           if (confirmed) {
+            const currentFoundCards = Array.from(document.querySelectorAll('#results-found .result-card'));
+            const isRemovingAllFoundCards = currentFoundCards.length > 0 && window.selectedModsForBulk.size === currentFoundCards.length;
+
+            if (isRemovingAllFoundCards) {
+              window.lastFullFoundRemovalState = {
+                cards: currentFoundCards,
+                successfulDownloads: successfulDownloads.slice(),
+                successfulDownloadKeys: Array.from(successfulDownloadKeys),
+                ignoredMods: Array.from(window.ignoredMods || [])
+              };
+            } else {
+              window.lastFullFoundRemovalState = null;
+              setRemoveButtonMode('remove');
+            }
+
             window.selectedModsForBulk.forEach(projectId => {
               const card = document.querySelector(`.result-card[data-project-id="${projectId}"]`);
               if (card) card.remove();
+              successfulDownloads = successfulDownloads.filter((dl) => dl.projectId !== projectId);
+              successfulDownloadKeys.clear();
+              for (const dl of successfulDownloads) {
+                successfulDownloadKeys.add(getSuccessfulDownloadKey(dl.projectId, dl.artifactType));
+              }
+              if (window.ignoredMods) {
+                window.ignoredMods.delete(projectId);
+              }
             });
             window.selectedModsForBulk.clear();
             window.lastClickedModIndex = null; // Reset shift+click tracking
+            syncSectionCountsFromDom();
             updateBulkSelectionCounts();
+            if (typeof window.updateDownloadAllCount === "function") {
+              window.updateDownloadAllCount();
+            }
+            if (isRemovingAllFoundCards) {
+              setRemoveButtonMode('undo');
+            }
           }
         });
       }
@@ -6700,6 +7757,12 @@
             card.style.display = "none";
           }
         });
+
+        if (sectionSelector === "#results-found") {
+          updateFoundSectionActionVisibility();
+        } else if (sectionSelector === "#results-warning") {
+          updateWarningSectionFilterVisibility();
+        }
       }
 
       // Add event listeners for search inputs
@@ -6753,6 +7816,15 @@
       let foundSortDirection = {}; // Track sort direction for each sort type
       let warningSortDirection = {}; // Track sort direction for each sort type
 
+      function updateSortButtonActiveStates() {
+        if (sortFoundBtn) {
+          sortFoundBtn.classList.toggle('active', currentFoundSort !== 'default');
+        }
+        if (sortWarningBtn) {
+          sortWarningBtn.classList.toggle('active', currentWarningSort !== 'default');
+        }
+      }
+
       // Toggle dropdown visibility
       function toggleSortDropdown(dropdown, otherDropdown) {
         dropdown.classList.toggle('show');
@@ -6803,6 +7875,7 @@
             applySorting('#results-found', sortType, isReversed);
           }
 
+          updateSortButtonActiveStates();
           sortFoundDropdown.classList.remove('show');
         }
       });
@@ -6835,6 +7908,7 @@
             applySorting('#results-warning', sortType, isReversed);
           }
 
+          updateSortButtonActiveStates();
           sortWarningDropdown.classList.remove('show');
         }
       });
@@ -6956,6 +8030,9 @@
           } else if (filterType === 'project_type') {
             const cardProjectType = extractProjectType(card);
             shouldShow = cardProjectType === filterValue;
+          } else if (filterType === 'supported_loader') {
+            const cardSupportedLoaders = extractSupportedLoaders(card);
+            shouldShow = cardSupportedLoaders.includes(filterValue);
           } else if (filterType === 'dependency_status') {
             const cardDependencyStatus = extractDependencyStatus(card);
             shouldShow = cardDependencyStatus === filterValue;
@@ -6970,6 +8047,12 @@
             card.style.display = 'none';
           }
         });
+
+        if (sectionSelector === "#results-found") {
+          updateFoundSectionActionVisibility();
+        } else if (sectionSelector === "#results-warning") {
+          updateWarningSectionFilterVisibility();
+        }
       }
 
       // Clear all filters for a section
@@ -6979,6 +8062,12 @@
         cards.forEach(card => {
           card.style.display = '';
         });
+
+        if (sectionSelector === "#results-found") {
+          updateFoundSectionActionVisibility();
+        } else if (sectionSelector === "#results-warning") {
+          updateWarningSectionFilterVisibility();
+        }
       }
 
       // Restore original order for a section
@@ -7159,6 +8248,12 @@
         return 'mod';
       }
 
+      function extractSupportedLoaders(card) {
+        const raw = card.dataset.supportedLoaders || '';
+        if (!raw) return [];
+        return raw.split(',').map(loader => loader.trim().toLowerCase()).filter(Boolean);
+      }
+
       function extractDependencyStatus(card) {
         // Check if this mod is a dependency (has dependency tag)
         const dependencyTag = card.querySelector('.dependency-tag');
@@ -7200,12 +8295,15 @@
         if (sortWarningDropdown) {
           selectSortOption(sortWarningDropdown, 'default');
         }
+        updateSortButtonActiveStates();
 
         // Clear any applied filters by showing all cards
         document.querySelectorAll('.result-card').forEach(card => {
           card.style.display = '';
         });
       };
+
+      updateSortButtonActiveStates();
     }
 
     // Helper function to copy text to clipboard and show feedback
@@ -7255,7 +8353,96 @@
       // Only show the count if it's greater than zero
       if (count > 0) {
         headerElement.textContent = `${baseText} (${count})`;
+      } else {
+        headerElement.textContent = baseText;
       }
+    }
+
+    // Keep section counts and headers synchronized after dynamic card removal.
+    function syncSectionCountsFromDom() {
+      const foundCount = document.querySelectorAll('#results-found .result-card').length;
+      const warningCount = document.querySelectorAll('#results-warning .result-card').length;
+      const failureCount = document.querySelectorAll('#results-failure .result-card').length;
+
+      sectionCounts.found = foundCount;
+      sectionCounts.warning = warningCount;
+      sectionCounts.failure = failureCount;
+
+      updateSectionHeader("found", foundCount);
+      updateSectionHeader("warning", warningCount);
+      updateSectionHeader("failure", failureCount);
+    }
+
+    function ensureFoundEmptyInlineMessage(foundSection) {
+      let messageEl = document.getElementById('found-empty-inline-message');
+      if (!messageEl && foundSection) {
+        messageEl = document.createElement('p');
+        messageEl.id = 'found-empty-inline-message';
+        messageEl.className = 'found-empty-inline-message';
+        messageEl.textContent = 'No updates remaining.';
+        foundSection.appendChild(messageEl);
+      }
+      return messageEl;
+    }
+
+    function ensureWarningEmptyInlineMessage(warningSection) {
+      let messageEl = document.getElementById('warning-empty-inline-message');
+      if (!messageEl && warningSection) {
+        messageEl = document.createElement('p');
+        messageEl.id = 'warning-empty-inline-message';
+        messageEl.className = 'found-empty-inline-message';
+        messageEl.textContent = 'No incompatible mods match the current filters.';
+        warningSection.appendChild(messageEl);
+      }
+      return messageEl;
+    }
+
+    function updateFoundSectionActionVisibility() {
+      const foundSection = document.getElementById('results-found');
+      if (!foundSection) return;
+
+      const foundCards = Array.from(foundSection.querySelectorAll('.result-card'));
+      const foundCardCount = foundCards.length;
+      const visibleFoundCardCount = foundCards.filter(card => card.style.display !== 'none').length;
+      const actionsContainer = document.getElementById('results-found-actions');
+      const statusBar = document.getElementById('results-found-download-status');
+      const messageEl = ensureFoundEmptyInlineMessage(foundSection);
+
+      const hasVisibleCards = visibleFoundCardCount > 0;
+      if (actionsContainer) actionsContainer.style.display = hasVisibleCards ? '' : 'none';
+      if (statusBar) statusBar.style.display = hasVisibleCards ? '' : 'none';
+      if (messageEl) {
+        if (!hasVisibleCards) {
+          messageEl.textContent = foundCardCount === 0
+            ? 'No updates remaining.'
+            : 'No updates match the current filters.';
+          messageEl.style.display = 'block';
+        } else {
+          messageEl.style.display = 'none';
+        }
+      }
+
+      if (!hasVisibleCards && window.isBulkActionsMode) {
+        window.selectedModsForBulk.clear();
+        window.lastClickedModIndex = null;
+        if (typeof window.updateBulkSelectionCounts === 'function') {
+          window.updateBulkSelectionCounts();
+        }
+      }
+    }
+
+    function updateWarningSectionFilterVisibility() {
+      const warningSection = document.getElementById('results-warning');
+      if (!warningSection) return;
+
+      const warningCards = Array.from(warningSection.querySelectorAll('.result-card'));
+      const warningCardCount = warningCards.length;
+      const visibleWarningCardCount = warningCards.filter(card => card.style.display !== 'none').length;
+      const messageEl = ensureWarningEmptyInlineMessage(warningSection);
+
+      if (!messageEl) return;
+      const shouldShow = warningCardCount > 0 && visibleWarningCardCount === 0;
+      messageEl.style.display = shouldShow ? 'block' : 'none';
     }
 
     function renderSingleResult(result) {
@@ -7285,14 +8472,13 @@
           break;
       }
 
-      // Increment the appropriate counter
-      if (countType) {
-        sectionCounts[countType]++;
-        updateSectionHeader(countType, sectionCounts[countType]);
-      }
-
       // First, check for duplicates.
       if (!(result.status === "success" && renderedArtifactIds.has(result.modId + '|' + result.project_type))) {
+        // Increment the counter only when we will actually render the card.
+        if (countType) {
+          sectionCounts[countType]++;
+          updateSectionHeader(countType, sectionCounts[countType]);
+        }
         // If it's NOT a duplicate (or it's a warning/failure), then we render it.
         const section = document.getElementById(sectionId);
         if (section) {
@@ -7308,33 +8494,47 @@
     }
 
     // --- Update Dependency Chain Tooltip ---
-    function updateDependencyChainTooltip(projectId, dependencyName) {
-      // Find all cards that are waiting for this dependency name
-      const resultCards = document.querySelectorAll('.result-card');
+    function updateDependencyChainTooltip(projectId) {
+      const parentIds = dependencyDependents.get(projectId);
+      if (parentIds && parentIds.size > 0) {
+        for (const parentProjectId of parentIds) {
+          const card = document.querySelector(`.result-card[data-project-id="${parentProjectId}"]`);
+          if (!card) continue;
 
-      resultCards.forEach(card => {
-        // Check if this card has dependencies that include the projectId
-        const cardProjectId = card.dataset.projectId;
+          const dependencyIds = reverseDependencyMap.get(parentProjectId);
+          if (!dependencyIds) continue;
 
-        if (!cardProjectId || !reverseDependencyMap.has(cardProjectId)) {
-          return;
+          const chainTooltip = card.querySelector('.dependency-chain-tooltip');
+          if (!chainTooltip) continue;
+
+          const dependencyNames = [];
+          for (const depId of dependencyIds) {
+            const modName = modIdToNameMap.get(depId);
+            dependencyNames.push(modName || depId);
+          }
+          chainTooltip.textContent = `Depends on: ${dependencyNames.join(", ")}`;
         }
+        return;
+      }
+
+      // Fallback: if we don't have an index yet, scan cards (older path).
+      const resultCards = document.querySelectorAll('.result-card');
+      resultCards.forEach(card => {
+        const cardProjectId = card.dataset.projectId;
+        if (!cardProjectId || !reverseDependencyMap.has(cardProjectId)) return;
 
         const dependencyIds = reverseDependencyMap.get(cardProjectId);
+        if (!dependencyIds.includes(projectId)) return;
 
-        // Check if this card depends on the projectId we just processed
-        if (dependencyIds.includes(projectId)) {
-          const chainTooltip = card.querySelector('.dependency-chain-tooltip');
-          if (chainTooltip) {
-            // Update the tooltip with the actual dependency names
-            const dependencyNames = [];
-            for (const depId of dependencyIds) {
-              const modName = modIdToNameMap.get(depId);
-              dependencyNames.push(modName || depId);
-            }
-            chainTooltip.textContent = `Depends on: ${dependencyNames.join(", ")}`;
-          }
+        const chainTooltip = card.querySelector('.dependency-chain-tooltip');
+        if (!chainTooltip) return;
+
+        const dependencyNames = [];
+        for (const depId of dependencyIds) {
+          const modName = modIdToNameMap.get(depId);
+          dependencyNames.push(modName || depId);
         }
+        chainTooltip.textContent = `Depends on: ${dependencyNames.join(", ")}`;
       });
     }
 
@@ -7370,10 +8570,12 @@
         });
 
         const actionsContainer = document.createElement("div");
+        actionsContainer.id = "results-found-actions";
         actionsContainer.className = "results-actions";
 
         // Shared download status bar for all download button clicks.
         const downloadStatusBar = document.createElement("p");
+        downloadStatusBar.id = "results-found-download-status";
         downloadStatusBar.className = "download-status-bar";
 
         // --- Create a dedicated container for the "Download All" button and its size ---
@@ -7382,6 +8584,7 @@
 
         // Create and add the "Download All" button to its group
         const downloadAllBtn = document.createElement("button");
+        downloadAllBtn.id = "download-all-btn";
         downloadAllBtn.className = "action-button";
         downloadAllBtn.setAttribute("title", "Download all compatible mod files as individual .jar files");
         downloadAllBtn.innerHTML = `Download All (${nonIgnoredDownloads.length})
@@ -7445,6 +8648,7 @@
 
         // Create the .zip button
         const downloadZipBtn = document.createElement("button");
+        downloadZipBtn.id = "download-zip-btn";
         downloadZipBtn.className = "action-button";
         downloadZipBtn.setAttribute("title", "Download all compatible mods packaged in a single .zip file");
         downloadZipBtn.innerHTML = `Download .zip
@@ -7485,6 +8689,8 @@
         foundSection.appendChild(actionsContainer);
         // Status bar (declared above) goes below the action buttons.
         foundSection.appendChild(downloadStatusBar);
+        ensureFoundEmptyInlineMessage(foundSection);
+        updateFoundSectionActionVisibility();
 
         // --- Calculate and add the size info to all button groups ---
         try {
@@ -7629,9 +8835,10 @@
         mod.server_side
       );
       const versionOptions = mod.all_versions
-        .map((v) => {
+        .map((v, index) => {
           const type = v.version_type.charAt(0).toUpperCase();
-          return `<option value="${v.id}">${v.version_number} [${type}]</option>`;
+          const selected = index === 0 ? " selected" : "";
+          return `<option value="${v.id}"${selected}>${v.version_number} [${type}]</option>`;
         })
         .join("");
 
@@ -7653,7 +8860,7 @@
                    <span class="mod-title-tag dependency-tag"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="puzzle-dependency-icon"><path d="M15.39 4.39a1 1 0 0 0 1.68-.474 2.5 2.5 0 1 1 3.014 3.015 1 1 0 0 0-.474 1.68l1.683 1.682a2.414 2.414 0 0 1 0 3.414L19.61 15.39a1 1 0 0 0-1.68-.474 2.5 2.5 0 1 0-3.014 3.015 1 1 0 0 0 .474 1.68l-1.683 1.682a2.414 2.414 0 0 1-3.414 0L8.61 19.61a1 1 0 0 0-1.68.474 2.5 2.5 0 1 1-3.014-3.015 1 1 0 0 0 .474-1.68l-1.683-1.682a2.414 2.414 0 0 1 0-3.414L4.39 8.61a1 1 0 0 1 1.68.474 2.5 2.5 0 1 0 3.014-3.015 1 1 0 0 1-.474-1.68l1.683-1.682a2.414 2.414 0 0 1 3.414 0z"/></svg></span>
                    <span class="dependency-tooltip">Required by: ${(() => {
             // Look up which mod requires this dependency
-            return dependencyMap.get(mod.projectId) || 'Unknown';
+            return getDependencyRequiredByText(mod.projectId);
           })()}</span>
                  </span>`
           : ""
@@ -7745,10 +8952,13 @@
 
         const primaryFile = selectArtifactFile(selectedVersion, mod.project_type);
 
+        const dlKey = getSuccessfulDownloadKey(mod.projectId, mod.project_type);
+
         // Remove previous version from downloads list if it exists
         const existingDownloadIndex = successfulDownloads.findIndex(dl => dl.projectId === mod.projectId && dl.artifactType === mod.project_type);
         if (existingDownloadIndex > -1) {
           successfulDownloads.splice(existingDownloadIndex, 1);
+          successfulDownloadKeys.delete(dlKey);
         }
 
         if (primaryFile) {
@@ -7756,6 +8966,7 @@
           downloadLink.setAttribute("download", primaryFile.filename);
 
           // --- Add new version to the list for bulk downloads ---
+          successfulDownloadKeys.add(dlKey);
           successfulDownloads.push({
             projectId: mod.projectId,
             url: primaryFile.url,
@@ -7769,6 +8980,9 @@
             client_side: mod.client_side,
             server_side: mod.server_side,
           });
+        }
+        if (typeof window.updateDownloadAllCount === "function") {
+          window.updateDownloadAllCount();
         }
         dateSpan.textContent = formatTimeAgo(selectedVersion.date_published);
         changelogContent.innerHTML = marked.parse(
@@ -7847,8 +9061,9 @@
         
         // Handle shift+click for range selection
         if (e.shiftKey && window.lastClickedModIndex !== null && window.lastClickedModIndex !== undefined) {
-          // Get all cards in the results section
-          const allCards = Array.from(document.querySelectorAll('#results-found .result-card'));
+          // Get visible cards in the results section
+          const allCards = Array.from(document.querySelectorAll('#results-found .result-card'))
+            .filter(card => card.style.display !== 'none');
           const currentIndex = allCards.indexOf(currentCard);
           
           if (currentIndex !== -1 && currentIndex !== window.lastClickedModIndex) {
@@ -7878,7 +9093,8 @@
             downloadLink.textContent = 'Select';
             
             // If we just deselected the last clicked mod, find the most recent still-selected mod
-            const allCards = Array.from(document.querySelectorAll('#results-found .result-card'));
+            const allCards = Array.from(document.querySelectorAll('#results-found .result-card'))
+              .filter(card => card.style.display !== 'none');
             const currentIndex = allCards.indexOf(currentCard);
             if (window.lastClickedModIndex === currentIndex) {
               // Find the last selected mod (highest index that's still selected)
@@ -7896,7 +9112,8 @@
             window.selectedModsForBulk.add(projectId);
             downloadLink.classList.add('selected');
             downloadLink.textContent = 'Selected';
-            const allCards = Array.from(document.querySelectorAll('#results-found .result-card'));
+            const allCards = Array.from(document.querySelectorAll('#results-found .result-card'))
+              .filter(card => card.style.display !== 'none');
             window.lastClickedModIndex = allCards.indexOf(currentCard);
           }
         }
@@ -8075,6 +9292,9 @@
       // We keep the 'warning' class for the yellow border
       card.className = "result-card warning";
       card.setAttribute('data-project-id', mod.projectId);
+      card.dataset.supportedLoaders = Array.isArray(mod.supportedLoaders)
+        ? mod.supportedLoaders.map(loader => String(loader).toLowerCase()).join(',')
+        : '';
       const clientServerInfo = getClientServerSupport(
         mod.client_side,
         mod.server_side
@@ -8430,7 +9650,17 @@
       }
 
       const filename = "MC-Mod-Updater.zip";
-      const zipButton = Array.from(document.querySelectorAll('.action-button')).find(btn => btn.textContent.includes('Download .zip'));
+      const zipButton = document.getElementById("download-zip-btn") ||
+        Array.from(document.querySelectorAll('.action-button')).find(btn => btn.textContent.includes('Download .zip'));
+      if (!zipButton) {
+        if (statusEl) {
+          statusEl.textContent = 'Download button not found.';
+          statusEl.classList.remove('success');
+          statusEl.classList.add('error');
+        }
+        showCustomAlert('Could not find the ZIP download button. Please refresh and try again.', 'error');
+        return;
+      }
       const originalText = zipButton.innerHTML;
 
       if (statusEl) {
@@ -8613,8 +9843,7 @@
     // Initialize cache on page load
     function initializeCache() {
       try {
-        // Clear any existing cache on page load to ensure fresh sessions
-        sessionStorage.removeItem(MOD_CACHE_KEY);
+        // Keep session cache across reloads (still version-checked + TTL-cleaned).
         cleanupExpiredCache();
       } catch (error) {
         console.warn('Cache initialization failed, clearing cache:', error);
@@ -8691,7 +9920,7 @@
       }
     }
 
-    // Get cache from sessionStorage (clears on browser refresh)
+    // Get cache from sessionStorage (persists for this tab until closed)
     function getCache() {
       try {
         const cached = sessionStorage.getItem(MOD_CACHE_KEY);
@@ -8711,7 +9940,7 @@
       }
     }
 
-    // Save cache to sessionStorage (clears on browser refresh)
+    // Save cache to sessionStorage
     function saveCache(cache) {
       try {
         cache.metadata.lastUpdated = Date.now();
