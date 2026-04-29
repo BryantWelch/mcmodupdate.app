@@ -5024,6 +5024,10 @@
 
     document.getElementById("current-year").textContent =
       new Date().getFullYear();
+
+    const MODRINTH_STATS_CACHE_KEY = "modrinth_stats_cache";
+    const MODRINTH_STATS_CACHE_TTL = 1000 * 60 * 60 * 24; // 24 hours
+
     async function populateMcVersions() {
       // Cache Minecraft versions for 24h to avoid unnecessary API calls
       const MC_VERSIONS_CACHE_KEY = "modrinth_game_versions_cache";
@@ -5171,24 +5175,23 @@
     }
 
     async function fetchModrinthStats() {
-      const cacheKey = "modrinth_stats_cache";
-      const ttl = 1000 * 60 * 60 * 24; // 24 hours — stats banner is decorative;
-      // a same-day stale value is fine and saves an API call on every reload.
+      const cacheKey = MODRINTH_STATS_CACHE_KEY;
+      const ttl = MODRINTH_STATS_CACHE_TTL; // Decorative stats can refresh weekly.
       const elProjects = document.getElementById("stat-projects");
       const elVersions = document.getElementById("stat-versions");
       const elFiles = document.getElementById("stat-files");
       const elAuthors = document.getElementById("stat-authors");
 
-      // Show cached stats immediately; skip refresh if cache is fresh
+      // Show cached stats immediately (even if stale), then refresh if needed.
       let cacheFresh = false;
       try {
         const cached = JSON.parse(localStorage.getItem(cacheKey));
-        if (cached && Date.now() - cached.ts < ttl) {
+        if (cached) {
           if (cached.projects != null) elProjects.textContent = cached.projects;
           if (cached.versions != null) elVersions.textContent = cached.versions;
           if (cached.files != null) elFiles.textContent = cached.files;
           if (cached.authors != null) elAuthors.textContent = cached.authors;
-          cacheFresh = true;
+          cacheFresh = cached.ts != null && Date.now() - cached.ts < ttl;
         }
       } catch (_) { /* ignore corrupt cache */ }
 
