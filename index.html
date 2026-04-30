@@ -694,6 +694,7 @@
       color: var(--secondary-text);
       font-size: 0.9rem;
       margin: 0;
+      white-space: pre-line;
       /* Margin will be part of the transition */
       max-height: 0;
       /* Start with zero height */
@@ -708,8 +709,10 @@
     .status-message.visible {
       margin-top: 0.5rem;
       /* Add margin when visible */
-      max-height: 6em;
-      /* Increased to accommodate more lines of text */
+      max-height: min(85vh, 36em);
+      /* Enough for extraction summary + totals + notices; scroll if unusually long */
+      overflow-x: hidden;
+      overflow-y: auto;
       opacity: 1;
       /* Animate to be fully visible */
     }
@@ -3379,6 +3382,26 @@
     const modalPlatformSelect = document.getElementById("modal-platform-select");
     const modalVersionSelect = document.getElementById("modal-version-select");
 
+    function countUploadAreaPills() {
+      return Array.from(fileListContainer.querySelectorAll(".file-pill")).filter((pill) => {
+        const label = pill.querySelector("span")?.textContent || "";
+        return !String(label).startsWith("Processing:");
+      }).length;
+    }
+
+    function refreshUpdateButtonLabel() {
+      if (isCurrentlySearching) return;
+      const n = countUploadAreaPills();
+      const countPart = n > 0 ? ` (${n})` : "";
+      updateButton.innerHTML = `Update${countPart}
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="17 8 12 3 7 8"></polyline>
+          <line x1="12" y1="3" x2="12" y2="15"></line>
+        </svg>`;
+    }
+
     const MOD_LOADERS = [
       { value: "fabric", label: "Fabric" },
       { value: "forge", label: "Forge" },
@@ -3846,6 +3869,8 @@
 
       // Hide the "Clear All" button since there's nothing to clear
       clearAllButton.style.display = "none";
+
+      refreshUpdateButtonLabel();
     }
 
     // --- Mod Search Functionality ---
@@ -3871,6 +3896,11 @@
     function hasAnyExtension(filename, extensions) {
       const lower = String(filename || "").toLowerCase();
       return extensions.some((ext) => lower.endsWith(ext));
+    }
+
+    function isAppGeneratedZipFilename(filename) {
+      const name = String(filename || "").trim();
+      return /^MC-Mod-Updater(?:\(\d+\))?\.zip$/i.test(name);
     }
 
     function getUploadFileKey(file) {
@@ -4684,6 +4714,29 @@
         fileInput.click();
       }
     });
+    dropzone.addEventListener("wheel", (event) => {
+      const maxScrollLeft = fileListContainer.scrollWidth - fileListContainer.clientWidth;
+      if (maxScrollLeft <= 0) return;
+
+      const normalizeDelta = (delta) => {
+        // WheelEvent.DOM_DELTA_LINE / DOM_DELTA_PAGE need scaling to pixels.
+        if (event.deltaMode === 1) return delta * 16;
+        if (event.deltaMode === 2) return delta * fileListContainer.clientWidth;
+        return delta;
+      };
+
+      const deltaX = normalizeDelta(event.deltaX);
+      const deltaY = normalizeDelta(event.deltaY);
+      const horizontalDelta = Math.abs(deltaY) > Math.abs(deltaX) ? deltaY : deltaX;
+      if (horizontalDelta === 0) return;
+
+      const previous = fileListContainer.scrollLeft;
+      const next = Math.min(maxScrollLeft, Math.max(0, previous + horizontalDelta));
+      if (next === previous) return;
+
+      fileListContainer.scrollLeft = next;
+      event.preventDefault();
+    }, { passive: false });
     fileInput.addEventListener("change", async (event) => {
       if (event.target.files.length > 0) {
         await handleFiles(event.target.files);
@@ -4692,9 +4745,10 @@
     });
 
     // Detects container .zip archives (flat folders: mods/, plugins/, datapacks/, resourcepacks/, shaderpacks/). Extracts inner files as File objects if container, otherwise returns null.
-    async function extractContainerZip(file) {
+    async function extractContainerZip(file, onProgress, options = {}) {
       try {
         const zip = await JSZip.loadAsync(file);
+        const { looseExtraction = false } = options;
         const paths = Object.keys(zip.files);
         const hasPath = (suffix) => paths.some(p => p.toLowerCase().endsWith(suffix.toLowerCase()));
 
@@ -4723,36 +4777,62 @@
         const knownLeadingWrappers = new Set(["overrides", ".minecraft", "minecraft", "instance"]);
 
         const extracted = [];
+        let processedEntries = 0;
+        let matchedEntries = 0;
+        const totalEntries = Object.values(zip.files).filter((entry) => !entry.dir).length;
+        const reportProgress = () => {
+          if (typeof onProgress === "function") {
+            onProgress({ processedEntries, totalEntries, matchedEntries });
+          }
+        };
+
+        reportProgress();
         for (const [path, entry] of Object.entries(zip.files)) {
           if (entry.dir) continue;
+          processedEntries++;
           const parts = path.split("/").filter(Boolean);
-          if (parts.length < 2) continue;
+          if (parts.length < 1) {
+            reportProgress();
+            continue;
+          }
 
           // Safe acceptance shapes:
           // - <folder>/<filename>
           // - <wrapper>/<folder>/<filename> where wrapper is known
           // - .../<folder>/<filename> under known wrappers (nested internals)
-          let folder = null;
-          let innerName = null;
+          let innerName = parts[parts.length - 1];
 
-          if (parts.length === 2) {
-            [folder, innerName] = parts;
-          } else {
-            const first = parts[0].toLowerCase();
-            if (!knownLeadingWrappers.has(first)) continue;
-            const candidateFolder = parts[parts.length - 2];
-            const candidateName = parts[parts.length - 1];
-            folder = candidateFolder;
-            innerName = candidateName;
+          if (!looseExtraction) {
+            let folder = null;
+            if (parts.length === 2) {
+              [folder, innerName] = parts;
+            } else {
+              const first = parts[0].toLowerCase();
+              if (!knownLeadingWrappers.has(first)) {
+                reportProgress();
+                continue;
+              }
+              folder = parts[parts.length - 2];
+              innerName = parts[parts.length - 1];
+            }
+
+            if (!allowedFoldersLower.has(String(folder).toLowerCase())) {
+              reportProgress();
+              continue;
+            }
           }
 
-          if (!allowedFoldersLower.has(String(folder).toLowerCase())) continue;
-          if (!hasAnyExtension(innerName, [".jar", ".zip"])) continue;
+          if (!hasAnyExtension(innerName, [".jar", ".zip"])) {
+            reportProgress();
+            continue;
+          }
           const blob = await entry.async("blob");
           const extractedFile = new File([blob], innerName, { type: "application/octet-stream" });
           // Preserve uniqueness even when different folders contain same basename.
           assignUploadFileKey(extractedFile, `${file.name}::${path.toLowerCase()}`);
           extracted.push(extractedFile);
+          matchedEntries++;
+          reportProgress();
         }
         return extracted.length > 0 ? extracted : null;
       } catch (e) {
@@ -4764,12 +4844,14 @@
     async function handleFiles(files) {
       if (files.length === 0) return;
 
-      // Check if a .mrpack file is among the dropped files
-      const mrpackFile = Array.from(files).find((file) =>
-        hasAnyExtension(file.name, [".mrpack"])
-      );
+      const allFiles = Array.from(files);
+      const mrpackFiles = allFiles.filter((file) => hasAnyExtension(file.name, [".mrpack"]));
+      const hasMixedMrpackDrop = mrpackFiles.length > 0 && mrpackFiles.length < allFiles.length;
+      const hasMultipleMrpacks = mrpackFiles.length > 1;
+      const mrpackFile = mrpackFiles[0] || null;
 
-      if (mrpackFile) {
+      // Auto-process .mrpack only when exactly one file was uploaded and it is .mrpack.
+      if (mrpackFile && mrpackFiles.length === 1 && allFiles.length === 1) {
         // If a modpack is found, clear everything and process only the pack.
         clearDropzone();
         // Add the .mrpack file itself to uploadedFiles so it can be updated as a whole package
@@ -4779,10 +4861,13 @@
       }
 
       // Expand container .zip files into their inner artifacts.
-      const containerCandidates = Array.from(files).filter((f) => hasAnyExtension(f.name, [".zip"]));
+      const containerCandidates = allFiles.filter((f) => hasAnyExtension(f.name, [".zip"]));
       const expandedFiles = [];
       const expansionSummary = []; // [{ name, count }] for user-facing feedback
       const processingPills = []; // temp UI pills shown during extraction
+      const totalContainerCount = containerCandidates.length;
+      let extractedArchiveCount = 0;
+      let extractionProgressActive = false;
 
       for (const candidate of containerCandidates) {
         const pill = createFilePill({ name: `Processing: ${candidate.name}...` });
@@ -4792,15 +4877,41 @@
       if (processingPills.length > 0) {
         dropzonePrompt.style.display = "none";
         dropzone.classList.add("dropzone-expanded");
+        progressBarContainer.style.display = "block";
+        progressBar.style.width = "0%";
+        extractionProgressActive = true;
       }
 
       const expandedContainerNames = new Set();
-      for (const candidate of containerCandidates) {
-        const inner = await extractContainerZip(candidate);
+      const updateExtractionProgressBar = (archiveIndex, processedEntries, totalEntries) => {
+        if (!extractionProgressActive || totalContainerCount === 0) return;
+        const safeTotalEntries = Math.max(totalEntries || 0, 1);
+        const perArchiveProgress = Math.min(processedEntries / safeTotalEntries, 1);
+        const completedPortion = (archiveIndex - 1) / totalContainerCount;
+        const currentPortion = perArchiveProgress / totalContainerCount;
+        const totalProgress = Math.min((completedPortion + currentPortion) * 100, 100);
+        progressBar.style.width = `${totalProgress}%`;
+      };
+
+      for (let i = 0; i < containerCandidates.length; i++) {
+        const candidate = containerCandidates[i];
+        const isAppGeneratedZip = isAppGeneratedZipFilename(candidate.name);
+        statusMessage.textContent = `Extracting archive ${i + 1}/${containerCandidates.length}: ${candidate.name}...`;
+        statusMessage.classList.add("visible");
+        const inner = await extractContainerZip(candidate, ({ processedEntries, totalEntries, matchedEntries }) => {
+          updateExtractionProgressBar(i + 1, processedEntries, totalEntries);
+          statusMessage.textContent =
+            `Extracting archive ${i + 1}/${containerCandidates.length}: ${candidate.name} (${processedEntries}/${totalEntries} scanned, ${matchedEntries} extracted)`;
+        }, { looseExtraction: isAppGeneratedZip });
+        extractedArchiveCount++;
+        updateExtractionProgressBar(extractedArchiveCount, 1, 1);
         if (inner && inner.length > 0) {
           expandedFiles.push(...inner);
           expandedContainerNames.add(candidate.name);
           expansionSummary.push({ name: candidate.name, count: inner.length });
+        } else if (isAppGeneratedZip) {
+          // Keep the upload list focused on extracted artifacts for app-generated bundles.
+          expandedContainerNames.add(candidate.name);
         }
       }
 
@@ -4808,19 +4919,49 @@
       for (const pill of processingPills) {
         if (pill && pill.parentNode) pill.parentNode.removeChild(pill);
       }
+      refreshUpdateButtonLabel();
+      if (extractionProgressActive) {
+        progressBar.style.width = "100%";
+        setTimeout(() => {
+          progressBarContainer.style.display = "none";
+          progressBar.style.width = "0%";
+        }, 250);
+      }
 
       // Build the effective input list: keep everything that wasn't a container,
       // plus the extracted contents of every container that was one.
       const effectiveFiles = [
-        ...Array.from(files).filter(f => !expandedContainerNames.has(f.name)),
+        ...allFiles.filter(f => !expandedContainerNames.has(f.name)),
         ...expandedFiles,
       ];
 
-      // Separate validation for better error messages
-      const acceptedFiles = effectiveFiles.filter((file) => hasAnyExtension(file.name, [".jar", ".zip"]));
-      const duplicateFiles = acceptedFiles.filter((file) => isUploadedFileDuplicate(file));
-      const validFiles = acceptedFiles.filter((file) => !isUploadedFileDuplicate(file));
-      const invalidFiles = effectiveFiles.filter((file) => !hasAnyExtension(file.name, [".jar", ".zip"]));
+      // Separate validation for better error messages.
+      // Dedupe happens once here at the end of drag processing so it catches:
+      // 1) duplicates already uploaded in prior drops, and
+      // 2) duplicates inside this same drop batch.
+      const acceptedFiles = effectiveFiles.filter((file) => hasAnyExtension(file.name, [".jar", ".zip", ".mrpack"]));
+      const duplicateFiles = [];
+      const validFiles = [];
+      const batchSeenKeys = new Set();
+      for (const file of acceptedFiles) {
+        const normalizedName = normalizeUploadFilename(file?.name);
+        const size = Number.isFinite(file?.size) ? file.size : null;
+        const batchKey = normalizedName
+          ? (size !== null ? `${normalizedName}|${size}` : `name:${normalizedName}`)
+          : "";
+
+        const duplicateInBatch = batchKey ? batchSeenKeys.has(batchKey) : false;
+        const duplicateAlreadyUploaded = isUploadedFileDuplicate(file);
+
+        if (duplicateInBatch || duplicateAlreadyUploaded) {
+          duplicateFiles.push(file);
+          continue;
+        }
+
+        if (batchKey) batchSeenKeys.add(batchKey);
+        validFiles.push(file);
+      }
+      const invalidFiles = effectiveFiles.filter((file) => !hasAnyExtension(file.name, [".jar", ".zip", ".mrpack"]));
 
       if (validFiles.length > 0) {
         // Only update UI if we have valid files
@@ -4835,9 +4976,25 @@
 
         // If we expanded any containers, tell the user what happened so the
         // sudden appearance of many pills isn't surprising.
+        const uploadNotices = [];
         if (expansionSummary.length > 0) {
-          const parts = expansionSummary.map(s => `${s.name} (${s.count})`).join(", ");
-          statusMessage.textContent = `Extracted from archive: ${parts}`;
+          const totalExtracted = expansionSummary.reduce((sum, item) => sum + item.count, 0);
+          const archiveCount = expansionSummary.length;
+          const fileWord = totalExtracted === 1 ? "file" : "files";
+          if (archiveCount === 1) {
+            uploadNotices.push(`Extracted ${totalExtracted} ${fileWord} from archive.`);
+          } else {
+            uploadNotices.push(`Extracted ${totalExtracted} ${fileWord} from ${archiveCount} archives.`);
+          }
+        }
+        if (hasMixedMrpackDrop) {
+          uploadNotices.push("Mixed upload detected: .mrpack manifest extraction was skipped.");
+        }
+        if (hasMultipleMrpacks) {
+          uploadNotices.push("Multiple .mrpack files detected: manifest extraction was skipped.");
+        }
+        if (uploadNotices.length > 0) {
+          statusMessage.textContent = uploadNotices.join("\n");
           statusMessage.classList.add("visible");
         }
       } else {
@@ -4851,7 +5008,7 @@
           );
         } else if (invalidFiles.length > 0) {
           showCustomAlert(
-            "Please upload valid files (.jar, .zip) or a Modrinth modpack (.mrpack).",
+            "Please upload valid files (.jar, .zip, .mrpack).",
             "notice",
             "Invalid File Type"
           );
@@ -4861,6 +5018,14 @@
 
     // --- Process .mrpack file ---
     async function processMrpack(packFile) {
+      const finishMrpackProgressBar = () => {
+        progressBar.style.width = "100%";
+        setTimeout(() => {
+          progressBarContainer.style.display = "none";
+          progressBar.style.width = "0%";
+        }, 250);
+      };
+
       try {
         // Update UI to show processing has started
         dropzonePrompt.style.display = "none";
@@ -4872,10 +5037,15 @@
         statusMessage.textContent = `Processing modpack: ${packFile.name}...`;
         statusMessage.classList.add("visible");
 
+        progressBarContainer.style.display = "block";
+        progressBar.style.width = "5%";
+
         const zip = await JSZip.loadAsync(packFile);
+        progressBar.style.width = "18%";
         const manifestFile = zip.file("modrinth.index.json");
 
         if (!manifestFile) {
+          finishMrpackProgressBar();
           showCustomAlert(
             "The uploaded file is not a valid Modrinth modpack (missing modrinth.index.json).",
             "error"
@@ -4885,6 +5055,7 @@
         }
 
         const content = await manifestFile.async("string");
+        progressBar.style.width = "28%";
         const manifest = JSON.parse(content);
 
         // --- Informational Message: Get Source Version and Loader ---
@@ -4914,10 +5085,17 @@
 
         // The manifest.files array contains the list of mods
         let parsedModsCount = 0;
-        if (manifest.files && manifest.files.length > 0) {
+        const manifestFiles = manifest.files && manifest.files.length > 0 ? manifest.files : [];
+        if (manifestFiles.length > 0) {
           let skippedWithoutSha1 = 0;
           let addedByProjectId = 0;
-          for (const modFile of manifest.files) {
+          const entryTotal = manifestFiles.length;
+          for (let fi = 0; fi < entryTotal; fi++) {
+            const modFile = manifestFiles[fi];
+            // Progress: ~28% after parse → ~96% by end of entries (remainder for finish)
+            progressBar.style.width = `${28 + ((fi + 1) / entryTotal) * 68}%`;
+            statusMessage.textContent =
+              `Processing modpack: ${packFile.name} (${fi + 1}/${entryTotal} entries)...`;
             // The path often looks like "mods/fabric-api-0.91.0.jar"
             const filename = modFile.path.split("/").pop();
             const sha1Hash = modFile.hashes?.sha1 || null;
@@ -4967,13 +5145,18 @@
             skippedNote;
           statusMessage.classList.add("visible");
         } else {
+          progressBar.style.width = "92%";
           statusMessage.textContent =
             `Detected modpack: ${packDisplayName} [${sourceLoader}] for Minecraft ${sourceVersion}. ` +
             `Parsed 0 mods. Checking updates for the modpack.`;
           statusMessage.classList.add("visible");
         }
+
+        finishMrpackProgressBar();
       } catch (error) {
         console.error("Error processing .mrpack file:", error);
+        progressBarContainer.style.display = "none";
+        progressBar.style.width = "0%";
         showCustomAlert(
           "Could not read the uploaded .mrpack file. It may be corrupt.",
           "error"
@@ -5003,6 +5186,7 @@
         }
         filePill.remove();
         if (onRemove) onRemove();
+        refreshUpdateButtonLabel();
         if (uploadedFiles.size === 0 && searchedMods.size === 0 && mrpackMods.size === 0) {
           dropzonePrompt.style.display = "block";
           dropzone.classList.remove("dropzone-expanded");
@@ -5017,6 +5201,7 @@
       };
       filePill.appendChild(removeButton);
       fileListContainer.appendChild(filePill);
+      refreshUpdateButtonLabel();
       // Returning the element lets callers (e.g., the container-zip extractor)
       // remove transient "Processing..." pills once work completes.
       return filePill;
@@ -5278,6 +5463,8 @@
       // Configure modal loader options based on active project type
       updateModalLoaderOptions(projectTypeSelect.value, modLoaderSelect.value);
       modalVersionSelect.value = mcVersionSelect.value;
+
+      refreshUpdateButtonLabel();
     });
 
     // --- UI State Reset Function ---
@@ -5324,22 +5511,7 @@
 
       // Re-enable the update button
       updateButton.disabled = false;
-      updateButton.innerHTML = `Update
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-    >
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-      <polyline points="17 8 12 3 7 8"></polyline>
-      <line x1="12" y1="3" x2="12" y2="15"></line>
-    </svg>`;
+      refreshUpdateButtonLabel();
     }
 
     // --- Skeleton Loading Functions ---
@@ -5807,22 +5979,7 @@
         isCurrentlySearching = false;
         // Always reset the button state
         updateButton.disabled = false;
-        updateButton.innerHTML = `Update
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="20"
-        height="20"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      >
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-        <polyline points="17 8 12 3 7 8"></polyline>
-        <line x1="12" y1="3" x2="12" y2="15"></line>
-      </svg>`;
+        refreshUpdateButtonLabel();
 
         // Ensure we show the final summary if it was calculated
         if (window.finalSummaryText && sectionCounts.found > 0) {
@@ -9717,9 +9874,9 @@
         if (statusEl) {
           const succeeded = downloadsToProcess.length - failedCount;
           if (failedCount > 0) {
-            statusEl.textContent = `✓ Downloaded ${succeeded} file${succeeded !== 1 ? 's' : ''} (${failedCount} failed) • ${zipSizeMB}`;
+            statusEl.textContent = `✓ Created ${filename} • ${succeeded} file${succeeded !== 1 ? 's' : ''} • ${zipSizeMB} (${failedCount} failed)`;
           } else {
-            statusEl.textContent = `✓ Downloaded ${succeeded} file${succeeded !== 1 ? 's' : ''} • ${zipSizeMB}`;
+            statusEl.textContent = `✓ Created ${filename} • ${succeeded} file${succeeded !== 1 ? 's' : ''} • ${zipSizeMB}`;
           }
           statusEl.classList.remove('error');
           statusEl.classList.add('success');
