@@ -4896,27 +4896,38 @@
       event.target.value = null;
     });
 
+    // Returns true when the zip's lowercased path list belongs to a self-contained
+    // single artifact (mod, resource/data pack, shader pack, or mrpack payload)
+    // rather than a container that should be expanded. Used by both
+    // extractContainerZip and isLikelyContainerZip to stay in sync.
+    function isSingleArtifactZip(lowerPaths) {
+      // Root-level file check — handles both "file.ext" and "/file.ext" path formats
+      // that different zip tools may produce.
+      const hasRootFile = (name) => lowerPaths.some(p => p === name || p === `/${name}`);
+      return (
+        hasRootFile("fabric.mod.json") ||
+        hasRootFile("quilt.mod.json") ||
+        // Forge / NeoForge manifests live one level deep under META-INF/
+        lowerPaths.some(p => p === "meta-inf/mods.toml"          || p === "/meta-inf/mods.toml" ||
+                              p === "meta-inf/neoforge.mods.toml" || p === "/meta-inf/neoforge.mods.toml") ||
+        hasRootFile("pack.mcmeta") ||       // resource pack or data pack
+        hasRootFile("modrinth.index.json") || // .mrpack payload misnamed as .zip
+        lowerPaths.some(p => p.startsWith("shaders/")) // shader pack content at root
+      );
+    }
+
     // Detects container .zip archives (flat folders: mods/, plugins/, datapacks/, resourcepacks/, shaderpacks/). Extracts inner files as File objects if container, otherwise returns null.
     async function extractContainerZip(file, onProgress, options = {}) {
       try {
         const zip = await JSZip.loadAsync(file);
         const { looseExtraction = false } = options;
         const paths = Object.keys(zip.files);
-        const hasPath = (suffix) => paths.some(p => p.toLowerCase().endsWith(suffix.toLowerCase()));
 
-        // Bail if this is a single-artifact zip: mod .jar renamed to .zip, or a
-        // resource/data pack (pack.mcmeta at root). `detectZipContentType`
-        // handles those cases downstream.
-        if (
-          hasPath("/fabric.mod.json") || hasPath("fabric.mod.json") ||
-          hasPath("/quilt.mod.json") || hasPath("quilt.mod.json") ||
-          hasPath("/meta-inf/mods.toml") || hasPath("meta-inf/mods.toml") ||
-          hasPath("/meta-inf/neoforge.mods.toml") || hasPath("meta-inf/neoforge.mods.toml") ||
-          hasPath("/pack.mcmeta") || hasPath("pack.mcmeta") ||
-          hasPath("/modrinth.index.json") || hasPath("modrinth.index.json") // .mrpack payload misnamed as .zip
-        ) {
-          return null;
-        }
+        // Bail if this is a single-artifact zip — detectZipContentType handles
+        // those cases downstream. isSingleArtifactZip uses root-level matching
+        // so a container that merely has overrides/pack.mcmeta inside won't bail.
+        const lowerPaths = paths.map(p => p.toLowerCase());
+        if (isSingleArtifactZip(lowerPaths)) return null;
 
         // Derive allowed folders from ARTIFACT_CONFIG for automatic support of new artifact types.
         const allowedFolders = new Set(
@@ -4952,9 +4963,12 @@
           // - <folder>/<filename>
           // - <wrapper>/<folder>/<filename> where wrapper is known
           // - .../<folder>/<filename> under known wrappers (nested internals)
+          // .mrpack files are extracted regardless of folder structure since they
+          // don't live under a standard artifact folder (mods/, shaderpacks/, etc.).
           let innerName = parts[parts.length - 1];
+          const innerIsMrpack = hasAnyExtension(innerName, [".mrpack"]);
 
-          if (!looseExtraction) {
+          if (!looseExtraction && !innerIsMrpack) {
             let folder = null;
             if (parts.length === 2) {
               [folder, innerName] = parts;
@@ -4974,7 +4988,7 @@
             }
           }
 
-          if (!hasAnyExtension(innerName, [".jar", ".zip"])) {
+          if (!hasAnyExtension(innerName, [".jar", ".zip", ".mrpack"])) {
             reportProgress();
             continue;
           }
@@ -4990,6 +5004,39 @@
       } catch (e) {
         // Corrupt/non-zip payload — let the normal path handle/validate it.
         return null;
+      }
+    }
+
+    // Quick pre-screen: returns false for known single-artifact zips (shaders,
+    // resource/data packs, mods, etc.) that should never be treated as containers.
+    // Avoids showing extraction UI for files that extractContainerZip would bail on anyway.
+    // Uses isSingleArtifactZip so both functions stay in sync automatically.
+    async function isLikelyContainerZip(file) {
+      try {
+        const zip = await JSZip.loadAsync(file);
+        const paths = Object.keys(zip.files);
+        const lowerPaths = paths.map(p => p.toLowerCase());
+
+        if (isSingleArtifactZip(lowerPaths)) return false;
+
+        // A zip containing an inner .mrpack is always a container worth extracting
+        // regardless of folder structure (mrpacks don't live under a standard folder).
+        if (lowerPaths.some(p => p.endsWith(".mrpack"))) return true;
+
+        // Must have at least one file in an allowed container folder to be worth extracting.
+        const allowedFolders = new Set(Object.values(ARTIFACT_CONFIG).map(cfg => cfg.folder).filter(Boolean));
+        const allowedFoldersLower = new Set(Array.from(allowedFolders).map(f => f.toLowerCase()));
+        const knownLeadingWrappers = new Set(["overrides", ".minecraft", "minecraft", "instance"]);
+        return lowerPaths.some(lp => {
+          const parts = lp.split("/").filter(Boolean);
+          if (parts.length === 2) return allowedFoldersLower.has(parts[0]);
+          if (parts.length >= 3 && knownLeadingWrappers.has(parts[0])) {
+            return allowedFoldersLower.has(parts[parts.length - 2]);
+          }
+          return false;
+        });
+      } catch {
+        return false;
       }
     }
 
@@ -5013,7 +5060,12 @@
       }
 
       // Expand container .zip files into their inner artifacts.
-      const containerCandidates = allFiles.filter((f) => hasAnyExtension(f.name, [".zip"]));
+      // Pre-screen all .zip files to exclude single-artifact zips (shaders, resource
+      // packs, etc.) before showing any extraction UI.
+      const zipCandidates = allFiles.filter((f) => hasAnyExtension(f.name, [".zip"]));
+      const containerCandidates = (
+        await Promise.all(zipCandidates.map(f => isLikelyContainerZip(f).then(ok => ok ? f : null)))
+      ).filter(Boolean);
       const expandedFiles = [];
       const expansionSummary = []; // [{ name, count }] for user-facing feedback
       const processingPills = []; // temp UI pills shown during extraction
