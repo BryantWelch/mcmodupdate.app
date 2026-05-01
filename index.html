@@ -4058,11 +4058,7 @@
       const lower = String(filename || "").toLowerCase();
       return extensions.some((ext) => lower.endsWith(ext));
     }
-
-    function isAppGeneratedZipFilename(filename) {
-      const name = String(filename || "").trim();
-      return /^MC-Mod-Updater(?:\(\d+\))?\.zip$/i.test(name);
-    }
+    const SUPPORTED_UPLOAD_EXTENSIONS = [".jar", ".zip", ".mrpack"];
 
     function getUploadFileKey(file) {
       if (!file) return "";
@@ -4898,8 +4894,7 @@
 
     // Returns true when the zip's lowercased path list belongs to a self-contained
     // single artifact (mod, resource/data pack, shader pack, or mrpack payload)
-    // rather than a container that should be expanded. Used by both
-    // extractContainerZip and isLikelyContainerZip to stay in sync.
+    // rather than a container that should be expanded.
     function isSingleArtifactZip(lowerPaths) {
       // Root-level file check — handles both "file.ext" and "/file.ext" path formats
       // that different zip tools may produce.
@@ -4916,18 +4911,27 @@
       );
     }
 
-    // Detects container .zip archives (flat folders: mods/, plugins/, datapacks/, resourcepacks/, shaderpacks/). Extracts inner files as File objects if container, otherwise returns null.
-    async function extractContainerZip(file, onProgress, options = {}) {
+    // Pure zip analyzer: decides whether a zip is a container archive and
+    // returns extracted uploadable inner files when applicable.
+    async function analyzeZipArchive(file) {
       try {
         const zip = await JSZip.loadAsync(file);
-        const { looseExtraction = false } = options;
-        const paths = Object.keys(zip.files);
+        const zipEntries = Object.entries(zip.files);
+        const paths = zipEntries.map(([path]) => path);
 
         // Bail if this is a single-artifact zip — detectZipContentType handles
         // those cases downstream. isSingleArtifactZip uses root-level matching
         // so a container that merely has overrides/pack.mcmeta inside won't bail.
         const lowerPaths = paths.map(p => p.toLowerCase());
-        if (isSingleArtifactZip(lowerPaths)) return null;
+        const totalEntries = zipEntries.reduce((count, [, entry]) => count + (entry.dir ? 0 : 1), 0);
+        if (isSingleArtifactZip(lowerPaths)) {
+          return {
+            extractedFiles: [],
+            totalEntries,
+            matchedEntries: 0,
+            isContainer: false,
+          };
+        }
 
         // Derive allowed folders from ARTIFACT_CONFIG for automatic support of new artifact types.
         const allowedFolders = new Set(
@@ -4942,20 +4946,11 @@
         const extracted = [];
         let processedEntries = 0;
         let matchedEntries = 0;
-        const totalEntries = Object.values(zip.files).filter((entry) => !entry.dir).length;
-        const reportProgress = () => {
-          if (typeof onProgress === "function") {
-            onProgress({ processedEntries, totalEntries, matchedEntries });
-          }
-        };
-
-        reportProgress();
-        for (const [path, entry] of Object.entries(zip.files)) {
+        for (const [path, entry] of zipEntries) {
           if (entry.dir) continue;
           processedEntries++;
           const parts = path.split("/").filter(Boolean);
           if (parts.length < 1) {
-            reportProgress();
             continue;
           }
 
@@ -4968,14 +4963,13 @@
           let innerName = parts[parts.length - 1];
           const innerIsMrpack = hasAnyExtension(innerName, [".mrpack"]);
 
-          if (!looseExtraction && !innerIsMrpack) {
+          if (!innerIsMrpack) {
             let folder = null;
             if (parts.length === 2) {
               [folder, innerName] = parts;
             } else {
               const first = parts[0].toLowerCase();
               if (!knownLeadingWrappers.has(first)) {
-                reportProgress();
                 continue;
               }
               folder = parts[parts.length - 2];
@@ -4983,13 +4977,11 @@
             }
 
             if (!allowedFoldersLower.has(String(folder).toLowerCase())) {
-              reportProgress();
               continue;
             }
           }
 
-          if (!hasAnyExtension(innerName, [".jar", ".zip", ".mrpack"])) {
-            reportProgress();
+          if (!hasAnyExtension(innerName, SUPPORTED_UPLOAD_EXTENSIONS)) {
             continue;
           }
           const blob = await entry.async("blob");
@@ -4998,86 +4990,60 @@
           assignUploadFileKey(extractedFile, `${file.name}::${path.toLowerCase()}`);
           extracted.push(extractedFile);
           matchedEntries++;
-          reportProgress();
         }
-        return extracted.length > 0 ? extracted : null;
+        return {
+          extractedFiles: extracted,
+          totalEntries,
+          matchedEntries,
+          isContainer: extracted.length > 0,
+          processedEntries,
+        };
       } catch (e) {
         // Corrupt/non-zip payload — let the normal path handle/validate it.
         return null;
       }
     }
 
-    // Quick pre-screen: returns false for known single-artifact zips (shaders,
-    // resource/data packs, mods, etc.) that should never be treated as containers.
-    // Avoids showing extraction UI for files that extractContainerZip would bail on anyway.
-    // Uses isSingleArtifactZip so both functions stay in sync automatically.
-    async function isLikelyContainerZip(file) {
-      try {
-        const zip = await JSZip.loadAsync(file);
-        const paths = Object.keys(zip.files);
-        const lowerPaths = paths.map(p => p.toLowerCase());
-
-        if (isSingleArtifactZip(lowerPaths)) return false;
-
-        // A zip containing an inner .mrpack is always a container worth extracting
-        // regardless of folder structure (mrpacks don't live under a standard folder).
-        if (lowerPaths.some(p => p.endsWith(".mrpack"))) return true;
-
-        // Must have at least one file in an allowed container folder to be worth extracting.
-        const allowedFolders = new Set(Object.values(ARTIFACT_CONFIG).map(cfg => cfg.folder).filter(Boolean));
-        const allowedFoldersLower = new Set(Array.from(allowedFolders).map(f => f.toLowerCase()));
-        const knownLeadingWrappers = new Set(["overrides", ".minecraft", "minecraft", "instance"]);
-        return lowerPaths.some(lp => {
-          const parts = lp.split("/").filter(Boolean);
-          if (parts.length === 2) return allowedFoldersLower.has(parts[0]);
-          if (parts.length >= 3 && knownLeadingWrappers.has(parts[0])) {
-            return allowedFoldersLower.has(parts[parts.length - 2]);
-          }
-          return false;
-        });
-      } catch {
-        return false;
-      }
-    }
-
-    async function handleFiles(files) {
-      if (files.length === 0) return;
-
-      const allFiles = Array.from(files);
+    function getMrpackUploadContext(allFiles) {
       const mrpackFiles = allFiles.filter((file) => hasAnyExtension(file.name, [".mrpack"]));
       const hasMixedMrpackDrop = mrpackFiles.length > 0 && mrpackFiles.length < allFiles.length;
       const hasMultipleMrpacks = mrpackFiles.length > 1;
       const mrpackFile = mrpackFiles[0] || null;
+      const isUploadAreaEmpty = uploadedFiles.size === 0 && mrpackMods.size === 0;
+      const shouldAutoProcessMrpack =
+        Boolean(mrpackFile) &&
+        mrpackFiles.length === 1 &&
+        allFiles.length === 1 &&
+        isUploadAreaEmpty;
+      return {
+        mrpackFiles,
+        mrpackFile,
+        hasMixedMrpackDrop,
+        hasMultipleMrpacks,
+        isUploadAreaEmpty,
+        shouldAutoProcessMrpack,
+      };
+    }
 
-      // Auto-process .mrpack only when exactly one file was uploaded and it is .mrpack.
-      if (mrpackFile && mrpackFiles.length === 1 && allFiles.length === 1) {
-        // If a modpack is found, clear everything and process only the pack.
-        clearDropzone();
-        // Add the .mrpack file itself to uploadedFiles so it can be updated as a whole package
-        uploadedFiles.set(assignUploadFileKey(mrpackFile), mrpackFile);
-        processMrpack(mrpackFile);
-        return;
+    async function expandContainerZips(allFiles) {
+      const zipCandidates = allFiles.filter((f) => hasAnyExtension(f.name, [".zip"]));
+      if (zipCandidates.length === 0) {
+        return { effectiveFiles: allFiles, expansionSummary: [] };
       }
 
-      // Expand container .zip files into their inner artifacts.
-      // Pre-screen all .zip files to exclude single-artifact zips (shaders, resource
-      // packs, etc.) before showing any extraction UI.
-      const zipCandidates = allFiles.filter((f) => hasAnyExtension(f.name, [".zip"]));
-      const containerCandidates = (
-        await Promise.all(zipCandidates.map(f => isLikelyContainerZip(f).then(ok => ok ? f : null)))
-      ).filter(Boolean);
       const expandedFiles = [];
-      const expansionSummary = []; // [{ name, count }] for user-facing feedback
-      const processingPills = []; // temp UI pills shown during extraction
-      const totalContainerCount = containerCandidates.length;
+      const expansionSummary = [];
+      const processingPills = [];
+      const totalZipCount = zipCandidates.length;
       let extractedArchiveCount = 0;
       let extractionProgressActive = false;
+      const expandedContainerNames = new Set();
 
-      for (const candidate of containerCandidates) {
+      for (const candidate of zipCandidates) {
         const pill = createFilePill({ name: `Processing: ${candidate.name}...` });
         processingPills.push(pill);
       }
-      // Ensure the dropzone is expanded while we work so the pills are visible.
+
       if (processingPills.length > 0) {
         dropzonePrompt.style.display = "none";
         dropzone.classList.add("dropzone-expanded");
@@ -5086,44 +5052,43 @@
         extractionProgressActive = true;
       }
 
-      const expandedContainerNames = new Set();
       const updateExtractionProgressBar = (archiveIndex, processedEntries, totalEntries) => {
-        if (!extractionProgressActive || totalContainerCount === 0) return;
+        if (!extractionProgressActive || totalZipCount === 0) return;
         const safeTotalEntries = Math.max(totalEntries || 0, 1);
         const perArchiveProgress = Math.min(processedEntries / safeTotalEntries, 1);
-        const completedPortion = (archiveIndex - 1) / totalContainerCount;
-        const currentPortion = perArchiveProgress / totalContainerCount;
+        const completedPortion = (archiveIndex - 1) / totalZipCount;
+        const currentPortion = perArchiveProgress / totalZipCount;
         const totalProgress = Math.min((completedPortion + currentPortion) * 100, 100);
         progressBar.style.width = `${totalProgress}%`;
       };
 
-      for (let i = 0; i < containerCandidates.length; i++) {
-        const candidate = containerCandidates[i];
-        const isAppGeneratedZip = isAppGeneratedZipFilename(candidate.name);
-        statusMessage.textContent = `Extracting archive ${i + 1}/${containerCandidates.length}: ${candidate.name}...`;
+      for (let i = 0; i < zipCandidates.length; i++) {
+        const candidate = zipCandidates[i];
+        statusMessage.textContent = `Inspecting archive ${i + 1}/${zipCandidates.length}: ${candidate.name}...`;
         statusMessage.classList.add("visible");
-        const inner = await extractContainerZip(candidate, ({ processedEntries, totalEntries, matchedEntries }) => {
-          updateExtractionProgressBar(i + 1, processedEntries, totalEntries);
+
+        const analysis = await analyzeZipArchive(candidate);
+        if (analysis) {
+          updateExtractionProgressBar(i + 1, analysis.totalEntries, analysis.totalEntries);
           statusMessage.textContent =
-            `Extracting archive ${i + 1}/${containerCandidates.length}: ${candidate.name} (${processedEntries}/${totalEntries} scanned, ${matchedEntries} extracted)`;
-        }, { looseExtraction: isAppGeneratedZip });
+            `Inspecting archive ${i + 1}/${zipCandidates.length}: ${candidate.name} (${analysis.totalEntries} scanned, ${analysis.matchedEntries} extracted)`;
+        }
+
         extractedArchiveCount++;
         updateExtractionProgressBar(extractedArchiveCount, 1, 1);
-        if (inner && inner.length > 0) {
-          expandedFiles.push(...inner);
+
+        if (analysis && analysis.extractedFiles.length > 0) {
+          expandedFiles.push(...analysis.extractedFiles);
           expandedContainerNames.add(candidate.name);
-          expansionSummary.push({ name: candidate.name, count: inner.length });
-        } else if (isAppGeneratedZip) {
-          // Keep the upload list focused on extracted artifacts for app-generated bundles.
-          expandedContainerNames.add(candidate.name);
+          expansionSummary.push({ name: candidate.name, count: analysis.extractedFiles.length });
         }
       }
 
-      // Remove the temporary "Processing: ..." pills now that extraction is done.
       for (const pill of processingPills) {
         if (pill && pill.parentNode) pill.parentNode.removeChild(pill);
       }
       refreshUpdateButtonLabel();
+
       if (extractionProgressActive) {
         progressBar.style.width = "100%";
         setTimeout(() => {
@@ -5132,22 +5097,26 @@
         }, 250);
       }
 
-      // Build the effective input list: keep everything that wasn't a container,
-      // plus the extracted contents of every container that was one.
       const effectiveFiles = [
-        ...allFiles.filter(f => !expandedContainerNames.has(f.name)),
+        ...allFiles.filter((f) => !expandedContainerNames.has(f.name)),
         ...expandedFiles,
       ];
 
-      // Separate validation for better error messages.
-      // Dedupe happens once here at the end of drag processing so it catches:
-      // 1) duplicates already uploaded in prior drops, and
-      // 2) duplicates inside this same drop batch.
-      const acceptedFiles = effectiveFiles.filter((file) => hasAnyExtension(file.name, [".jar", ".zip", ".mrpack"]));
+      return { effectiveFiles, expansionSummary };
+    }
+
+    function partitionUploadFiles(effectiveFiles) {
       const duplicateFiles = [];
       const validFiles = [];
+      const invalidFiles = [];
       const batchSeenKeys = new Set();
-      for (const file of acceptedFiles) {
+
+      for (const file of effectiveFiles) {
+        if (!hasAnyExtension(file.name, SUPPORTED_UPLOAD_EXTENSIONS)) {
+          invalidFiles.push(file);
+          continue;
+        }
+
         const normalizedName = normalizeUploadFilename(file?.name);
         const size = Number.isFinite(file?.size) ? file.size : null;
         const batchKey = normalizedName
@@ -5156,7 +5125,6 @@
 
         const duplicateInBatch = batchKey ? batchSeenKeys.has(batchKey) : false;
         const duplicateAlreadyUploaded = isUploadedFileDuplicate(file);
-
         if (duplicateInBatch || duplicateAlreadyUploaded) {
           duplicateFiles.push(file);
           continue;
@@ -5165,10 +5133,60 @@
         if (batchKey) batchSeenKeys.add(batchKey);
         validFiles.push(file);
       }
-      const invalidFiles = effectiveFiles.filter((file) => !hasAnyExtension(file.name, [".jar", ".zip", ".mrpack"]));
+
+      return { validFiles, duplicateFiles, invalidFiles };
+    }
+
+    function buildUploadNotices({ expansionSummary, duplicateFiles, mrpackContext, allFilesCount }) {
+      const uploadNotices = [];
+
+      if (expansionSummary.length > 0) {
+        const totalExtracted = expansionSummary.reduce((sum, item) => sum + item.count, 0);
+        const archiveCount = expansionSummary.length;
+        const fileWord = totalExtracted === 1 ? "file" : "files";
+        if (archiveCount === 1) {
+          uploadNotices.push(`Extracted ${totalExtracted} ${fileWord} from archive.`);
+        } else {
+          uploadNotices.push(`Extracted ${totalExtracted} ${fileWord} from ${archiveCount} archives.`);
+        }
+      }
+
+      if (duplicateFiles.length > 0) {
+        const dupWord = duplicateFiles.length === 1 ? "file" : "files";
+        uploadNotices.push(`Skipped ${duplicateFiles.length} duplicate ${dupWord}.`);
+      }
+
+      if (mrpackContext.hasMixedMrpackDrop) {
+        uploadNotices.push("Mixed upload detected: .mrpack manifest extraction was skipped.");
+      }
+      if (mrpackContext.hasMultipleMrpacks) {
+        uploadNotices.push("Multiple .mrpack files detected: manifest extraction was skipped.");
+      } else if (mrpackContext.mrpackFiles.length === 1 && allFilesCount === 1 && !mrpackContext.isUploadAreaEmpty) {
+        uploadNotices.push("Existing uploads detected: .mrpack manifest extraction was skipped.");
+      }
+
+      return uploadNotices;
+    }
+
+    async function handleFiles(files) {
+      if (files.length === 0) return;
+
+      const allFiles = Array.from(files);
+      const mrpackContext = getMrpackUploadContext(allFiles);
+
+      // Auto-process .mrpack only when exactly one file was uploaded, it is .mrpack,
+      // and the upload area is currently empty.
+      if (mrpackContext.shouldAutoProcessMrpack) {
+        clearDropzone();
+        uploadedFiles.set(assignUploadFileKey(mrpackContext.mrpackFile), mrpackContext.mrpackFile);
+        processMrpack(mrpackContext.mrpackFile);
+        return;
+      }
+
+      const { effectiveFiles, expansionSummary } = await expandContainerZips(allFiles);
+      const { validFiles, duplicateFiles, invalidFiles } = partitionUploadFiles(effectiveFiles);
 
       if (validFiles.length > 0) {
-        // Only update UI if we have valid files
         dropzonePrompt.style.display = "none";
         dropzone.classList.add("dropzone-expanded");
         clearAllButton.style.display = "inline-flex";
@@ -5178,51 +5196,29 @@
           createFilePill(file);
         }
 
-        // If we expanded any containers, tell the user what happened so the
-        // sudden appearance of many pills isn't surprising.
-        const uploadNotices = [];
-        if (expansionSummary.length > 0) {
-          const totalExtracted = expansionSummary.reduce((sum, item) => sum + item.count, 0);
-          const archiveCount = expansionSummary.length;
-          const fileWord = totalExtracted === 1 ? "file" : "files";
-          if (archiveCount === 1) {
-            uploadNotices.push(`Extracted ${totalExtracted} ${fileWord} from archive.`);
-          } else {
-            uploadNotices.push(`Extracted ${totalExtracted} ${fileWord} from ${archiveCount} archives.`);
-          }
-        }
-        if (duplicateFiles.length > 0) {
-          const dupWord = duplicateFiles.length === 1 ? "file" : "files";
-          uploadNotices.push(
-            `Skipped ${duplicateFiles.length} duplicate ${dupWord}.`
-          );
-        }
-        if (hasMixedMrpackDrop) {
-          uploadNotices.push("Mixed upload detected: .mrpack manifest extraction was skipped.");
-        }
-        if (hasMultipleMrpacks) {
-          uploadNotices.push("Multiple .mrpack files detected: manifest extraction was skipped.");
-        }
+        const uploadNotices = buildUploadNotices({
+          expansionSummary,
+          duplicateFiles,
+          mrpackContext,
+          allFilesCount: allFiles.length,
+        });
         if (uploadNotices.length > 0) {
           statusMessage.textContent = uploadNotices.join("\n");
           statusMessage.classList.add("visible");
         }
-      } else {
-        // Provide specific error messages based on what went wrong
-        if (duplicateFiles.length > 0) {
-          const fileNames = duplicateFiles.map(f => f.name).join(", ");
-          showCustomAlert(
-            `The following file(s) are already uploaded: ${fileNames}`,
-            "notice",
-            "Duplicate Files"
-          );
-        } else if (invalidFiles.length > 0) {
-          showCustomAlert(
-            "Please upload valid files (.jar, .zip, .mrpack).",
-            "notice",
-            "Invalid File Type"
-          );
-        }
+      } else if (duplicateFiles.length > 0) {
+        const fileNames = duplicateFiles.map((f) => f.name).join(", ");
+        showCustomAlert(
+          `The following file(s) are already uploaded: ${fileNames}`,
+          "notice",
+          "Duplicate Files"
+        );
+      } else if (invalidFiles.length > 0) {
+        showCustomAlert(
+          "Please upload valid files (.jar, .zip, .mrpack).",
+          "notice",
+          "Invalid File Type"
+        );
       }
     }
 
@@ -6831,7 +6827,7 @@
             }
 
             // Get original version from uploaded file if available
-            if (lookupType === "file") {
+            if (lookupType === "file" && hasAnyExtension(job?.data?.name, [".jar"])) {
               try {
                 originalModInfo = await getModIdFromJar(job.data);
               } catch (e) {
@@ -10024,8 +10020,7 @@
 
       const downloadsToProcess = successfulDownloads.filter(dl => {
         const isIgnored = window.ignoredMods && window.ignoredMods.has(dl.projectId);
-        const isMrpackFile = dl.isMrpackFile === true;
-        return !isIgnored && !isMrpackFile;
+        return !isIgnored;
       });
 
       if (downloadsToProcess.length === 0) {
