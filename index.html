@@ -126,7 +126,8 @@
       padding: 0 1rem;
     }
 
-    h1 {
+    /* Site title only — do not use gradient text on all h1s (breaks emoji in markdown bodies). */
+    .main-container > header h1 {
       font-size: 3rem;
       font-weight: bold;
       background: linear-gradient(to right,
@@ -1149,7 +1150,7 @@
     .description-content.visible::before,
     .reason-content.visible::before {
       display: block;
-      font-size: 1rem;
+      font-size: 1.2rem;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.1em;
@@ -1360,6 +1361,22 @@
     .description-content ul {
       padding-left: 20px;
       margin: 0;
+    }
+
+    /* Markdown headings: normal text paint so emojis and inline images behave like Modrinth. */
+    .description-content h1,
+    .description-content h2,
+    .description-content h3,
+    .description-content h4,
+    .changelog-content h1,
+    .changelog-content h2,
+    .changelog-content h3,
+    .changelog-content h4 {
+      color: var(--primary-text);
+      background: none;
+      -webkit-background-clip: unset;
+      background-clip: unset;
+      -webkit-text-fill-color: unset;
     }
 
     .description-content video,
@@ -2487,7 +2504,7 @@
       }
 
       /* Reduce header size */
-      h1 {
+      .main-container > header h1 {
         font-size: 2.2rem;
       }
 
@@ -3456,7 +3473,6 @@
     const dropzonePrompt = document.getElementById("dropzone-prompt");
     const fileListContainer = document.getElementById("file-list-container");
     const fileInput = document.getElementById("file-input");
-    const helpLink = document.getElementById("help-link");
     const infoModal = document.getElementById("info-modal");
     const modalCloseButton = document.getElementById("modal-close-button");
     const mcVersionSelect = document.getElementById("mc-version");
@@ -3795,30 +3811,34 @@
       unlockPageScroll();
     }
 
+    function attachOverlayBackdropClose(overlayEl, closeFn) {
+      overlayEl.addEventListener("click", (event) => {
+        if (event.target === overlayEl) closeFn();
+      });
+    }
+
+    const MODAL_ICONS = {
+      warning: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+          stroke="var(--warning-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`,
+      error: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+          stroke="var(--error-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`
+    };
+
     // --- UI LOGIC ---
-    helpLink.addEventListener("click", () => {
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest("#help-link")) return;
       showModalWithScrollLock(infoModal);
     });
     modalCloseButton.addEventListener("click", () => {
       hideModalWithScrollUnlock(infoModal);
     });
-    infoModal.addEventListener("click", (event) => {
-      if (event.target === infoModal) {
-        hideModalWithScrollUnlock(infoModal);
-      }
-    });
+    attachOverlayBackdropClose(infoModal, () => hideModalWithScrollUnlock(infoModal));
 
     // --- Clear Results Button Logic ---
     clearResultsButton.addEventListener("click", resetResults);
 
     // --- Custom Alert Modal Logic ---
     function showCustomAlert(message, type = "notice", customTitle = null) {
-      const icons = {
-        notice: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
-          stroke="var(--warning-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`,
-        error: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
-          stroke="var(--error-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`,
-      };
       const titles = {
         notice: "Notice",
         error: "Error",
@@ -3829,7 +3849,8 @@
 
       // Set the text content of the title, excluding the icon
       alertTitle.childNodes[1].nodeValue = titleText;
-      alertIcon.innerHTML = icons[type] || icons.notice;
+      alertIcon.innerHTML =
+        type === "error" ? MODAL_ICONS.error : MODAL_ICONS.warning;
 
       alertMessage.textContent = message;
       showModalWithScrollLock(alertModal);
@@ -3840,11 +3861,7 @@
     }
 
     alertOkButton.addEventListener("click", hideCustomAlert);
-    alertModal.addEventListener("click", (event) => {
-      if (event.target === alertModal) {
-        hideCustomAlert();
-      }
-    });
+    attachOverlayBackdropClose(alertModal, hideCustomAlert);
 
     // --- Custom Confirm Modal Logic ---
     const confirmModal = document.getElementById("confirm-modal");
@@ -3859,13 +3876,9 @@
     function showCustomConfirm(message, customTitle = "Confirm Action") {
       return new Promise((resolve) => {
         confirmResolve = resolve;
-        
-        // Set warning icon
-        const warningIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
-          stroke="var(--warning-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`;
-        
+
         confirmTitle.childNodes[1].nodeValue = customTitle;
-        confirmIcon.innerHTML = warningIcon;
+        confirmIcon.innerHTML = MODAL_ICONS.warning;
         confirmMessage.textContent = message;
         showModalWithScrollLock(confirmModal);
       });
@@ -3884,11 +3897,7 @@
     confirmOkButton.addEventListener("click", () => hideCustomConfirm(true));
     confirmCancelButton.addEventListener("click", () => hideCustomConfirm(false));
     confirmXCloseButton.addEventListener("click", () => hideCustomConfirm(false));
-    confirmModal.addEventListener("click", (event) => {
-      if (event.target === confirmModal) {
-        hideCustomConfirm(false);
-      }
-    });
+    attachOverlayBackdropClose(confirmModal, () => hideCustomConfirm(false));
 
     // Make globally accessible
     window.showCustomConfirm = showCustomConfirm;
@@ -3933,9 +3942,7 @@
     promptOkButton.addEventListener("click", () => hideCustomPrompt(promptInput.value));
     promptCancelButton.addEventListener("click", () => hideCustomPrompt(null));
     promptXCloseButton.addEventListener("click", () => hideCustomPrompt(null));
-    promptModal.addEventListener("click", (event) => {
-      if (event.target === promptModal) hideCustomPrompt(null);
-    });
+    attachOverlayBackdropClose(promptModal, () => hideCustomPrompt(null));
     promptInput.addEventListener("keydown", (event) => {
       if (event.key === "Enter") {
         event.preventDefault();
@@ -4577,12 +4584,7 @@
       hideModalWithScrollUnlock(searchModal);
     });
 
-    searchModal.addEventListener("click", (event) => {
-      // If the user clicks on the dark overlay itself, not the content
-      if (event.target === searchModal) {
-        hideModalWithScrollUnlock(searchModal);
-      }
-    });
+    attachOverlayBackdropClose(searchModal, () => hideModalWithScrollUnlock(searchModal));
 
     // --- Enrich Search Hits with Full Project Details ---
     async function enrichSearchHits(hits) {
@@ -4746,7 +4748,7 @@
               </div>
             </div>
             <div class="mod-actions">
-              <button class="add-mod-button" data-slug="${mod.slug}" data-project-id="${mod.project_id}" data-title="${mod.title}" title="Add this mod to your collection">Add</button>
+              <button class="add-mod-button" data-slug="${mod.slug}" data-project-id="${mod.project_id || mod.slug}" data-title="${mod.title}" title="Add this mod to your collection">Add</button>
             </div>
           </div>`;
 
@@ -4779,16 +4781,22 @@
       }
 
       const addButton = card.querySelector(".add-mod-button");
+      const mapKey = mod.project_id || mod.slug;
       // Disable button if already added
-      if (searchedMods.has(mod.project_id) || renderedModIds.has(mod.slug)) {
+      if (!mapKey || searchedMods.has(mapKey) || renderedModIds.has(mod.slug)) {
         addButton.disabled = true;
         addButton.textContent = "Added";
       }
 
       addButton.addEventListener("click", (e) => {
-        const slug = e.target.dataset.slug;
-        const projectId = e.target.dataset.projectId;
-        const title = e.target.dataset.title;
+        const btn = e.currentTarget;
+        const projectId = mod.project_id || mod.slug;
+        const title = mod.title;
+
+        if (!projectId) {
+          showCustomAlert("Could not read a project id for this search result. Try again or report this mod.", "error");
+          return;
+        }
 
         // Respect the user's search filter intent for dual-type projects.
         // If they searched under "datapack", treat it as a datapack;
@@ -4811,19 +4819,16 @@
           });
           createFilePill({ name: `${title} (Searched)` }, () => {
             searchedMods.delete(projectId);
-            const btn = document.querySelector(`.add-mod-button[data-project-id="${projectId}"]`);
-            if (btn) {
-              btn.disabled = false;
-              btn.textContent = "Add";
-            }
+            addButton.disabled = false;
+            addButton.textContent = "Add";
           });
           dropzonePrompt.style.display = "none";
           dropzone.classList.add("dropzone-expanded");
           clearAllButton.style.display = "inline-flex";
         }
 
-        e.target.disabled = true;
-        e.target.textContent = "Added";
+        btn.disabled = true;
+        btn.textContent = "Added";
       });
 
       return card;
@@ -5133,6 +5138,12 @@
           } else {
             uploadNotices.push(`Extracted ${totalExtracted} ${fileWord} from ${archiveCount} archives.`);
           }
+        }
+        if (duplicateFiles.length > 0) {
+          const dupWord = duplicateFiles.length === 1 ? "file" : "files";
+          uploadNotices.push(
+            `Skipped ${duplicateFiles.length} duplicate ${dupWord}.`
+          );
         }
         if (hasMixedMrpackDrop) {
           uploadNotices.push("Mixed upload detected: .mrpack manifest extraction was skipped.");
@@ -5619,14 +5630,6 @@
       // Restore the welcome message from snapshot
       if (welcomeMessageSnapshot) {
         resultsArea.innerHTML = welcomeMessageSnapshot;
-
-        // Re-attach event listener to the restored help link
-        const restoredHelpLink = document.getElementById("help-link");
-        if (restoredHelpLink) {
-          restoredHelpLink.addEventListener("click", () => {
-            showModalWithScrollLock(infoModal);
-          });
-        }
       } else {
         // Fallback if snapshot isn't available
         resultsArea.innerHTML = "";
@@ -6258,7 +6261,6 @@
       // Step 0: Check cache for complete results first
       const cachedResults = [];
       const uncachedJobs = [];
-      const processedCacheKeys = new Set(); // Prevent double-counting
 
       // Pre-calculate all hashes in parallel for uploaded files and mrpack files
       const fileHashPromises = jobs
@@ -6287,11 +6289,6 @@
         }
 
         if (cacheKey) {
-          if (processedCacheKeys.has(cacheKey)) {
-            // We already handled this exact lookup in the current run.
-            continue;
-          }
-          processedCacheKeys.add(cacheKey);
           const cachedResult = getCachedResult(cacheKey);
           if (cachedResult) {
             // Add cache indicator to result
