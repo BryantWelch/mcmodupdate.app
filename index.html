@@ -3348,6 +3348,7 @@
     let renderedArtifactIds = new Set(); // Tracks (slug, artifactType) to allow multiple artifact types per project
     let searchedMods = new Map();
     let mrpackMods = new Map(); // For mods from .mrpack files
+    let zipContentTypeByUploadKey = new Map(); // Cache zip content type discovered during upload analysis
     let isCurrentlySearching = false;
     let welcomeMessageSnapshot = null; // Store the welcome message snapshot
     let apiCallCount = 0; // Track total API calls made
@@ -3411,6 +3412,8 @@
       // Modpacks are still loader/version specific and should honor those filters.
       modpack:      { folder: null,            exts: ['.mrpack'], needsLoader: true,  loaderTags: null },
     };
+    const ZIP_ANALYSIS_CONCURRENCY = 3;
+    const DOWNLOAD_ZIP_FETCH_CONCURRENCY = 4;
 
     // Backward-compatible: types that skip loader filtering
     const LOADER_AGNOSTIC_TYPES = Object.entries(ARTIFACT_CONFIG)
@@ -4012,6 +4015,7 @@
     function clearDropzone() {
       // Clear the underlying file data
       uploadedFiles.clear();
+      zipContentTypeByUploadKey.clear();
 
       searchedMods.clear();
       mrpackMods.clear();
@@ -4054,6 +4058,27 @@
       };
     }
 
+    async function mapWithConcurrency(items, concurrencyLimit, mapper) {
+      const list = Array.isArray(items) ? items : [];
+      if (list.length === 0) return [];
+      const limit = Math.max(1, Math.min(Number(concurrencyLimit) || 1, list.length));
+      const results = new Array(list.length);
+      let nextIndex = 0;
+
+      const worker = async () => {
+        while (true) {
+          const currentIndex = nextIndex;
+          if (currentIndex >= list.length) break;
+          nextIndex++;
+          results[currentIndex] = await mapper(list[currentIndex], currentIndex);
+        }
+      };
+
+      const workers = Array.from({ length: limit }, () => worker());
+      await Promise.all(workers);
+      return results;
+    }
+
     function hasAnyExtension(filename, extensions) {
       const lower = String(filename || "").toLowerCase();
       return extensions.some((ext) => lower.endsWith(ext));
@@ -4086,6 +4111,33 @@
 
     function normalizeUploadFilename(filename) {
       return String(filename || "").trim().toLowerCase();
+    }
+
+    function cacheZipContentType(file, contentType) {
+      if (!file) return;
+      const key = assignUploadFileKey(file);
+      zipContentTypeByUploadKey.set(key, contentType ?? null);
+      try {
+        Object.defineProperty(file, "__zipContentType", {
+          value: contentType ?? null,
+          writable: true,
+          configurable: true,
+        });
+      } catch (_) {
+        file.__zipContentType = contentType ?? null;
+      }
+    }
+
+    function getCachedZipContentType(file) {
+      if (!file) return undefined;
+      const key = getUploadFileKey(file);
+      if (zipContentTypeByUploadKey.has(key)) {
+        return zipContentTypeByUploadKey.get(key);
+      }
+      if (Object.prototype.hasOwnProperty.call(file, "__zipContentType")) {
+        return file.__zipContentType;
+      }
+      return undefined;
     }
 
     function isUploadedFileDuplicate(file) {
@@ -4692,8 +4744,8 @@
 
       card.innerHTML = `
           <div class="result-card-main">
-            <a href="${projectUrl}" target="_blank" rel="noopener noreferrer" class="mod-icon-link">
-              <img src="${mod.icon_url || DEFAULT_MOD_ICON}" alt="${mod.title} icon" class="mod-icon" onerror="this.src=window.DEFAULT_MOD_ICON">
+            <a href="${projectUrl}" target="_blank" rel="noopener noreferrer" class="mod-icon-link" aria-label="${mod.title}">
+              <img src="${mod.icon_url || DEFAULT_MOD_ICON}" alt="" class="mod-icon" onerror="this.src=window.DEFAULT_MOD_ICON">
             </a>
             <div class="mod-details">
               <div class="mod-title">
@@ -4911,6 +4963,41 @@
       );
     }
 
+    function classifyZipContentTypeFromLowerPaths(lowerPaths) {
+      const hasPath = (suffix) => lowerPaths.some((p) => p.endsWith(String(suffix).toLowerCase()));
+      const hasAssets = lowerPaths.some((p) => p.startsWith("assets/"));
+      const hasData = lowerPaths.some((p) => p.startsWith("data/"));
+      const hasShaders = lowerPaths.some((p) => p.startsWith("shaders/"));
+      const hasPackMcmeta = hasPath("/pack.mcmeta") || hasPath("pack.mcmeta");
+
+      // Prioritize mod manifests to avoid misclassifying mods as resource packs when renamed to .zip
+      const hasModManifest =
+        hasPath("/fabric.mod.json") || hasPath("fabric.mod.json") ||
+        hasPath("/quilt.mod.json") || hasPath("quilt.mod.json") ||
+        hasPath("/meta-inf/mods.toml") || hasPath("meta-inf/mods.toml") ||
+        hasPath("/meta-inf/neoforge.mods.toml") || hasPath("meta-inf/neoforge.mods.toml");
+      if (hasModManifest) {
+        return "mod";
+      }
+
+      // Resource packs and data packs BOTH have pack.mcmeta; the real discriminator is assets/ vs data/.
+      if (hasPackMcmeta && hasAssets && !hasData) {
+        return "resourcepack";
+      }
+      if (hasPackMcmeta && hasData) {
+        return "datapack";
+      }
+
+      if (hasShaders) {
+        return "shader";
+      }
+
+      // Fallback: prioritize datapack if data/ exists, otherwise resourcepack.
+      if (hasData) return "datapack";
+      if (hasAssets) return "resourcepack";
+      return null;
+    }
+
     // Pure zip analyzer: decides whether a zip is a container archive and
     // returns extracted uploadable inner files when applicable.
     async function analyzeZipArchive(file) {
@@ -4930,6 +5017,7 @@
             totalEntries,
             matchedEntries: 0,
             isContainer: false,
+            zipContentType: classifyZipContentTypeFromLowerPaths(lowerPaths),
           };
         }
 
@@ -4997,6 +5085,7 @@
           matchedEntries,
           isContainer: extracted.length > 0,
           processedEntries,
+          zipContentType: null,
         };
       } catch (e) {
         // Corrupt/non-zip payload — let the normal path handle/validate it.
@@ -5035,7 +5124,7 @@
       const expansionSummary = [];
       const processingPills = [];
       const totalZipCount = zipCandidates.length;
-      let extractedArchiveCount = 0;
+      let completedArchiveCount = 0;
       let extractionProgressActive = false;
       const expandedContainerNames = new Set();
 
@@ -5062,25 +5151,38 @@
         progressBar.style.width = `${totalProgress}%`;
       };
 
-      for (let i = 0; i < zipCandidates.length; i++) {
-        const candidate = zipCandidates[i];
-        statusMessage.textContent = `Inspecting archive ${i + 1}/${zipCandidates.length}: ${candidate.name}...`;
-        statusMessage.classList.add("visible");
+      statusMessage.textContent = `Inspecting ${totalZipCount} archive${totalZipCount !== 1 ? "s" : ""}...`;
+      statusMessage.classList.add("visible");
 
-        const analysis = await analyzeZipArchive(candidate);
-        if (analysis) {
-          updateExtractionProgressBar(i + 1, analysis.totalEntries, analysis.totalEntries);
-          statusMessage.textContent =
-            `Inspecting archive ${i + 1}/${zipCandidates.length}: ${candidate.name} (${analysis.totalEntries} scanned, ${analysis.matchedEntries} extracted)`;
+      const archiveResults = await mapWithConcurrency(
+        zipCandidates,
+        ZIP_ANALYSIS_CONCURRENCY,
+        async (candidate, i) => {
+          const analysis = await analyzeZipArchive(candidate);
+          completedArchiveCount++;
+          updateExtractionProgressBar(completedArchiveCount, 1, 1);
+
+          if (analysis) {
+            statusMessage.textContent =
+              `Inspecting archives (${completedArchiveCount}/${totalZipCount} complete): ${candidate.name} (${analysis.totalEntries} scanned, ${analysis.matchedEntries} extracted)`;
+          } else {
+            statusMessage.textContent =
+              `Inspecting archives (${completedArchiveCount}/${totalZipCount} complete): ${candidate.name} (unreadable archive)`;
+          }
+
+          return { candidate, analysis, index: i };
         }
+      );
 
-        extractedArchiveCount++;
-        updateExtractionProgressBar(extractedArchiveCount, 1, 1);
-
+      for (const result of archiveResults) {
+        const { candidate, analysis } = result;
         if (analysis && analysis.extractedFiles.length > 0) {
           expandedFiles.push(...analysis.extractedFiles);
           expandedContainerNames.add(candidate.name);
           expansionSummary.push({ name: candidate.name, count: analysis.extractedFiles.length });
+        } else if (analysis && analysis.isContainer === false) {
+          // Cache type classification so later update resolution can avoid reparsing this zip.
+          cacheZipContentType(candidate, analysis.zipContentType ?? null);
         }
       }
 
@@ -5185,6 +5287,14 @@
 
       const { effectiveFiles, expansionSummary } = await expandContainerZips(allFiles);
       const { validFiles, duplicateFiles, invalidFiles } = partitionUploadFiles(effectiveFiles);
+      const retainedUploadKeys = new Set(validFiles.map((file) => getUploadFileKey(file)));
+      for (const file of [...duplicateFiles, ...invalidFiles]) {
+        if (!file || !hasAnyExtension(file.name, [".zip"])) continue;
+        const key = getUploadFileKey(file);
+        if (!retainedUploadKeys.has(key)) {
+          zipContentTypeByUploadKey.delete(key);
+        }
+      }
 
       if (validFiles.length > 0) {
         dropzonePrompt.style.display = "none";
@@ -5388,7 +5498,9 @@
       removeButton.onclick = function (event) {
         event.stopPropagation();
         if (file instanceof File) {
-          uploadedFiles.delete(getUploadFileKey(file));
+          const fileKey = getUploadFileKey(file);
+          uploadedFiles.delete(fileKey);
+          zipContentTypeByUploadKey.delete(fileKey);
         }
         filePill.remove();
         if (onRemove) onRemove();
@@ -6805,7 +6917,10 @@
           let artifactType = null;
           if (lookupType === "file") {
             if (hasAnyExtension(job.data.name, [".zip"])) {
-              artifactType = await detectZipContentType(job.data);
+              const cachedZipType = getCachedZipContentType(job.data);
+              artifactType = cachedZipType !== undefined
+                ? cachedZipType
+                : await detectZipContentType(job.data);
             } else if (hasAnyExtension(job.data.name, [".jar"])) {
               artifactType = "mod";
             }
@@ -7139,42 +7254,9 @@
         // `zip.folder()` and `zip.file(/regex/)` are unreliable; check the file map directly.
         const paths = Object.keys(zip.files);
         const lowerPaths = paths.map((p) => String(p).toLowerCase());
-        const hasPath = (suffix) => paths.some(p => p.toLowerCase().endsWith(suffix.toLowerCase()));
-        const hasAssets = lowerPaths.some((p) => p.startsWith("assets/"));
-        const hasData = lowerPaths.some((p) => p.startsWith("data/"));
-        const hasShaders = lowerPaths.some((p) => p.startsWith("shaders/"));
-        const hasPackMcmeta = hasPath("/pack.mcmeta") || hasPath("pack.mcmeta");
-
-        // Prioritize mod manifests to avoid misclassifying mods as resource packs when renamed to .zip
-        const hasModManifest =
-          hasPath("/fabric.mod.json") || hasPath("fabric.mod.json") ||
-          hasPath("/quilt.mod.json") || hasPath("quilt.mod.json") ||
-          hasPath("/meta-inf/mods.toml") || hasPath("meta-inf/mods.toml") ||
-          hasPath("/meta-inf/neoforge.mods.toml") || hasPath("meta-inf/neoforge.mods.toml");
-        if (hasModManifest) {
-          return "mod";
-        }
-
-        // Resource packs and data packs BOTH have pack.mcmeta; the real
-        // discriminator is assets/ (resourcepack) vs data/ (datapack).
-        if (hasPackMcmeta && hasAssets && !hasData) {
-          return "resourcepack";
-        }
-        if (hasPackMcmeta && hasData) {
-          return "datapack";
-        }
-
-        // --- Shaderpack ---
-        if (hasShaders) {
-          return "shader";
-        }
-
-        // Fallback: prioritize datapack if data/ exists, otherwise resourcepack
-        if (hasData) return "datapack";
-        if (hasAssets) return "resourcepack";
-
-        // --- Unknown ---
-        return null;
+        const zipType = classifyZipContentTypeFromLowerPaths(lowerPaths);
+        cacheZipContentType(file, zipType ?? null);
+        return zipType;
       } catch (e) {
         return null;
       }
@@ -9201,10 +9283,9 @@
       card.innerHTML = `
     <div class="result-card-main">
       <a href="${mod.project_url
-        }" target="_blank" rel="noopener noreferrer" class="mod-icon-link">
+        }" target="_blank" rel="noopener noreferrer" class="mod-icon-link" aria-label="${mod.title}">
         <img src="${mod.icon_url || DEFAULT_MOD_ICON
-        }" alt="${mod.title
-        } icon" class="mod-icon" onerror="this.src=window.DEFAULT_MOD_ICON">
+        }" alt="" class="mod-icon" onerror="this.src=window.DEFAULT_MOD_ICON">
       </a>
       <div class="mod-details">
         <div class="mod-title">
@@ -9682,8 +9763,8 @@
 
       card.innerHTML = `
     <div class="result-card-main">
-      <a href="${mod.project_url}" target="_blank" rel="noopener noreferrer" class="mod-icon-link">
-        <img src="${mod.icon_url || DEFAULT_MOD_ICON}" alt="${mod.title} icon" class="mod-icon" onerror="this.src=window.DEFAULT_MOD_ICON">
+      <a href="${mod.project_url}" target="_blank" rel="noopener noreferrer" class="mod-icon-link" aria-label="${mod.title}">
+        <img src="${mod.icon_url || DEFAULT_MOD_ICON}" alt="" class="mod-icon" onerror="this.src=window.DEFAULT_MOD_ICON">
       </a>
       <div class="mod-details">
         <div class="mod-title">
@@ -9840,8 +9921,8 @@
       const curseForgeUrl = `https://www.curseforge.com/minecraft/search?search=${encodeURIComponent(cleanName || mod.title)}`;
       card.innerHTML = `
         <div class="result-card-main">
-          <a href="${modrinthUrl}" target="_blank" rel="noopener" class="mod-icon-link">
-            <img src="${DEFAULT_MOD_ICON}" alt="${displayName} icon" class="mod-icon">
+          <a href="${modrinthUrl}" target="_blank" rel="noopener" class="mod-icon-link" aria-label="${displayName}">
+            <img src="${DEFAULT_MOD_ICON}" alt="" class="mod-icon">
           </a>
           <div class="mod-details">
             <div class="mod-title">
@@ -10052,25 +10133,40 @@
         zipButton.disabled = true;
 
         let failedCount = 0;
-        for (let i = 0; i < downloadsToProcess.length; i++) {
-          const dl = downloadsToProcess[i];
-          zipButton.innerHTML = `Adding ${i + 1}/${downloadsToProcess.length}...`;
-          if (statusEl) statusEl.textContent = `Downloading ${i + 1} / ${downloadsToProcess.length}...`;
-
-          try {
-            const response = await fetch(dl.url);
-            if (response.ok) {
+        let completedCount = 0;
+        const fetchedEntries = [];
+        const fetchResults = await mapWithConcurrency(
+          downloadsToProcess,
+          DOWNLOAD_ZIP_FETCH_CONCURRENCY,
+          async (dl, i) => {
+            try {
+              const response = await fetch(dl.url);
+              if (!response.ok) {
+                failedCount++;
+                console.warn(`Failed to download ${dl.filename}`, response.status, response.statusText);
+                return null;
+              }
               const blob = await response.blob();
               const entryPath = buildArtifactPath(dl.artifactType || dl.projectType, dl.filename);
-              zip.file(entryPath, blob);
-            } else {
+              return { entryPath, blob, index: i };
+            } catch (error) {
               failedCount++;
-              console.warn(`Failed to download ${dl.filename}`, response.status, response.statusText);
+              console.warn(`Error downloading ${dl.filename}:`, error);
+              return null;
+            } finally {
+              completedCount++;
+              zipButton.innerHTML = `Adding ${completedCount}/${downloadsToProcess.length}...`;
+              if (statusEl) statusEl.textContent = `Downloading ${completedCount} / ${downloadsToProcess.length}...`;
             }
-          } catch (error) {
-            failedCount++;
-            console.warn(`Error downloading ${dl.filename}:`, error);
           }
+        );
+
+        for (const entry of fetchResults) {
+          if (!entry) continue;
+          fetchedEntries.push(entry);
+        }
+        for (const entry of fetchedEntries) {
+          zip.file(entry.entryPath, entry.blob);
         }
 
         zipButton.innerHTML = 'Generating ZIP...';
