@@ -1199,12 +1199,15 @@
       height: 140px;
       object-fit: cover;
       border-radius: 8px;
+      border: 2px solid transparent;
       cursor: pointer;
-      transition: opacity 0.2s ease;
+      transition: opacity 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
     }
 
     .gallery-grid img:hover {
-      opacity: 0.85;
+      opacity: 0.88;
+      border-color: var(--gradient-start);
+      box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.35);
     }
 
     #gallery-lightbox {
@@ -1229,23 +1232,129 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 0.75rem;
-      max-width: 90vw;
-      max-height: 90vh;
+      gap: 1rem;
+      width: min(96vw, 1400px);
+      max-height: 96vh;
+      padding: 1rem;
+      box-sizing: border-box;
+    }
+
+    #gallery-lightbox-close {
+      position: absolute;
+      top: 0.25rem;
+      right: 0.25rem;
+      width: 2.2rem;
+      height: 2.2rem;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.45);
+      color: #ffffff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background-color 0.2s ease, border-color 0.2s ease;
+    }
+
+    #gallery-lightbox-close:hover {
+      background: rgba(0, 0, 0, 0.65);
+      border-color: rgba(255, 255, 255, 0.6);
+    }
+
+    #gallery-lightbox-close svg {
+      width: 0.95rem;
+      height: 0.95rem;
+      stroke: currentColor;
+      stroke-width: 2.4;
+      stroke-linecap: round;
+      fill: none;
+    }
+
+    #gallery-lightbox-stage {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      max-height: min(82vh, calc((96vw - 2rem) * 9 / 16));
+      background: rgba(0, 0, 0, 0.42);
+      border-radius: 8px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.7);
     }
 
     #gallery-lightbox-img {
-      max-width: 90vw;
-      max-height: 82vh;
+      width: 100%;
+      height: 100%;
       object-fit: contain;
-      border-radius: 8px;
-      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.7);
     }
 
     #gallery-lightbox-caption {
       color: rgba(255, 255, 255, 0.8);
-      font-size: 0.9rem;
+      font-size: 0.95rem;
       text-align: center;
+      max-width: min(96vw, 1200px);
+      line-height: 1.35;
+    }
+
+    #gallery-lightbox-caption-title {
+      color: #ffffff;
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin-bottom: 0.15rem;
+    }
+
+    #gallery-lightbox-caption-description {
+      color: rgba(255, 255, 255, 0.85);
+      margin-bottom: 0.2rem;
+      white-space: pre-line;
+    }
+
+    #gallery-lightbox-caption-count {
+      color: rgba(255, 255, 255, 0.65);
+      font-size: 0.85rem;
+    }
+
+    #gallery-lightbox-nav {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+    }
+
+    .gallery-lightbox-arrow {
+      width: 2rem;
+      height: 2rem;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background-color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+    }
+
+    .gallery-lightbox-arrow svg {
+      width: 0.95rem;
+      height: 0.95rem;
+      stroke: currentColor;
+      stroke-width: 2.4;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+    }
+
+    .gallery-lightbox-arrow:hover {
+      background: rgba(255, 255, 255, 0.2);
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+
+    .gallery-lightbox-arrow:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
     }
 
     .description-content ul {
@@ -3632,19 +3741,70 @@
       return { versions, compatibilityStatus };
     }
 
+    // --- Modal Utilities (shared by modals + gallery lightbox) ---
+    const pageScrollLockState = {
+      lockCount: 0,
+      previousBodyOverflow: "",
+      previousHtmlOverflow: "",
+      previousBodyPosition: "",
+      previousBodyTop: "",
+      previousBodyWidth: "",
+      previousScrollY: 0
+    };
+
+    function lockPageScroll() {
+      if (pageScrollLockState.lockCount === 0) {
+        pageScrollLockState.previousScrollY = window.scrollY || window.pageYOffset || 0;
+        pageScrollLockState.previousBodyOverflow = document.body.style.overflow;
+        pageScrollLockState.previousHtmlOverflow = document.documentElement.style.overflow;
+        pageScrollLockState.previousBodyPosition = document.body.style.position;
+        pageScrollLockState.previousBodyTop = document.body.style.top;
+        pageScrollLockState.previousBodyWidth = document.body.style.width;
+
+        document.documentElement.style.overflow = "hidden";
+        document.body.style.overflow = "hidden";
+        document.body.style.position = "fixed";
+        document.body.style.top = `-${pageScrollLockState.previousScrollY}px`;
+        document.body.style.width = "100%";
+      }
+      pageScrollLockState.lockCount += 1;
+    }
+
+    function unlockPageScroll() {
+      if (pageScrollLockState.lockCount === 0) return;
+      pageScrollLockState.lockCount -= 1;
+      if (pageScrollLockState.lockCount > 0) return;
+
+      document.body.style.overflow = pageScrollLockState.previousBodyOverflow;
+      document.documentElement.style.overflow = pageScrollLockState.previousHtmlOverflow;
+      document.body.style.position = pageScrollLockState.previousBodyPosition;
+      document.body.style.top = pageScrollLockState.previousBodyTop;
+      document.body.style.width = pageScrollLockState.previousBodyWidth;
+      window.scrollTo(0, pageScrollLockState.previousScrollY);
+    }
+
+    function showModalWithScrollLock(modalElement) {
+      if (modalElement.classList.contains("visible")) return;
+      modalElement.classList.add("visible");
+      lockPageScroll();
+    }
+
+    function hideModalWithScrollUnlock(modalElement) {
+      if (!modalElement.classList.contains("visible")) return;
+      modalElement.classList.remove("visible");
+      unlockPageScroll();
+    }
+
     // --- UI LOGIC ---
     helpLink.addEventListener("click", () => {
-      infoModal.classList.add("visible");
-      document.body.style.overflow = "hidden"; // Prevent background scrolling
+      showModalWithScrollLock(infoModal);
     });
     modalCloseButton.addEventListener("click", () => {
-      infoModal.classList.remove("visible");
-      document.body.style.overflow = ""; // Restore background scrolling
+      hideModalWithScrollUnlock(infoModal);
     });
     infoModal.addEventListener("click", (event) => {
       if (event.target === infoModal) {
-        infoModal.classList.remove("visible");
-        document.body.style.overflow = ""; // Restore background scrolling
+        hideModalWithScrollUnlock(infoModal);
       }
     });
 
@@ -3672,13 +3832,11 @@
       alertIcon.innerHTML = icons[type] || icons.notice;
 
       alertMessage.textContent = message;
-      alertModal.classList.add("visible");
-      document.body.style.overflow = "hidden"; // Prevent background scrolling
+      showModalWithScrollLock(alertModal);
     }
 
     function hideCustomAlert() {
-      alertModal.classList.remove("visible");
-      document.body.style.overflow = ""; // Restore background scrolling
+      hideModalWithScrollUnlock(alertModal);
     }
 
     alertOkButton.addEventListener("click", hideCustomAlert);
@@ -3709,14 +3867,12 @@
         confirmTitle.childNodes[1].nodeValue = customTitle;
         confirmIcon.innerHTML = warningIcon;
         confirmMessage.textContent = message;
-        confirmModal.classList.add("visible");
-        document.body.style.overflow = "hidden";
+        showModalWithScrollLock(confirmModal);
       });
     }
 
     function hideCustomConfirm(result) {
-      confirmModal.classList.remove("visible");
-      document.body.style.overflow = "";
+      hideModalWithScrollUnlock(confirmModal);
       if (confirmResolve) {
         confirmResolve(result);
         confirmResolve = null;
@@ -3757,8 +3913,7 @@
         promptTitle.textContent = customTitle;
         promptMessage.textContent = message;
         promptInput.value = defaultValue;
-        promptModal.classList.add("visible");
-        document.body.style.overflow = "hidden";
+        showModalWithScrollLock(promptModal);
         // Defer focus until after the modal is laid out so the cursor lands in the input.
         setTimeout(() => {
           promptInput.focus();
@@ -3768,8 +3923,7 @@
     }
 
     function hideCustomPrompt(result) {
-      promptModal.classList.remove("visible");
-      document.body.style.overflow = "";
+      hideModalWithScrollUnlock(promptModal);
       if (promptResolve) {
         promptResolve(result);
         promptResolve = null;
@@ -4298,8 +4452,7 @@
         // Set sort to relevance when user starts searching
         sortSelect.value = 'relevance';
         positionSearchModal();
-        searchModal.classList.add("visible");
-        document.body.style.overflow = "hidden"; // Prevent background scrolling
+        showModalWithScrollLock(searchModal);
         debouncedSearch(query);
       } else {
         // Show featured content when search is empty - don't randomize, use current filters
@@ -4352,8 +4505,7 @@
     searchClearButton.addEventListener("click", () => {
       clearSearch(searchInput);
       // Close the search modal when clearing from the main search box
-      searchModal.classList.remove("visible");
-      document.body.style.overflow = ""; // Restore background scrolling
+      hideModalWithScrollUnlock(searchModal);
     });
 
     modalSearchClearButton.addEventListener("click", () => {
@@ -4364,8 +4516,7 @@
     searchInput.addEventListener("focus", () => {
       // Show the search modal whenever user clicks in the main search box
       positionSearchModal();
-      searchModal.classList.add("visible");
-      document.body.style.overflow = "hidden"; // Prevent background scrolling
+      showModalWithScrollLock(searchModal);
       // Focus the modal search input for immediate typing
       modalSearchInput.focus();
 
@@ -4390,8 +4541,7 @@
     modalSearchInput.addEventListener("focus", () => {
       // Already in modal, just make sure modal is visible
       positionSearchModal();
-      searchModal.classList.add("visible");
-      document.body.style.overflow = "hidden"; // Prevent background scrolling
+      showModalWithScrollLock(searchModal);
     });
 
     // Event listeners for filter dropdowns
@@ -4420,20 +4570,17 @@
 
     // --- Search Modal Close Logic ---
     searchCloseButton.addEventListener("click", () => {
-      searchModal.classList.remove("visible");
-      document.body.style.overflow = ""; // Restore background scrolling
+      hideModalWithScrollUnlock(searchModal);
     });
 
     searchXCloseButton.addEventListener("click", () => {
-      searchModal.classList.remove("visible");
-      document.body.style.overflow = ""; // Restore background scrolling
+      hideModalWithScrollUnlock(searchModal);
     });
 
     searchModal.addEventListener("click", (event) => {
       // If the user clicks on the dark overlay itself, not the content
       if (event.target === searchModal) {
-        searchModal.classList.remove("visible");
-        document.body.style.overflow = ""; // Restore background scrolling
+        hideModalWithScrollUnlock(searchModal);
       }
     });
 
@@ -5477,8 +5624,7 @@
         const restoredHelpLink = document.getElementById("help-link");
         if (restoredHelpLink) {
           restoredHelpLink.addEventListener("click", () => {
-            infoModal.classList.add("visible");
-            document.body.style.overflow = "hidden"; // Match original handler so background can't scroll
+            showModalWithScrollLock(infoModal);
           });
         }
       } else {
@@ -9099,6 +9245,7 @@
       const changelogContent = card.querySelector(".changelog-content");
       const galleryContent = card.querySelector(".gallery-content");
       const descriptionContent = card.querySelector(".description-content");
+      let normalizedGalleryImages = [];
 
       // Get references to channel links
       const listLinks = {
@@ -9179,10 +9326,31 @@
         galleryToggle.classList.toggle("active");
         if (galleryContent.classList.contains("visible") && galleryContent.innerHTML === "") {
           if (mod.gallery && mod.gallery.length > 0) {
-            const imgs = mod.gallery.map(img =>
-              `<img src="${img.url}" alt="${img.title || 'Gallery image'}" title="${img.title || ''}" loading="lazy">`
-            ).join("");
-            galleryContent.innerHTML = `<div class="gallery-grid">${imgs}</div>`;
+            normalizedGalleryImages = mod.gallery.map((img, index) => {
+              const fallbackTitle = `Gallery image ${index + 1}`;
+              return {
+                src: img.raw_url || img.original_url || img.url || img.thumbnail_url || "",
+                thumbnailSrc: img.thumbnail_url || img.url || "",
+                alt: img.title || fallbackTitle,
+                title: img.title || fallbackTitle,
+                description: img.description || ""
+              };
+            });
+
+            const grid = document.createElement("div");
+            grid.className = "gallery-grid";
+
+            normalizedGalleryImages.forEach((img, index) => {
+              const imageEl = document.createElement("img");
+              imageEl.src = img.thumbnailSrc;
+              imageEl.alt = img.alt;
+              imageEl.title = img.title || "";
+              imageEl.loading = "lazy";
+              imageEl.dataset.galleryIndex = String(index);
+              grid.appendChild(imageEl);
+            });
+
+            galleryContent.replaceChildren(grid);
           } else {
             galleryContent.innerHTML = `<p style="color: var(--secondary-text); margin: 0;">No gallery images available for this mod.</p>`;
           }
@@ -9191,7 +9359,9 @@
 
       galleryContent.addEventListener("click", (e) => {
         if (e.target.tagName === "IMG") {
-          openGalleryLightbox(e.target.src, e.target.alt);
+          const clickedIndex = Number(e.target.dataset.galleryIndex);
+          const startIndex = Number.isInteger(clickedIndex) ? clickedIndex : 0;
+          openGalleryLightbox(normalizedGalleryImages, startIndex);
         }
       });
 
@@ -10174,21 +10344,103 @@
   <div id="gallery-lightbox" style="display:none;">
     <div id="gallery-lightbox-backdrop"></div>
     <div id="gallery-lightbox-content">
-      <img id="gallery-lightbox-img" src="" alt="">
-      <div id="gallery-lightbox-caption"></div>
+      <button id="gallery-lightbox-close" type="button" aria-label="Close image viewer">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M6 6l12 12M18 6L6 18"></path>
+        </svg>
+      </button>
+      <div id="gallery-lightbox-stage">
+        <img id="gallery-lightbox-img" src="" alt="">
+      </div>
+      <div id="gallery-lightbox-caption">
+        <div id="gallery-lightbox-caption-title"></div>
+        <div id="gallery-lightbox-caption-description"></div>
+        <div id="gallery-lightbox-nav">
+          <button id="gallery-lightbox-prev" class="gallery-lightbox-arrow" type="button" aria-label="Previous image">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M15 18l-6-6 6-6"></path>
+            </svg>
+          </button>
+          <div id="gallery-lightbox-caption-count"></div>
+          <button id="gallery-lightbox-next" class="gallery-lightbox-arrow" type="button" aria-label="Next image">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M9 18l6-6-6-6"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
     </div>
   </div>
   <script>
-    function openGalleryLightbox(src, alt) {
-      document.getElementById("gallery-lightbox-img").src = src;
-      document.getElementById("gallery-lightbox-caption").textContent = alt || "";
+    const galleryLightboxState = {
+      images: [],
+      currentIndex: 0
+    };
+
+    function renderGalleryLightboxImage() {
+      const lightboxImg = document.getElementById("gallery-lightbox-img");
+      const titleEl = document.getElementById("gallery-lightbox-caption-title");
+      const descriptionEl = document.getElementById("gallery-lightbox-caption-description");
+      const countEl = document.getElementById("gallery-lightbox-caption-count");
+      const prevButton = document.getElementById("gallery-lightbox-prev");
+      const nextButton = document.getElementById("gallery-lightbox-next");
+      const image = galleryLightboxState.images[galleryLightboxState.currentIndex];
+
+      if (!image) return;
+
+      lightboxImg.src = image.src;
+      lightboxImg.alt = image.alt || image.title || "Gallery image";
+
+      titleEl.textContent = image.title || image.alt || "Gallery image";
+      descriptionEl.textContent = image.description || "";
+      countEl.textContent = `${galleryLightboxState.currentIndex + 1} / ${galleryLightboxState.images.length}`;
+      prevButton.disabled = galleryLightboxState.currentIndex <= 0;
+      nextButton.disabled = galleryLightboxState.currentIndex >= galleryLightboxState.images.length - 1;
+    }
+
+    function openGalleryLightbox(images, startIndex = 0) {
+      if (!Array.isArray(images) || images.length === 0) return;
+      galleryLightboxState.images = images;
+      galleryLightboxState.currentIndex = Math.max(0, Math.min(startIndex, images.length - 1));
+      renderGalleryLightboxImage();
+      lockPageScroll();
+
       document.getElementById("gallery-lightbox").style.display = "flex";
     }
-    document.getElementById("gallery-lightbox-backdrop").addEventListener("click", () => {
+
+    function navigateGalleryLightbox(direction) {
+      if (!galleryLightboxState.images.length) return;
+      const nextIndex = galleryLightboxState.currentIndex + direction;
+      if (nextIndex < 0 || nextIndex >= galleryLightboxState.images.length) return;
+      galleryLightboxState.currentIndex = nextIndex;
+      renderGalleryLightboxImage();
+    }
+
+    function closeGalleryLightbox() {
       document.getElementById("gallery-lightbox").style.display = "none";
+      unlockPageScroll();
+    }
+
+    document.getElementById("gallery-lightbox-prev").addEventListener("click", () => {
+      navigateGalleryLightbox(-1);
+    });
+    document.getElementById("gallery-lightbox-next").addEventListener("click", () => {
+      navigateGalleryLightbox(1);
+    });
+    document.getElementById("gallery-lightbox-close").addEventListener("click", closeGalleryLightbox);
+    document.getElementById("gallery-lightbox-backdrop").addEventListener("click", () => {
+      closeGalleryLightbox();
     });
     document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") document.getElementById("gallery-lightbox").style.display = "none";
+      const lightboxVisible = document.getElementById("gallery-lightbox").style.display === "flex";
+      if (!lightboxVisible) return;
+      if (e.key === "Escape") {
+        closeGalleryLightbox();
+      } else if (e.key === "ArrowLeft") {
+        navigateGalleryLightbox(-1);
+      } else if (e.key === "ArrowRight") {
+        navigateGalleryLightbox(1);
+      }
     });
   </script>
 </body>
