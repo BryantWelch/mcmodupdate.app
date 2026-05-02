@@ -345,8 +345,7 @@
       font-weight: bold;
       cursor: pointer;
       transition: all 0.2s ease;
-      display: none;
-      /* Hidden by default */
+      display: none; /* Hidden by default */
     }
 
     .clear-all-button:hover {
@@ -373,8 +372,7 @@
       border: 1px solid var(--border-color);
       border-radius: 50%;
       cursor: pointer;
-      display: none;
-      /* Hidden by default */
+      display: none; /* Hidden by default */
       align-items: center;
       justify-content: center;
       transition: all 0.3s ease;
@@ -404,36 +402,26 @@
       justify-content: center;
       z-index: 1000;
       transition: opacity 0.3s ease-in-out;
-      opacity: 0;
-      /* Start transparent */
-      pointer-events: none;
-      /* Prevent interaction when hidden */
+      opacity: 0; /* Start transparent */
+      pointer-events: none; /* Prevent interaction when hidden */
       overflow: hidden;
     }
 
     #search-modal {
-      align-items: flex-start;
-      /* Aligns content to the top */
-      justify-content: center;
-      /* Center horizontally */
-      padding-top: 0;
-      /* Remove the viewport-based padding */
+      align-items: flex-start; /* Aligns content to the top */
+      justify-content: center; /* Center horizontally */
+      padding-top: 0; /* Remove the viewport-based padding */
     }
 
     #search-modal .modal-content {
       position: absolute;
-      top: 280px;
-      /* Position directly below the controls - adjust this value as needed */
-      max-width: 750px;
-      /* Slightly smaller to ensure no overflow */
-      width: calc(100% - 3rem);
-      /* More conservative margin */
-      margin: 0 1.5rem;
-      /* Larger side margins */
+      top: 280px; /* Position directly below the controls - adjust this value as needed */
+      max-width: 750px; /* Slightly smaller to ensure no overflow */
+      width: calc(100% - 3rem); /* More conservative margin */
+      margin: 0 1.5rem; /* Larger side margins */
       box-sizing: border-box;
       overflow: hidden;
-      max-height: calc(100vh - 320px);
-      /* Ensure it doesn't go beyond viewport, accounting for top position */
+      max-height: calc(100vh - 320px); /* Ensure it doesn't go beyond viewport, accounting for top position */
       display: flex;
       flex-direction: column;
       padding: 0;
@@ -442,10 +430,8 @@
     }
 
     .modal-overlay.visible {
-      opacity: 1;
-      /* Fade in to full opacity */
-      pointer-events: auto;
-      /* Allow interaction when visible */
+      opacity: 1; /* Fade in to full opacity */
+      pointer-events: auto; /* Allow interaction when visible */
     }
 
     .modal-content {
@@ -677,8 +663,7 @@
       background-color: var(--card-bg);
       border-radius: 4px;
       margin-top: 1rem;
-      display: none;
-      /* Hidden by default */
+      display: none; /* Hidden by default */
     }
 
     .progress-bar {
@@ -695,27 +680,19 @@
       color: var(--secondary-text);
       font-size: 0.9rem;
       margin: 0;
-      white-space: pre-line;
-      /* Margin will be part of the transition */
-      max-height: 0;
-      /* Start with zero height */
-      opacity: 0;
-      /* Start fully transparent */
-      overflow: hidden;
-      /* Important for the max-height trick */
-      transition: all 0.2s ease-in-out;
-      /* Animate everything */
+      white-space: pre-line; /* Margin will be part of the transition */
+      max-height: 0; /* Start with zero height */
+      opacity: 0; /* Start fully transparent */
+      overflow: hidden; /* Important for the max-height trick */
+      transition: all 0.2s ease-in-out; /* Animate everything */
     }
 
     .status-message.visible {
-      margin-top: 0.5rem;
-      /* Add margin when visible */
-      max-height: min(85vh, 36em);
-      /* Enough for extraction summary + totals + notices; scroll if unusually long */
+      margin-top: 0.5rem; /* Add margin when visible */
+      max-height: min(85vh, 36em); /* Enough for extraction summary + totals + notices; scroll if unusually long */
       overflow-x: hidden;
       overflow-y: auto;
-      opacity: 1;
-      /* Animate to be fully visible */
+      opacity: 1; /* Animate to be fully visible */
     }
 
     #results-area {
@@ -727,8 +704,7 @@
     }
 
     .results-section {
-      display: none;
-      /* Hidden by default */
+      display: none; /* Hidden by default */
     }
 
     .results-section.visible {
@@ -783,19 +759,16 @@
     }
 
     .result-card.dependency {
-      border-left: 4px solid #3b82f6;
-      /* Blue color for dependencies */
+      border-left: 4px solid #3b82f6; /* Blue color for dependencies */
     }
 
     .result-card.already-up-to-date {
-      border-left: 4px solid #ffffff;
-      /* White color for already up-to-date */
+      border-left: 4px solid #ffffff; /* White color for already up-to-date */
     }
 
     .result-card.search {
       border: 1px solid rgba(255, 255, 255, 0.1);
-      border-left: 4px solid var(--gradient-start);
-      /* Purple gradient color for search results */
+      border-left: 4px solid var(--gradient-start); /* Purple gradient color for search results */
       transition: all 0.2s ease;
       position: relative;
       box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22);
@@ -932,24 +905,20 @@
 
     /* --- Category Tooltip Styles --- */
     .category-tooltip-container {
-      position: relative;
-      /* This is crucial for positioning the tooltip */
+      position: relative; /* This is crucial for positioning the tooltip */
       display: flex;
       align-items: center;
     }
 
     .category-tooltip {
-      visibility: hidden;
-      /* Hide the tooltip by default */
+      visibility: hidden; /* Hide the tooltip by default */
       opacity: 0;
       transition: opacity 0.2s ease;
 
       position: absolute;
-      bottom: 125%;
-      /* Position it above the icon */
+      bottom: 125%; /* Position it above the icon */
       left: 50%;
-      transform: translateX(-50%);
-      /* Center it horizontally */
+      transform: translateX(-50%); /* Center it horizontally */
 
       background-color: var(--card-bg);
       color: var(--primary-text);
@@ -958,8 +927,7 @@
       padding: 0.5rem 0.75rem;
       z-index: 10;
 
-      white-space: nowrap;
-      /* Keep the tooltip on a single line */
+      white-space: nowrap; /* Keep the tooltip on a single line */
       font-size: 0.85rem;
     }
 
@@ -1014,8 +982,7 @@
 
     /* Override hover color change for reason toggle in warning cards */
     .warning .changelog-toggle:hover {
-      color: var(--warning-color);
-      /* Keep the same warning color on hover */
+      color: var(--warning-color); /* Keep the same warning color on hover */
     }
 
     .warning .changelog-toggle.active {
@@ -1106,8 +1073,7 @@
     .changelog-content img {
       max-width: 100%;
       height: auto;
-      border-radius: 8px;
-      /* Optional: adds rounded corners to the media */
+      border-radius: 8px; /* Optional: adds rounded corners to the media */
     }
 
     .gallery-toggle,
@@ -1406,12 +1372,9 @@
       border-radius: 6px;
       padding: 0.3rem 0.5rem;
       width: clamp(100px, 25vw, 140px);
-      white-space: nowrap;
-      /* Prevents the text inside from wrapping */
-      overflow: hidden;
-      /* Hides the text that overflows the container */
-      text-overflow: ellipsis;
-      /* Adds the "..." for any hidden text */
+      white-space: nowrap; /* Prevents the text inside from wrapping */
+      overflow: hidden; /* Hides the text that overflows the container */
+      text-overflow: ellipsis; /* Adds the "..." for any hidden text */
     }
 
     .version-type {
@@ -1561,8 +1524,7 @@
     .results-actions {
       display: flex;
       justify-content: center;
-      align-items: flex-start;
-      /* Aligns the tops of the buttons */
+      align-items: flex-start; /* Aligns the tops of the buttons */
       gap: 1rem;
       margin-top: 1rem;
     }
@@ -1627,8 +1589,7 @@
       color: var(--secondary-text);
       font-size: 1.4rem;
       cursor: pointer;
-      display: none;
-      /* Hidden by default */
+      display: none; /* Hidden by default */
       padding: 4px;
       line-height: 1;
       width: 28px;
@@ -1650,8 +1611,7 @@
       margin-top: 0;
       display: flex;
       flex-direction: column;
-      gap: 1rem;
-      /* Match the spacing used in main results sections */
+      gap: 1rem; /* Match the spacing used in main results sections */
       width: 100%;
       box-sizing: border-box;
       padding: 1rem 1.25rem 0.5rem;
@@ -1717,12 +1677,9 @@
 
     /* Specific styling for the search modal load more button */
     #load-more-btn {
-      width: 95% !important;
-      /* Slightly smaller to accommodate hover scale effect */
-      margin: 1rem auto 0 auto !important;
-      /* Center the button */
-      display: block !important;
-      /* Ensure block display for margin auto to work */
+      width: 95% !important; /* Slightly smaller to accommodate hover scale effect */
+      margin: 1rem auto 0 auto !important; /* Center the button */
+      display: block !important; /* Ensure block display for margin auto to work */
     }
 
     /* -- Styles for the header and the toggle button's container -- */
@@ -2056,12 +2013,10 @@
     .mod-title-tag {
       font-size: 0.9rem;
       font-weight: normal;
-      color: var(--secondary-text);
-      /* Matches the author text color */
+      color: var(--secondary-text); /* Matches the author text color */
       margin-left: 0.5rem;
       font-style: italic;
-      white-space: nowrap;
-      /* Prevents the tag itself from breaking onto two lines */
+      white-space: nowrap; /* Prevents the tag itself from breaking onto two lines */
     }
 
     /* Dependency tag specific styling - same pattern as category tooltip */
@@ -2425,8 +2380,7 @@
 
     /* Fix tooltip positioning for search cards - especially the first one */
     .result-card.search .project-type-tooltip {
-      z-index: 1001;
-      /* Higher than modal z-index (1000) to show above modal boundaries */
+      z-index: 1001; /* Higher than modal z-index (1000) to show above modal boundaries */
     }
 
     /* For the first search card, position tooltip to the right instead of above */
@@ -2434,8 +2388,7 @@
       bottom: auto;
       top: 50%;
       left: 125%;
-      transform: translateY(-50%);
-      /* Position to the right of the icon instead of above */
+      transform: translateY(-50%); /* Position to the right of the icon instead of above */
     }
 
     /* Up-to-date icon styling */
@@ -2511,15 +2464,13 @@
       /* --- 1. Stack the main controls vertically --- */
       .controls {
         flex-direction: column;
-        align-items: stretch;
-        /* Make all control groups full-width */
+        align-items: stretch; /* Make all control groups full-width */
         gap: 1rem;
       }
 
       .control-group {
         display: flex;
-        flex-direction: column;
-        /* Stack label above the input/select */
+        flex-direction: column; /* Stack label above the input/select */
         align-items: flex-start;
         gap: 0.25rem;
       }
@@ -2537,8 +2488,7 @@
         align-items: center;
         width: 100%;
         max-width: 400px;
-        gap: 1rem;
-        /* Add a gap for nice spacing when both buttons are visible */
+        gap: 1rem; /* Add a gap for nice spacing when both buttons are visible */
       }
 
       /* Center the welcome message content */
@@ -2550,56 +2500,44 @@
       /* --- Stack the result card content --- */
       .result-card-main {
         flex-direction: column;
-        align-items: center;
-        /* Center the icon */
+        align-items: center; /* Center the icon */
         gap: 0.5rem;
       }
 
       .mod-details,
       .mod-actions {
-        width: 100%;
-        /* Allow details and actions to take full width */
-        align-items: center;
-        /* Makes dropdown/button full width */
+        width: 100%; /* Allow details and actions to take full width */
+        align-items: center; /* Makes dropdown/button full width */
       }
 
       .mod-details {
-        text-align: center;
-        /* Center the text below the icon */
+        text-align: center; /* Center the text below the icon */
       }
 
       .mod-meta {
-        justify-content: center;
-        /* Center the metadata items */
+        justify-content: center; /* Center the metadata items */
         margin-top: 1rem;
       }
 
       /* --- Fix the Footer Layout --- */
       .footer-content {
-        flex-direction: column;
-        /* Stack the columns vertically */
-        text-align: center;
-        /* Center the text inside each column */
-        gap: 2rem;
-        /* Add more space between the stacked sections */
+        flex-direction: column; /* Stack the columns vertically */
+        text-align: center; /* Center the text inside each column */
+        gap: 2rem; /* Add more space between the stacked sections */
       }
 
       .footer-bottom {
         display: flex;
-        flex-direction: column;
-        /* Stack the copyright and Ko-fi button */
+        flex-direction: column; /* Stack the copyright and Ko-fi button */
         align-items: center;
         gap: 1rem;
         padding-top: 1.5rem;
       }
 
       .kofi-button {
-        position: static;
-        /* Remove absolute positioning */
-        transform: none;
-        /* Reset the transform */
-        margin-top: 0.5rem;
-        /* Add some space above it */
+        position: static; /* Remove absolute positioning */
+        transform: none; /* Reset the transform */
+        margin-top: 0.5rem; /* Add some space above it */
       }
 
       /* --- Mobile-friendly Info Modal --- */
@@ -2760,8 +2698,7 @@
 
       /* Center the 'Add' button in the search modal on mobile */
       #search-modal .result-card .mod-actions {
-        justify-content: center !important;
-        /* Override the more generic rule */
+        justify-content: center !important; /* Override the more generic rule */
         padding-top: 0.5rem;
       }
 
@@ -2795,8 +2732,7 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 0.25rem;
-      /* Creates a small space between the button and the text below it */
+      gap: 0.25rem; /* Creates a small space between the button and the text below it */
     }
 
     .download-size-info {
@@ -2848,8 +2784,7 @@
     #info-button {
       /* Make the button larger without changing its shape */
       transform: scale(1.25);
-      transform-origin: top right;
-      /* Ensures scaling happens from the corner */
+      transform-origin: top right; /* Ensures scaling happens from the corner */
     }
 
     /* --- End of CSS */
@@ -3378,22 +3313,17 @@
 
     // Default mod icon as a data URL
     const DEFAULT_MOD_ICON = 'data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGcgaWQ9Ik1pbmVjcmFmdCI+PHBhdGggZD0ibTIxIDFoLTE4YTIgMiAwIDAgMCAtMiAydjE4YTIgMiAwIDAgMCAyIDJoMThhMiAyIDAgMCAwIDItMnYtMThhMiAyIDAgMCAwIC0yLTJ6bS0xNSA4LjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYzYS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV6bTExIDhhLjUuNSAwIDAgMSAtLjUuNWgtMmEuNS41IDAgMCAxIC0uNS0uNXYtMS41aC00djEuNWEuNS41IDAgMCAxIC0uNS41aC0yYS41LjUgMCAwIDEgLS41LS41di01YS41LjUgMCAwIDEgLjUtLjVoMi41di0xLjVhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXYxLjVoMi41YS41LjUgMCAwIDEgLjUuNXptMS04YS41LjUgMCAwIDEgLS41LjVoLTNhLjUuNSAwIDAgMSAtLjUtLjV2LTNhLjUuNSAwIDAgMSAuNS0uNWgzYS41LjUgMCAwIDEgLjUuNXoiIGZpbGw9IiMzMDNjNDIiLz48L2c+PC9zdmc+';
-    // Inline `onerror="this.src=window.DEFAULT_MOD_ICON"` handlers run in a scope chain
-    // that does NOT reliably reach top-level `const` bindings, so expose it as a
-    // `window` property too.
-    window.DEFAULT_MOD_ICON = DEFAULT_MOD_ICON;
+    window.DEFAULT_MOD_ICON = DEFAULT_MOD_ICON; // img onerror can't see top-level const
 
-    // One-time registration of the document-level click listener used to close
-    // sort dropdowns. Calling this multiple times is a no-op so setupResultSections
-    // can call it on every Update run without leaking listeners.
+    // Registers a single global click handler to close sort dropdowns, avoiding duplicate listeners.
     let _sortDropdownCloserRegistered = false;
     function registerGlobalSortDropdownCloser() {
       if (_sortDropdownCloserRegistered) return;
       _sortDropdownCloserRegistered = true;
       document.addEventListener('click', (e) => {
         if (e.target.closest('.sort-dropdown-container')) return;
-        // Resolve the dropdowns lazily so we don't hold references to detached
-        // nodes after a Clear Results / re-Update cycle.
+        // Lazily lookup dropdowns to avoid storing stale DOM references.
+   
         const found = document.getElementById('sort-found-dropdown');
         const warning = document.getElementById('sort-warning-dropdown');
         if (found) found.classList.remove('show');
@@ -3401,8 +3331,7 @@
       });
     }
 
-    // Artifact configuration: defines folder, extensions, loader requirements, and tags.
-    // loaderTags filter versions by type (e.g., datapack vs mod) for projects with multiple artifacts.
+    // Artifact config: maps type to folder, file extensions, loader need, and tags for filtering versions.
     const ARTIFACT_CONFIG = {
       mod:          { folder: 'mods',          exts: ['.jar'],    needsLoader: true,  loaderTags: null },
       plugin:       { folder: 'plugins',       exts: ['.jar'],    needsLoader: true,  loaderTags: null },
@@ -3413,6 +3342,7 @@
       modpack:      { folder: null,            exts: ['.mrpack'], needsLoader: true,  loaderTags: null },
     };
     const ZIP_ANALYSIS_CONCURRENCY = 3;
+    const ZIP_ENTRY_EXTRACTION_CONCURRENCY = 6;
     const DOWNLOAD_ZIP_FETCH_CONCURRENCY = 4;
 
     // Backward-compatible: types that skip loader filtering
@@ -3420,17 +3350,14 @@
       .filter(([_, cfg]) => !cfg.needsLoader)
       .map(([type]) => type);
 
-    // Returns the destination folder for an artifact type, or null for root placement.
-    // Unknown types default to root to avoid silently placing ambiguous files in `mods/`.
+    // Returns folder for given artifact type, or null (root) if unknown.
     function getArtifactFolder(type) {
       const cfg = ARTIFACT_CONFIG[type];
       if (!cfg) return null;
       return cfg.folder; // may be null for modpack — caller must handle
     }
 
-    // Build a `path` field for `modrinth.index.json` and `downloadInfo.path`.
-    // Folder-less artifacts (modpacks) go at the archive root, so their path
-    // is just the filename with no leading folder segment.
+    // Returns artifact path for modrinth.index.json: folderless types (e.g. modpacks) use just the filename; others are folder/filename.
     function buildArtifactPath(type, filename) {
       const folder = getArtifactFolder(type);
       return folder ? `${folder}/${filename}` : filename;
@@ -3668,8 +3595,7 @@
         return { client_side: clientSide, server_side: serverSide };
       }
 
-      // Search hits often carry accurate environment support even when project
-      // detail endpoints return unknown.
+      // Search results may provide environment info when project details don't.
       const hintedClient = job?.environmentHints?.client_side;
       const hintedServer = job?.environmentHints?.server_side;
       if (
@@ -3906,9 +3832,7 @@
     window.showCustomConfirm = showCustomConfirm;
 
     // --- Custom Prompt Modal Logic ---
-    // Replaces native `prompt()` for input flows (modpack name/version) so the
-    // UX matches the rest of the custom modals. Returns the entered string on
-    // OK or null on cancel/close, mirroring `prompt()`'s contract.
+    // Custom prompt modal—mimics native `prompt()` but matches app modals. Returns input string or null.
     const promptModal = document.getElementById("prompt-modal");
     const promptTitle = document.getElementById("prompt-title");
     const promptMessage = document.getElementById("prompt-message");
@@ -3981,7 +3905,6 @@
 
       // --- "Scroll to Bottom" Button Logic ---
       // Show if we are NOT at the bottom.
-      // The '- 1' is a small buffer for rounding issues.
       if (scrollY + viewportHeight < pageHeight - 1) {
         scrollToBottomBtn.style.display = "flex";
       } else {
@@ -4013,10 +3936,8 @@
 
     // --- Clear All Button Logic ---
     function clearDropzone() {
-      // Clear the underlying file data
       uploadedFiles.clear();
       zipContentTypeByUploadKey.clear();
-
       searchedMods.clear();
       mrpackMods.clear();
 
@@ -4154,8 +4075,7 @@
 
         if (existingName !== incomingName) continue;
 
-        // Prefer exact name+size matching to avoid false positives when two
-        // different files share a basename.
+        // Match by both name and size to avoid basename collisions.
         if (incomingSize !== null && existingSize !== null) {
           if (incomingSize === existingSize) return true;
           continue;
@@ -4256,8 +4176,7 @@
         facets.push(`["project_type:${projectType}"]`);
       }
       
-      // Only apply loader and version filters for project types that support them
-      // Shaders, resource packs, and data packs are typically loader-agnostic
+      // Only add loader/version filters for types that aren't loader-agnostic
       const shouldApplyLoaderFilters = !projectType || !LOADER_AGNOSTIC_TYPES.includes(projectType);
       
       if (shouldApplyLoaderFilters) {
@@ -4427,8 +4346,8 @@
         await performSearch(currentSearchQuery, true);
       }
 
-      // Reset button state. Text is set correctly inside updateLoadMoreButton()
-      // (called transitively from appendSearchResults), so we only need to re-enable.
+      // Re-enable button (label is managed by updateLoadMoreButton)
+ 
       if (loadMoreBtn) {
         loadMoreBtn.disabled = false;
       }
@@ -4846,18 +4765,15 @@
           return;
         }
 
-        // Respect the user's search filter intent for dual-type projects.
-        // If they searched under "datapack", treat it as a datapack;
-        // if they searched under "mod", keep it as a mod.
-        // The user's search filter is the source of truth for artifact type.
+        // Use user's selected type ("datapack", "mod", etc.) as artifact type for dual-type projects.
+   
         const artifactType = projectTypeSelect.value || mod.project_type;
 
         if (!searchedMods.has(projectId)) {
           searchedMods.set(projectId, {
             title: title,
             artifactType: artifactType,
-            // Preserve plugin-specific filters so update resolution can pick
-            // the correct server artifact instead of falling back to page loader.
+            // Keep plugin filter info for correct server/plugin resolution.
             loaderFilter: artifactType === "plugin" ? (modalLoaderSelect.value || null) : null,
             platformFilter: artifactType === "plugin" ? (modalPlatformSelect?.value || null) : null,
             environmentHints: {
@@ -4944,12 +4860,9 @@
       event.target.value = null;
     });
 
-    // Returns true when the zip's lowercased path list belongs to a self-contained
-    // single artifact (mod, resource/data pack, shader pack, or mrpack payload)
-    // rather than a container that should be expanded.
+    // True if lowercased zip paths indicate a self-contained artifact (mod, resource pack, data pack, shader pack, or mrpack), not a container.
     function isSingleArtifactZip(lowerPaths) {
-      // Root-level file check — handles both "file.ext" and "/file.ext" path formats
-      // that different zip tools may produce.
+      // Root file check—supports both "file.ext" and "/file.ext" formats.
       const hasRootFile = (name) => lowerPaths.some(p => p === name || p === `/${name}`);
       return (
         hasRootFile("fabric.mod.json") ||
@@ -4998,17 +4911,15 @@
       return null;
     }
 
-    // Pure zip analyzer: decides whether a zip is a container archive and
-    // returns extracted uploadable inner files when applicable.
+    // Zip analyzer: detects container zips and returns extracted inner files if found.
     async function analyzeZipArchive(file) {
       try {
         const zip = await JSZip.loadAsync(file);
         const zipEntries = Object.entries(zip.files);
         const paths = zipEntries.map(([path]) => path);
 
-        // Bail if this is a single-artifact zip — detectZipContentType handles
-        // those cases downstream. isSingleArtifactZip uses root-level matching
-        // so a container that merely has overrides/pack.mcmeta inside won't bail.
+        // Skip: single-artifact zips are classified later; root-level check only.
+   
         const lowerPaths = paths.map(p => p.toLowerCase());
         const totalEntries = zipEntries.reduce((count, [, entry]) => count + (entry.dir ? 0 : 1), 0);
         if (isSingleArtifactZip(lowerPaths)) {
@@ -5031,9 +4942,8 @@
         // Common launcher/export wrappers that place artifacts under one extra root.
         const knownLeadingWrappers = new Set(["overrides", ".minecraft", "minecraft", "instance"]);
 
-        const extracted = [];
+        const pendingExtractions = [];
         let processedEntries = 0;
-        let matchedEntries = 0;
         for (const [path, entry] of zipEntries) {
           if (entry.dir) continue;
           processedEntries++;
@@ -5042,12 +4952,12 @@
             continue;
           }
 
-          // Safe acceptance shapes:
-          // - <folder>/<filename>
-          // - <wrapper>/<folder>/<filename> where wrapper is known
-          // - .../<folder>/<filename> under known wrappers (nested internals)
-          // .mrpack files are extracted regardless of folder structure since they
-          // don't live under a standard artifact folder (mods/, shaderpacks/, etc.).
+          // Accept if:
+          // - <folder>/<file>
+          // - <wrapper>/<folder>/<file> (known wrapper)
+          // - Nested <folder>/<file> under known wrappers
+          // - .mrpack files: always extract (not under standard artifact dirs)
+     
           let innerName = parts[parts.length - 1];
           const innerIsMrpack = hasAnyExtension(innerName, [".mrpack"]);
 
@@ -5072,13 +4982,20 @@
           if (!hasAnyExtension(innerName, SUPPORTED_UPLOAD_EXTENSIONS)) {
             continue;
           }
-          const blob = await entry.async("blob");
-          const extractedFile = new File([blob], innerName, { type: "application/octet-stream" });
-          // Preserve uniqueness even when different folders contain same basename.
-          assignUploadFileKey(extractedFile, `${file.name}::${path.toLowerCase()}`);
-          extracted.push(extractedFile);
-          matchedEntries++;
+          pendingExtractions.push({ path, entry, innerName });
         }
+
+        const extracted = await mapWithConcurrency(
+          pendingExtractions,
+          ZIP_ENTRY_EXTRACTION_CONCURRENCY,
+          async ({ path, entry, innerName }) => {
+            const blob = await entry.async("blob");
+            const extractedFile = new File([blob], innerName, { type: "application/octet-stream" });
+            assignUploadFileKey(extractedFile, `${file.name}::${path.toLowerCase()}`);
+            return extractedFile;
+          }
+        );
+        const matchedEntries = extracted.length;
         return {
           extractedFiles: extracted,
           totalEntries,
@@ -5276,8 +5193,8 @@
       const allFiles = Array.from(files);
       const mrpackContext = getMrpackUploadContext(allFiles);
 
-      // Auto-process .mrpack only when exactly one file was uploaded, it is .mrpack,
-      // and the upload area is currently empty.
+      // Auto-process .mrpack if it's the only uploaded file and the upload area is empty.
+ 
       if (mrpackContext.shouldAutoProcessMrpack) {
         clearDropzone();
         uploadedFiles.set(assignUploadFileKey(mrpackContext.mrpackFile), mrpackContext.mrpackFile);
@@ -5385,9 +5302,8 @@
           if (manifest.dependencies.minecraft) {
             sourceVersion = manifest.dependencies.minecraft;
           }
-          // Order matters: some transitional packs declare both `forge` and
-          // `neoforge` keys, so we must match NeoForge first to avoid the more
-          // generic `forge` branch falsely winning.
+          // Match NeoForge before Forge—some packs declare both.
+     
           if (manifest.dependencies["fabric-loader"]) {
             sourceLoader = "Fabric";
           } else if (manifest.dependencies["quilt-loader"]) {
@@ -5420,8 +5336,8 @@
               .find(Boolean);
 
             if (sha1Hash && filename) {
-              // Use the hash as the unique key and store the filename for display.
-              // This uses the new `mrpackMods` map to keep them separate.
+              // Use hash as unique key in mrpackMods for display.
+         
               mrpackMods.set(`${filename}|${sha1Hash}`, {
                 title: filename,
                 lookupType: "hash",
@@ -5520,8 +5436,8 @@
       filePill.appendChild(removeButton);
       fileListContainer.appendChild(filePill);
       refreshUpdateButtonLabel();
-      // Returning the element lets callers (e.g., the container-zip extractor)
-      // remove transient "Processing..." pills once work completes.
+      // Return element so callers can remove it after processing (e.g., for "Processing..." pills).
+ 
       return filePill;
     }
 
@@ -5787,38 +5703,22 @@
 
     // --- UI State Reset Function ---
     function resetResults() {
-      // Restore the welcome message from snapshot
       if (welcomeMessageSnapshot) {
         resultsArea.innerHTML = welcomeMessageSnapshot;
       } else {
-        // Fallback if snapshot isn't available
-        resultsArea.innerHTML = "";
+        resultsArea.innerHTML = ""; // no welcome snapshot
       }
-
-      // Hide the progress bar and status message
-      progressBarContainer.style.display = "none";
+      progressBarContainer.style.display = "none"; // progress bar + status chrome
       progressBar.style.width = "0%";
       statusMessage.classList.remove("visible");
-
-      // Reset the data arrays
       successfulDownloads = [];
       successfulDownloadKeys.clear();
       dependencyDependents.clear();
       sectionCounts = { found: 0, warning: 0, failure: 0 };
-
-      // Reset mod tracking for search modal
       renderedModIds.clear();
       renderedArtifactIds.clear();
-
-      // Reset sort states
-      if (window.resetSortStates) {
-        window.resetSortStates();
-      }
-
-      // Hide the "Clear Results" button
+      if (window.resetSortStates) window.resetSortStates();
       clearResultsButton.style.display = "none";
-
-      // Re-enable the update button
       updateButton.disabled = false;
       refreshUpdateButtonLabel();
     }
@@ -6213,10 +6113,9 @@
           progressBar.style.width = `${depProgressPercentage}%`;
         }
 
-        // Conflict detection uses only target-version Modrinth metadata (incompatible dependencies)
-        // Uploaded JAR declarations are ignored since users are moving away from those versions
-        // incompatibleMap is populated during dependency resolution
-
+        // Conflict detection uses only Modrinth 'incompatible' metadata for the target version.
+        // Uploaded JAR conflicts are ignored; incompatibleMap is filled during dependency resolution.
+   
         // Phase 3: Analyze conflicts after all mods are processed
         statusMessage.textContent = "Analyzing mod conflicts...";
         conflictResults = analyzeConflicts(allInitialResults);
@@ -6243,12 +6142,12 @@
           summaryText += `, Conflicts detected: ${conflictResults.totalConflicts}`;
         }
 
-        // Add processing time, API calls, and cache info
-        // Count unique mods that were cached vs fresh (include both success and warning results)
+        // Add timing, API, and cache stats
         const allCards = document.querySelectorAll('#results-found .result-card, #results-warning .result-card');
         let cachedModCount = 0;
         let freshModCount = 0;
 
+        // Count unique mods that were cached vs fresh (include both success and warning results)
         allCards.forEach(card => {
           const hasCacheIcon = card.querySelector('.cache-icon');
           if (hasCacheIcon) {
@@ -6466,9 +6365,7 @@
         return cachedResults;
       }
 
-      // Process uncached jobs through normal pipeline. Thread the pre-computed
-      // hashMap through so `processBatchUncached` can reuse hashes instead of
-      // re-running SHA1 over every uploaded JAR a second time.
+      // Process uncached jobs, passing hashMap to avoid redundant SHA1 computation.
       const freshResults = await processBatchUncached(uncachedJobs, loader, gameVersion, hashMap);
 
       // Cache the fresh results
@@ -6545,7 +6442,6 @@
       if (pipelineMetrics) pipelineMetrics.phaseMs.projectLookup += Math.round(performance.now() - tProjects);
 
       // Steps 4 + 5: Parallel batch lookups for authors and versions.
-      // Both depend only on `projectsData`, so running concurrently reduces latency.
       const tAuthorVersion = performance.now();
       const [authorData, versionData] = await Promise.all([
         batchAuthorLookup(projectsData),
@@ -6678,19 +6574,15 @@
     }
 
     // --- Batch Version Lookup Function ---
-    // Flattens all version IDs from projectsData and looks them up via batch /v2/versions endpoint.
-    // This reduces N per-project requests to ~N/500 chunked requests.
-    // Note: Downloads all versions (no server filtering) and sorts by date_published to maintain latest-first order.
+    // Batches all version IDs from projectsData for one-shot lookup via /v2/versions.
+    // Reduces N requests to ~N/500. Results are sorted newest-first by date_published.
     const VERSION_LOOKUP_CHUNK_SIZE = 500; // URL-safe batch size for /v2/versions
     const VERSION_LOOKUP_CONCURRENCY = 16;  // chunks in flight at a time
     async function batchVersionLookup(projectsData, loader, gameVersion) {
       const projectIds = Object.keys(projectsData);
       if (projectIds.length === 0) return {};
 
-      // Collect every known version ID across every project. We prime the
-      // per-project bucket map up front so projects with zero versions still
-      // get a defined entry (downstream code expects `allVersions: []`, not
-      // `undefined`).
+      // Gather all version IDs from each project, ensuring every project has an initialized version list (downstream expects [] not undefined).
       const versionsByProject = new Map();
       const allVersionIds = [];
       for (const projectId of projectIds) {
@@ -6729,9 +6621,7 @@
         }
       }
 
-      // Sort each project's versions newest-first. Downstream code picks the
-      // newest compatible candidate with `versions[0]` after filtering, so this
-      // ordering must remain stable.
+      // Sort versions by newest first for downstream compatibility filtering.
       for (const bucket of versionsByProject.values()) {
         bucket.sort((a, b) => {
           const da = Date.parse(a.date_published) || 0;
@@ -6740,15 +6630,12 @@
         });
       }
 
-      // Apply the same per-project compatibility-status logic as the old
-      // implementation so the return shape is byte-for-byte identical.
+      // Compatibility logic for per-project status, producing an identical output structure.
       const out = {};
       for (const projectId of projectIds) {
         const project = projectsData[projectId];
         const projectType = project.project_type;
-        // Keep batch-stage loader gating aligned with the global loader selector.
-        // Plugins use per-item loader/platform constraints later, so they should
-        // not be pre-filtered by the global mod loader here.
+        // Only gate loaders for mods/modpacks here; plugins are checked per-item later.
         const requiresGlobalLoader = projectType === "mod" || projectType === "modpack";
         const allVersions = versionsByProject.get(projectId) || [];
 
@@ -6935,9 +6822,7 @@
               versionDetails = hashResult.versionData;
               fileHash = hashResult.hash; // Preserve hash for caching
 
-              // Uploaded .jar files default to "mod", but some projects (e.g.
-              // Chunky) publish plugin artifacts under the same project.
-              // Use the matched file version loaders to classify per-item.
+              // Classify uploaded JARs by loaders, since some projects host both mods and plugins.
               artifactType = inferArtifactTypeFromVersionLoaders(artifactType, versionDetails.loaders);
             }
 
@@ -6951,8 +6836,7 @@
               }
             }
 
-            // Some .mrpack manifests reference mirrored files whose SHA1 does not
-            // map to Modrinth's version_files index. Fall back to filename search.
+            // If SHA1 lookup fails for .mrpack, try filename as fallback.
             if (!projectDetails && lookupType === "hash" && job.source === "mrpack") {
               const recoveredProject = await resolveMrpackHashMissByFilename(job);
               if (recoveredProject) {
@@ -6963,8 +6847,7 @@
           } else if (lookupType === "id") {
             projectDetails = projectsData[identifier];
             if (!projectDetails) {
-              // Batch /projects?ids works best with canonical IDs; fall back to
-              // direct lookup so slug-based identifiers from .mrpack hints still resolve.
+              // Prefer batch lookup; fallback for slug-based .mrpack IDs.
               projectDetails = await resolveProjectDetailsByIdentifier(identifier);
             }
           }
@@ -6997,9 +6880,7 @@
             environmentSupportCache
           );
 
-          // Fallback for false negatives when batch version aggregation misses
-          // some versions on large projects. We only do this for mods where
-          // project metadata says the selected loader/version should exist.
+          // Direct fetch fallback if batch version lookup may have missed versions; applies to mods expected to support the selected loader/game version.
           if (
             versions.length === 0 &&
             artifactType === "mod" &&
@@ -7206,8 +7087,7 @@
       return { name: "unknown", url: "#" };
     }
 
-    // Extracts mod metadata from JAR files.
-    // Returns { id, name, version } - only version is used downstream.
+    // Extract mod id, name, and version from JAR mods (only version used later).
     async function getModIdFromJar(jarFile) {
       try {
         const zip = await JSZip.loadAsync(jarFile);
@@ -7264,8 +7144,7 @@
 
     // --- Analyze Conflicts Function ---
 
-    // Decoupled from DOM: takes the authoritative list of processed results.
-    // Each conflict pair carries severity ("breaks" | "conflicts") so the UI can color/sort them.
+    // Pure function: analyzes processed results, returning conflict pairs with severity for UI display.
     function analyzeConflicts(allInitialResults) {
       const out = {
         conflictPairs: [],
@@ -7273,8 +7152,7 @@
         totalConflicts: 0,
       };
 
-      // Build the set of project IDs that the user actually has installed/uploaded.
-      // (We deliberately exclude `failure` results since we have no JAR data for them.)
+      // Collect IDs of uploaded/installed mods (exclude failures—no data for them).
       const uploadedModIds = new Set();
       for (const r of allInitialResults || []) {
         if ((r.status === "success" || r.status === "warning") && r.projectId) {
@@ -7282,8 +7160,7 @@
         }
       }
 
-      // Cross-reference incompatible relationships with uploaded mods.
-      // Each unique unordered pair is reported once (sorted key).
+      // Identify unique conflicting mod pairs among uploaded mods (unordered, reported once).
       const processedPairs = new Set();
       for (const [srcId, incompatibleSet] of incompatibleMap.entries()) {
         if (!uploadedModIds.has(srcId)) continue;
@@ -7297,8 +7174,7 @@
           const srcName = modIdToNameMap.get(srcId) || srcId;
           const tgtName = modIdToNameMap.get(tgtId) || tgtId;
 
-          // All conflicts are derived from target version metadata (Modrinth API),
-          // representing forward "breaks" declarations without version range gating.
+          // Conflicts are from Modrinth API "breaks" metadata (no version gating).
           const declarations = [{
             direction: 'forward',
             bySeverity: 'breaks',
@@ -7921,8 +7797,7 @@
             return;
           }
 
-          // Map the selection to actual downloadable entries. We exclude ignored mods
-          // and .mrpack files (those aren't individual downloads).
+          // Map the selection to actual downloadable entries. Exclude ignored mods and .mrpack files (not individual downloads).
           const downloadsToProcess = successfulDownloads.filter(dl => {
             if (!window.selectedModsForBulk.has(dl.projectId)) return false;
             if (dl.isMrpackFile === true) return false;
@@ -8268,8 +8143,7 @@
         otherDropdown.classList.remove('show'); // Close other dropdown
       }
 
-      // Close dropdowns when clicking outside. Registered once at startup to prevent
-      // memory leaks from stacking listeners on each Update run.
+      // Register one-time global click handler to close sort dropdowns when clicking outside.
       registerGlobalSortDropdownCloser();
 
       // Sort button click handlers
@@ -10170,8 +10044,12 @@
         }
 
         zipButton.innerHTML = 'Generating ZIP...';
-        if (statusEl) statusEl.textContent = 'Generating ZIP...';
-        const content = await zip.generateAsync({ type: "blob" });
+        if (statusEl) statusEl.textContent = 'Generating ZIP… 0%';
+        const content = await zip.generateAsync({ type: "blob" }, (meta) => {
+          if (statusEl && typeof meta.percent === "number") {
+            statusEl.textContent = `Generating ZIP… ${Math.round(meta.percent)}%`;
+          }
+        });
         const zipSizeMB = formatBytes(content.size);
 
         const link = document.createElement("a");
@@ -10271,11 +10149,22 @@
         })),
       };
 
-      const zip = new JSZip();
-      zip.file("modrinth.index.json", JSON.stringify(manifest, null, 2));
-      zip.folder("overrides");
+      try {
+        const zip = new JSZip();
+        zip.file("modrinth.index.json", JSON.stringify(manifest, null, 2));
+        zip.folder("overrides");
 
-      zip.generateAsync({ type: "blob" }).then(function (content) {
+        if (statusEl) {
+          statusEl.textContent = 'Generating .mrpack… 0%';
+          statusEl.classList.remove('success', 'error');
+        }
+
+        const content = await zip.generateAsync({ type: "blob" }, (meta) => {
+          if (statusEl && typeof meta.percent === "number") {
+            statusEl.textContent = `Generating .mrpack… ${Math.round(meta.percent)}%`;
+          }
+        });
+
         const link = document.createElement("a");
         link.href = URL.createObjectURL(content);
         link.download = filename;
@@ -10288,7 +10177,15 @@
           statusEl.classList.remove('error');
           statusEl.classList.add('success');
         }
-      });
+      } catch (error) {
+        console.error("Error creating modpack:", error);
+        if (statusEl) {
+          statusEl.textContent = 'Error creating modpack file.';
+          statusEl.classList.remove('success');
+          statusEl.classList.add('error');
+        }
+        showCustomAlert("Error creating modpack file. Please check the console for details.", 'error');
+      }
     }
 
     function formatBytes(bytes, decimals = 2) {
