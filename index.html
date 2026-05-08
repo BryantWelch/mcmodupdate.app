@@ -8080,13 +8080,13 @@
       </div>
       <!-- Bulk actions bar (hidden by default) -->
       <div id="bulk-actions-bar" class="bulk-actions-bar">
-        <button id="toggle-select-all-bulk-btn">Select All</button>
+        <button id="toggle-select-all-bulk-btn" title="Select every visible mod in the results">Select All</button>
         <span id="bulk-selection-count" class="bulk-selection-count">0 selected</span>
         <span class="bulk-divider">|</span>
-        <button id="download-selected-bulk-btn" class="primary">Download</button>
-        <button id="ignore-selected-bulk-btn">Ignore</button>
-        <button id="unignore-selected-bulk-btn">Unignore</button>
-        <button id="remove-selected-bulk-btn" class="danger">Remove</button>
+        <button id="download-selected-bulk-btn" class="primary" title="Download the selected mods">Download</button>
+        <button id="ignore-selected-bulk-btn" title="Skip the selected mods so they won't be included in downloads">Ignore</button>
+        <button id="unignore-selected-bulk-btn" title="Restore previously ignored mods so they're included again">Unignore</button>
+        <button id="remove-selected-bulk-btn" class="danger" title="Remove the selected mods from the results and the upload area">Remove</button>
         <span class="bulk-divider">|</span>
         <button id="undo-bulk-btn" class="undo" disabled title="No actions to undo">Undo</button>
       </div>
@@ -8291,6 +8291,9 @@
             window.selectedModsForBulk.has(card.dataset.projectId)
           );
           toggleSelectBtn.textContent = allSelected ? 'Clear All' : 'Select All';
+          toggleSelectBtn.title = allSelected
+            ? 'Deselect every mod currently selected'
+            : 'Select every visible mod in the results';
         }
       }
       
