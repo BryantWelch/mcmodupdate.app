@@ -4881,8 +4881,15 @@
       isShowingFeatured = false;
       // Show featured content when cleared - don't randomize, use current filters
       loadFeaturedContent(sortSelect.value, projectTypeSelect.value);
-      // Clear the searchedMods Map to reset added mod states
-      searchedMods.clear();
+      // NOTE: Do NOT clear searchedMods here. Pills in the upload area are the
+      // source of truth for added mods; their X-button handler removes the
+      // matching searchedMods entry. Wiping the map on a search-input clear
+      // orphaned pills (present in the DOM but absent from state), so the next
+      // Update run silently skipped the just-added mod.
+      // The Clear Input button uses clearDropzone() which still wipes everything.
+      // Refresh result-card "Add/Remove" states so the modal reflects the
+      // current added set after the search input was cleared.
+      refreshSearchModalAddedStates();
       // Reset sort states
       if (window.resetSortStates) {
         window.resetSortStates();
