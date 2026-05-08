@@ -797,6 +797,18 @@
       box-shadow: none;
     }
 
+    .result-card.search .add-mod-button.remove-mode {
+      background: var(--border-color);
+      color: var(--secondary-text);
+      box-shadow: none;
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    .result-card.search .add-mod-button.remove-mode:hover:not(:disabled) {
+      background-color: var(--error-color);
+      color: white;
+    }
+
     /* Ensure search cards fit within container */
     .result-card.search {
       max-width: 100%;
@@ -1958,9 +1970,22 @@
       border-color: #2563eb;
     }
 
-    .bulk-actions-bar button.undo:hover {
+    .bulk-actions-bar button.undo:hover:not(:disabled) {
       background-color: #1d4ed8;
       border-color: #1d4ed8;
+    }
+
+    .bulk-actions-bar button.undo:disabled {
+      background-color: var(--border-color);
+      color: var(--secondary-text);
+      border-color: var(--border-color);
+      cursor: not-allowed;
+      opacity: 0.7;
+    }
+
+    .bulk-actions-bar button.undo:disabled:hover {
+      background-color: var(--border-color);
+      border-color: var(--border-color);
     }
 
     .bulk-actions-bar .bulk-selection-count {
@@ -3284,6 +3309,405 @@
     let searchedMods = new Map();
     let mrpackMods = new Map(); // For mods from .mrpack files
     let zipContentTypeByUploadKey = new Map(); // Cache zip content type discovered during upload analysis
+    // Maps mod identifier (project_id or slug) → { pill, source } for the search modal Remove button.
+    // Source can be "search", "upload", or "mrpack". The pill is the upload-area DOM element.
+    const addedModRemovers = new Map();
+    // Maps file upload key → its file-pill DOM element (for File-instance pills).
+    const pillByUploadKey = new Map();
+    // Maps mrpackMods entry key → its file-pill DOM element (for mrpack child mod pills).
+    const pillByMrpackKey = new Map();
+    // Maps SHA1 hash → upload key, populated during processBatch so results can be linked to pills.
+    const uploadKeyByHash = new Map();
+
+    // Locate the upload-area pill that corresponds to a resolution result, so the search
+    // modal Remove button can target the right pill. Returns the pill DOM element or null.
+    function findPillForResult(result) {
+      if (!result) return null;
+      // 1) Uploaded files: result.hash matches a hash we stored when the file was first hashed.
+      if (result.hash && uploadKeyByHash.has(result.hash)) {
+        const uploadKey = uploadKeyByHash.get(result.hash);
+        const pill = pillByUploadKey.get(uploadKey);
+        if (pill) return pill;
+      }
+      // 2) mrpack mods looked up by hash: identifier on the mrpackMods entry equals result.hash.
+      if (result.hash) {
+        for (const [key, info] of mrpackMods) {
+          if (info && info.lookupType === "hash" && info.identifier === result.hash) {
+            const pill = pillByMrpackKey.get(key);
+            if (pill) return pill;
+          }
+        }
+      }
+      // 3) mrpack mods looked up by project id: identifier equals result.projectId.
+      if (result.projectId) {
+        for (const [key, info] of mrpackMods) {
+          if (info && info.lookupType === "id" && info.identifier === result.projectId) {
+            const pill = pillByMrpackKey.get(key);
+            if (pill) return pill;
+          }
+        }
+      }
+      return null;
+    }
+
+    // Register a mapping from mod identifier → { pill, source, projectId, modId } so the
+    // search modal Remove button can both delete the upload-area pill (if any) and the
+    // matching result card. Each registration merges with an existing entry, treating
+    // already-set fields as preferred so a later pill-less call (e.g. dependency
+    // resolution after a search add) cannot clobber a known pill or source.
+    function registerAddedModRemover(identifier, pill, source, ids = {}) {
+      if (!identifier) return;
+      const key = String(identifier);
+      const existing = addedModRemovers.get(key) || {};
+      addedModRemovers.set(key, {
+        pill: existing.pill || pill || null,
+        source: existing.source || source || null,
+        projectId: existing.projectId || ids.projectId || null,
+        modId: existing.modId || ids.modId || null,
+      });
+    }
+
+    // Convenience wrapper used at every result-rendering site. Always registers an entry,
+    // even when we couldn't find a source pill, so dependencies (auto-resolved, no pill)
+    // also get a working Remove button in the search modal.
+    function registerRenderedModRemover(result, pill = null) {
+      if (!result) return;
+      const ids = { projectId: result.projectId || null, modId: result.modId || null };
+      const source = pill ? "rendered" : "dependency";
+      if (result.modId) registerAddedModRemover(result.modId, pill, source, ids);
+      if (result.projectId && result.projectId !== result.modId) {
+        registerAddedModRemover(result.projectId, pill, source, ids);
+      }
+    }
+
+    // Remove a mod's result card from the results section, drop its successfulDownloads
+    // entry, and resync any DOM-derived UI (section counters, Download All count, etc.).
+    function removeResultCardForMod({ projectId, modId } = {}) {
+      const ids = [projectId, modId].filter(Boolean);
+      let removedAny = false;
+      for (const id of ids) {
+        const cards = document.querySelectorAll(`.result-card[data-project-id="${CSS.escape(String(id))}"]`);
+        cards.forEach((card) => {
+          card.remove();
+          removedAny = true;
+        });
+      }
+
+      // Drop matching downloads and rebuild the dedupe key set from the remaining list.
+      if (projectId) {
+        successfulDownloads = successfulDownloads.filter((dl) => dl.projectId !== projectId);
+      }
+      successfulDownloadKeys.clear();
+      for (const dl of successfulDownloads) {
+        successfulDownloadKeys.add(getSuccessfulDownloadKey(dl.projectId, dl.artifactType));
+      }
+
+      // Forget tracking sets so the same mod can be re-added later from search.
+      for (const id of ids) {
+        renderedModIds.delete(id);
+        for (const key of Array.from(renderedArtifactIds)) {
+          if (key.startsWith(id + '|')) renderedArtifactIds.delete(key);
+        }
+        if (window.ignoredMods) window.ignoredMods.delete(id);
+        dependencyMap.delete(id);
+        reverseDependencyMap.delete(id);
+        dependencyDependents.delete(id);
+      }
+
+      if (removedAny) {
+        syncSectionCountsFromDom();
+        if (typeof window.updateDownloadAllCount === "function") {
+          window.updateDownloadAllCount();
+        }
+      }
+      return removedAny;
+    }
+
+    // Re-evaluate Add/Remove buttons currently rendered in the search modal so the UI stays
+    // in sync after the upload area changes (e.g., a pill was removed via the X button).
+    function refreshSearchModalAddedStates() {
+      const cards = document.querySelectorAll('#search-results-container .result-card.search');
+      cards.forEach((card) => {
+        const btn = card.querySelector('.add-mod-button');
+        if (!btn) return;
+        const updater = btn._refreshAddedState;
+        if (typeof updater === 'function') updater();
+      });
+    }
+
+    // Capture enough state to recreate the upload-area pills (and their associated tracking
+    // map entries) for a set of mods that are about to be removed. Used by the bulk-actions
+    // Undo flow so it can fully restore the state after a "Remove all" wholesale clear.
+    function captureUploadAreaSnapshotForMods(selectedSet) {
+      const snapshots = [];
+      const seenSnapshotKeys = new Set();
+      selectedSet.forEach((projectId) => {
+        const entry = addedModRemovers.get(String(projectId));
+        const snap = {
+          projectId: entry?.projectId || projectId,
+          modId: entry?.modId || null,
+          source: entry?.source || null,
+          kind: "dependency", // default until we identify a concrete pill source
+        };
+
+        if (entry && entry.pill) {
+          snap.pillIndex = Array.from(fileListContainer.children).indexOf(entry.pill);
+          for (const [key, file] of uploadedFiles) {
+            if (pillByUploadKey.get(key) === entry.pill) {
+              snap.kind = "upload";
+              snap.uploadKey = key;
+              snap.file = file;
+              break;
+            }
+          }
+          if (snap.kind === "dependency") {
+            for (const [key, info] of mrpackMods) {
+              if (pillByMrpackKey.get(key) === entry.pill) {
+                snap.kind = "mrpack";
+                snap.mrpackKey = key;
+                snap.mrpackInfo = info;
+                break;
+              }
+            }
+          }
+          if (snap.kind === "dependency" && searchedMods.has(snap.projectId)) {
+            snap.kind = "search";
+            snap.searchedKey = snap.projectId;
+            snap.searchedModInfo = searchedMods.get(snap.projectId);
+          }
+        }
+
+        const snapshotKey = entry?.pill
+          ? `pill:${snap.pillIndex}:${entry.pill.textContent}`
+          : `id:${snap.projectId}:${snap.modId || ''}`;
+        if (seenSnapshotKeys.has(snapshotKey)) return;
+        seenSnapshotKeys.add(snapshotKey);
+
+        // Capture (modId, project_type) pairs so renderedArtifactIds can be restored too.
+        snap.renderedArtifactKeys = [];
+        for (const key of renderedArtifactIds) {
+          const idPart = key.split('|')[0];
+          if (idPart && (idPart === snap.modId || idPart === snap.projectId)) {
+            snap.renderedArtifactKeys.push(key);
+          }
+        }
+        snapshots.push(snap);
+      });
+      return snapshots;
+    }
+
+    // ---------- Undo history (bulk-actions Undo button) ----------
+    // Each entry is { description, undo: fn }. The most recent action is at the end of
+    // the array; performUndo pops from the end.
+    const undoHistory = [];
+
+    function refreshUndoButtonState() {
+      const btn = document.getElementById('undo-bulk-btn');
+      if (!btn) return;
+      if (undoHistory.length === 0) {
+        btn.disabled = true;
+        btn.title = 'No actions to undo';
+      } else {
+        btn.disabled = false;
+        const last = undoHistory[undoHistory.length - 1];
+        btn.title = `Undo: ${last.description || 'last action'}`;
+      }
+    }
+
+    function pushUndoableAction(action) {
+      if (!action || typeof action.undo !== 'function') return;
+      undoHistory.push(action);
+      refreshUndoButtonState();
+    }
+
+    function performUndo() {
+      if (undoHistory.length === 0) return;
+      const action = undoHistory.pop();
+      try {
+        action.undo();
+      } catch (e) {
+        console.error('Undo failed:', e);
+      }
+      refreshUndoButtonState();
+    }
+
+    function clearUndoHistory() {
+      undoHistory.length = 0;
+      refreshUndoButtonState();
+    }
+
+    // Capture a full snapshot for a set of mods being removed (cards + downloads +
+    // ignoredMods + upload-area). Used by both bulk Remove and search-modal Remove so
+    // the Undo button can later reinstate the exact pre-removal state.
+    function captureMultiModRemovalSnapshot(projectIdSet) {
+      const cardEntries = [];
+      const seen = new Set();
+      for (const pid of projectIdSet) {
+        if (!pid) continue;
+        const cards = document.querySelectorAll(`.result-card[data-project-id="${CSS.escape(String(pid))}"]`);
+        cards.forEach((card) => {
+          if (seen.has(card)) return;
+          seen.add(card);
+          const parent = card.parentNode;
+          // Record the card's index within its parent so multi-card undo can restore
+          // each one to its original spot, even when several siblings were also removed.
+          const cardIndex = parent ? Array.from(parent.children).indexOf(card) : -1;
+          cardEntries.push({
+            card,
+            parentNode: parent,
+            nextSibling: card.nextSibling,
+            cardIndex,
+          });
+        });
+      }
+      return {
+        cards: cardEntries,
+        successfulDownloads: successfulDownloads.slice(),
+        successfulDownloadKeys: Array.from(successfulDownloadKeys),
+        ignoredMods: Array.from(window.ignoredMods || []),
+        uploadAreaSnapshot: captureUploadAreaSnapshotForMods(projectIdSet),
+      };
+    }
+
+    // Reverse of captureMultiModRemovalSnapshot. Restores cards in their original DOM
+    // positions, rebuilds successfulDownloads / ignoredMods, and re-creates the upload
+    // pills + tracking maps via restoreUploadAreaSnapshot.
+    function restoreMultiModRemovalSnapshot(snap) {
+      if (!snap) return;
+      // 1) Re-insert cards at their original positions. Process ascending by original
+      //    index so each card slots into the same spot it occupied before, even when
+      //    several adjacent siblings were removed in the same operation.
+      const orderedCards = (snap.cards || []).slice().sort((a, b) => {
+        const ai = Number.isInteger(a.cardIndex) ? a.cardIndex : Number.MAX_SAFE_INTEGER;
+        const bi = Number.isInteger(b.cardIndex) ? b.cardIndex : Number.MAX_SAFE_INTEGER;
+        return ai - bi;
+      });
+      for (const entry of orderedCards) {
+        const parent = entry.parentNode;
+        if (!parent) continue;
+        const idx = Number.isInteger(entry.cardIndex) && entry.cardIndex >= 0
+          ? entry.cardIndex
+          : null;
+        let inserted = false;
+        if (idx !== null) {
+          // Pick the current child at the saved index (skip the card itself in case it's
+          // already in the parent for some reason) and insert before it. If the index is
+          // past the end of the current children list, fall through to appendChild.
+          const currentChildren = Array.from(parent.children).filter((c) => c !== entry.card);
+          const referenceNode = currentChildren[idx] || null;
+          if (referenceNode) {
+            parent.insertBefore(entry.card, referenceNode);
+            inserted = true;
+          }
+        }
+        if (!inserted && entry.nextSibling && entry.nextSibling.parentNode === parent) {
+          parent.insertBefore(entry.card, entry.nextSibling);
+          inserted = true;
+        }
+        if (!inserted) {
+          parent.appendChild(entry.card);
+        }
+        // Make sure the section header reflects the restored card, and that the card's
+        // download link reflects current bulk-mode / ignored state.
+        const section = parent.closest('.results-section');
+        if (section) section.classList.add('visible');
+        const downloadLink = entry.card.querySelector('.download-link');
+        if (downloadLink) {
+          downloadLink.classList.remove('selected');
+          if (window.isBulkActionsMode) {
+            downloadLink.classList.add('bulk-select-mode');
+            downloadLink.textContent = 'Select';
+            downloadLink.setAttribute('title', 'Select this mod for bulk actions');
+          } else if (downloadLink.classList.contains('ignored-state')) {
+            downloadLink.classList.remove('bulk-select-mode');
+            downloadLink.textContent = 'Ignored';
+            downloadLink.setAttribute('title', 'This mod is ignored');
+          } else {
+            downloadLink.classList.remove('bulk-select-mode');
+            downloadLink.textContent = 'Download';
+            downloadLink.setAttribute('title', 'Download this mod file');
+          }
+        }
+      }
+
+      // 2) Restore download metadata.
+      successfulDownloads = snap.successfulDownloads.slice();
+      successfulDownloadKeys.clear();
+      snap.successfulDownloadKeys.forEach((k) => successfulDownloadKeys.add(k));
+
+      // 3) Restore ignoredMods.
+      if (!window.ignoredMods) window.ignoredMods = new Set();
+      else window.ignoredMods.clear();
+      snap.ignoredMods.forEach((m) => window.ignoredMods.add(m));
+
+      // 4) Restore upload area (pills + uploadedFiles / mrpackMods / searchedMods).
+      restoreUploadAreaSnapshot(snap.uploadAreaSnapshot);
+
+      // 5) Resync DOM-derived UI.
+      syncSectionCountsFromDom();
+      refreshSearchModalAddedStates();
+      if (typeof window.updateDownloadAllCount === 'function') window.updateDownloadAllCount();
+      if (typeof window.updateBulkSelectionCounts === 'function') window.updateBulkSelectionCounts();
+    }
+
+    // Reverse of captureUploadAreaSnapshotForMods. Re-creates pills, repopulates the
+    // upload-area maps, and re-registers everything in addedModRemovers / renderedModIds
+    // so a subsequent Update run behaves as if the bulk Remove never happened.
+    function restorePillPosition(pill, originalIndex) {
+      if (!pill || !Number.isInteger(originalIndex) || originalIndex < 0) return;
+      const children = Array.from(fileListContainer.children).filter((child) => child !== pill);
+      const referenceNode = children[Math.min(originalIndex, children.length)] || null;
+      fileListContainer.insertBefore(pill, referenceNode);
+    }
+
+    function restoreUploadAreaSnapshot(snapshots) {
+      if (!Array.isArray(snapshots) || snapshots.length === 0) return;
+      for (const snap of snapshots) {
+        let pill = null;
+
+        if (snap.kind === "upload" && snap.file) {
+          uploadedFiles.set(snap.uploadKey || getUploadFileKey(snap.file), snap.file);
+          pill = createFilePill(snap.file);
+        } else if (snap.kind === "mrpack" && snap.mrpackInfo) {
+          mrpackMods.set(snap.mrpackKey, snap.mrpackInfo);
+          pill = createFilePill({ name: snap.mrpackInfo.title }, null, snap.mrpackKey);
+        } else if (snap.kind === "search" && snap.searchedModInfo) {
+          searchedMods.set(snap.searchedKey, snap.searchedModInfo);
+          const projectId = snap.searchedKey;
+          const slug = snap.modId;
+          const title = snap.searchedModInfo.title || projectId;
+          pill = createFilePill({ name: `${title} (Searched)` }, () => {
+            searchedMods.delete(projectId);
+            addedModRemovers.delete(String(projectId));
+            if (slug) addedModRemovers.delete(String(slug));
+            refreshSearchModalAddedStates();
+          });
+        }
+
+        restorePillPosition(pill, snap.pillIndex);
+
+        // Re-register the mod identifier(s) so the search modal Remove button keeps working.
+        const ids = { projectId: snap.projectId, modId: snap.modId };
+        const source = snap.kind === "search" ? "search" : (pill ? "rendered" : "dependency");
+        if (snap.modId) registerAddedModRemover(snap.modId, pill, source, ids);
+        if (snap.projectId && snap.projectId !== snap.modId) {
+          registerAddedModRemover(snap.projectId, pill, source, ids);
+        }
+
+        // Restore tracking sets so subsequent search opens will see this mod as already added.
+        if (snap.modId) renderedModIds.add(snap.modId);
+        if (snap.projectId) renderedModIds.add(snap.projectId);
+        for (const key of snap.renderedArtifactKeys || []) {
+          renderedArtifactIds.add(key);
+        }
+      }
+
+      if (uploadedFiles.size > 0 || searchedMods.size > 0 || mrpackMods.size > 0) {
+        dropzonePrompt.style.display = "none";
+        dropzone.classList.add("dropzone-expanded");
+        clearAllButton.style.display = "inline-flex";
+      }
+    }
     let isCurrentlySearching = false;
     let welcomeMessageSnapshot = null; // Store the welcome message snapshot
     let apiCallCount = 0; // Track total API calls made
@@ -3940,6 +4364,12 @@
       zipContentTypeByUploadKey.clear();
       searchedMods.clear();
       mrpackMods.clear();
+      addedModRemovers.clear();
+      pillByUploadKey.clear();
+      pillByMrpackKey.clear();
+      uploadKeyByHash.clear();
+      // Pending undo actions reference removed pills/maps and would no-op or error.
+      clearUndoHistory();
 
       // Clear the visual file pills from the UI
       fileListContainer.innerHTML = "";
@@ -4749,24 +5179,118 @@
 
       const addButton = card.querySelector(".add-mod-button");
       const mapKey = mod.project_id || mod.slug;
-      // Disable button if already added
-      if (!mapKey || searchedMods.has(mapKey) || renderedModIds.has(mod.slug)) {
-        addButton.disabled = true;
-        addButton.textContent = "Added";
-      }
+
+      // Toggle the button between Add and Remove states. Removable means we have a tracked
+      // pill to remove from the upload area; non-removable mods (no project id) stay "Added".
+      const setAddButtonState = (state) => {
+        addButton.classList.remove("remove-mode");
+        if (state === "added-locked") {
+          addButton.disabled = true;
+          addButton.textContent = "Added";
+          addButton.title = "Already added";
+        } else if (state === "remove") {
+          addButton.disabled = false;
+          addButton.classList.add("remove-mode");
+          addButton.textContent = "Remove";
+          addButton.title = "Remove this mod from the upload and results area";
+        } else {
+          addButton.disabled = false;
+          addButton.textContent = "Add";
+          addButton.title = "Add this mod to your collection";
+        }
+      };
+
+      const isModAdded = () => {
+        if (!mapKey) return false;
+        if (searchedMods.has(mapKey)) return true;
+        if (mod.slug && renderedModIds.has(mod.slug)) return true;
+        return false;
+      };
+
+      const refreshAddedState = () => {
+        if (!mapKey) {
+          setAddButtonState("added-locked");
+          return;
+        }
+        if (!isModAdded()) {
+          setAddButtonState("add");
+          return;
+        }
+        // Mod is added — show Remove if we know how to remove it, otherwise lock as "Added".
+        const hasRemover =
+          searchedMods.has(mapKey) ||
+          addedModRemovers.has(String(mapKey)) ||
+          (mod.slug && addedModRemovers.has(String(mod.slug)));
+        setAddButtonState(hasRemover ? "remove" : "added-locked");
+      };
+
+      // Expose a refresher so external removals (e.g., user clicks X on a pill) can sync this card.
+      addButton._refreshAddedState = refreshAddedState;
+      refreshAddedState();
 
       addButton.addEventListener("click", (e) => {
         const btn = e.currentTarget;
+        if (btn.disabled) return;
+
         const projectId = mod.project_id || mod.slug;
-        const title = mod.title;
 
         if (!projectId) {
           showCustomAlert("Could not read a project id for this search result. Try again or report this mod.", "error");
           return;
         }
 
+        // --- Remove flow ---
+        if (btn.classList.contains("remove-mode")) {
+          // Look up the registered entry and capture the projectId/modId we tracked at
+          // registration time (handles dependencies with no upload pill).
+          let entry = null;
+          for (const id of [projectId, mod.slug].filter(Boolean)) {
+            const found = addedModRemovers.get(String(id));
+            if (found) { entry = found; break; }
+          }
+
+          // Snapshot pre-removal state so the bulk-actions Undo button can restore it.
+          const idsForSnapshot = new Set([projectId, mod.slug, entry?.projectId, entry?.modId].filter(Boolean));
+          const snapshot = captureMultiModRemovalSnapshot(idsForSnapshot);
+
+          // 1) If we have a tracked pill, trigger its X button so the existing pill-side
+          //    cleanup runs (uploadedFiles, mrpackMods, registries, renderedModIds, etc.).
+          if (entry && entry.pill) {
+            const xBtn = entry.pill.querySelector(".file-pill-remove");
+            if (xBtn && typeof xBtn.click === "function") {
+              xBtn.click();
+            } else {
+              entry.pill.remove();
+            }
+          }
+
+          // 2) Always remove the corresponding result card (if any) from the results
+          //    section. Use the richest set of identifiers we know.
+          removeResultCardForMod({
+            projectId: entry?.projectId || projectId,
+            modId: entry?.modId || mod.slug || projectId,
+          });
+
+          // 3) Defensive cleanup in case neither path covered some identifier.
+          searchedMods.delete(projectId);
+          if (mod.slug) renderedModIds.delete(mod.slug);
+          renderedModIds.delete(projectId);
+          addedModRemovers.delete(String(projectId));
+          if (mod.slug) addedModRemovers.delete(String(mod.slug));
+
+          refreshSearchModalAddedStates();
+
+          // Register an undoable action so the bulk-actions Undo button can put the mod back.
+          pushUndoableAction({
+            description: `Remove "${mod.title || projectId}"`,
+            undo: () => restoreMultiModRemovalSnapshot(snapshot),
+          });
+          return;
+        }
+
+        // --- Add flow ---
+        const title = mod.title;
         // Use user's selected type ("datapack", "mod", etc.) as artifact type for dual-type projects.
-   
         const artifactType = projectTypeSelect.value || mod.project_type;
 
         if (!searchedMods.has(projectId)) {
@@ -4781,18 +5305,25 @@
               server_side: mod.server_side || "unknown",
             },
           });
-          createFilePill({ name: `${title} (Searched)` }, () => {
+          const pill = createFilePill({ name: `${title} (Searched)` }, () => {
             searchedMods.delete(projectId);
-            addButton.disabled = false;
-            addButton.textContent = "Add";
+            addedModRemovers.delete(String(projectId));
+            if (mod.slug) addedModRemovers.delete(String(mod.slug));
+            refreshSearchModalAddedStates();
           });
+          // Track the pill (and projectId/modId) so the Remove button can clean up both
+          // the upload-area pill and any rendered result card for related slugs.
+          const ids = { projectId, modId: mod.slug || null };
+          registerAddedModRemover(projectId, pill, "search", ids);
+          if (mod.slug && mod.slug !== projectId) {
+            registerAddedModRemover(mod.slug, pill, "search", ids);
+          }
           dropzonePrompt.style.display = "none";
           dropzone.classList.add("dropzone-expanded");
           clearAllButton.style.display = "inline-flex";
         }
 
-        btn.disabled = true;
-        btn.textContent = "Added";
+        refreshAddedState();
       });
 
       return card;
@@ -5338,23 +5869,25 @@
             if (sha1Hash && filename) {
               // Use hash as unique key in mrpackMods for display.
          
-              mrpackMods.set(`${filename}|${sha1Hash}`, {
+              const mrpackKey = `${filename}|${sha1Hash}`;
+              mrpackMods.set(mrpackKey, {
                 title: filename,
                 lookupType: "hash",
                 identifier: sha1Hash,
                 projectIdHint: projectIdFromUrl || null,
               });
-              createFilePill({ name: filename });
+              createFilePill({ name: filename }, null, mrpackKey);
               parsedModsCount++;
             } else if (projectIdFromUrl && filename) {
-              mrpackMods.set(`${filename}|id:${projectIdFromUrl}`, {
+              const mrpackKey = `${filename}|id:${projectIdFromUrl}`;
+              mrpackMods.set(mrpackKey, {
                 title: filename,
                 lookupType: "id",
                 identifier: projectIdFromUrl,
                 artifactType: "mod",
               });
               addedByProjectId++;
-              createFilePill({ name: filename });
+              createFilePill({ name: filename }, null, mrpackKey);
               parsedModsCount++;
             } else if (filename) {
               skippedWithoutSha1++;
@@ -5398,7 +5931,7 @@
     }
 
     // --- File Pill Logic ---
-    function createFilePill(file, onRemove) {
+    function createFilePill(file, onRemove, sourceKey = null) {
       const filePill = document.createElement("div");
       filePill.classList.add("file-pill");
       const fileNameSpan = document.createElement("span");
@@ -5411,16 +5944,39 @@
       removeButton.setAttribute("title", "Remove this file from the list");
       removeButton.setAttribute("tabindex", "0");
       removeButton.setAttribute("aria-label", "Remove " + file.name);
+
+      // Register pill in lookup tables so the search modal can find it for the Remove button.
+      if (file instanceof File) {
+        pillByUploadKey.set(getUploadFileKey(file), filePill);
+      } else if (sourceKey) {
+        pillByMrpackKey.set(sourceKey, filePill);
+      }
+
       removeButton.onclick = function (event) {
         event.stopPropagation();
         if (file instanceof File) {
           const fileKey = getUploadFileKey(file);
           uploadedFiles.delete(fileKey);
           zipContentTypeByUploadKey.delete(fileKey);
+          pillByUploadKey.delete(fileKey);
+        } else if (sourceKey) {
+          pillByMrpackKey.delete(sourceKey);
+          if (mrpackMods.has(sourceKey)) {
+            mrpackMods.delete(sourceKey);
+          }
+        }
+        // Drop any addedModRemovers entries that pointed at this pill so the search modal
+        // shows "Add" again the next time the mod appears in results.
+        for (const [identifier, entry] of Array.from(addedModRemovers)) {
+          if (entry && entry.pill === filePill) {
+            addedModRemovers.delete(identifier);
+            renderedModIds.delete(identifier);
+          }
         }
         filePill.remove();
         if (onRemove) onRemove();
         refreshUpdateButtonLabel();
+        refreshSearchModalAddedStates();
         if (uploadedFiles.size === 0 && searchedMods.size === 0 && mrpackMods.size === 0) {
           dropzonePrompt.style.display = "block";
           dropzone.classList.remove("dropzone-expanded");
@@ -5721,6 +6277,8 @@
       clearResultsButton.style.display = "none";
       updateButton.disabled = false;
       refreshUpdateButtonLabel();
+      // Pending undo actions reference the now-cleared DOM/state, so drop them.
+      clearUndoHistory();
     }
 
     // --- Skeleton Loading Functions ---
@@ -5887,6 +6445,8 @@
         resetPipelineMetrics();
         cacheStats = { hits: 0, misses: 0, stores: 0 }; // Reset cache stats for this run
         resultsSectionsSetup = false; // Reset flag for new search
+        // Drop any pending undo actions; they referenced the previous run's DOM/state.
+        clearUndoHistory();
         updateButton.disabled = true;
         updateButton.innerHTML = "Searching...";
         statusMessage.textContent = "Searching for updates and dependencies...";
@@ -5972,6 +6532,11 @@
                 renderedArtifactIds.add(result.modId + '|' + result.project_type);
                 // Store mod ID to name mapping for dependency tooltips
                 modIdToNameMap.set(result.projectId, result.title);
+
+                // Always register a remover entry — even if there's no upload-area pill
+                // (e.g. dependencies) — so the search modal can show a Remove button that
+                // at least removes the result card.
+                registerRenderedModRemover(result, findPillForResult(result));
 
                 // Update any parent cards that were waiting for this dependency name
                 updateDependencyChainTooltip(result.projectId);
@@ -6067,6 +6632,10 @@
               renderedModIds.add(result.modId);
               renderedArtifactIds.add(result.modId + '|' + result.project_type);
               modIdToNameMap.set(result.projectId, result.title);
+
+              // Register the dependency so the search modal Remove button can remove its
+              // result card. Dependencies have no upload-area pill, so pill is null here.
+              registerRenderedModRemover(result, findPillForResult(result));
 
               // Update any parent cards that were waiting for this dependency name
               updateDependencyChainTooltip(result.projectId);
@@ -6331,6 +6900,13 @@
 
       const fileHashes = await Promise.all(fileHashPromises);
       const hashMap = new Map(fileHashes.map(fh => [fh.job, fh.hash]));
+
+      // Track hash → upload key so the search modal Remove button can locate the source pill.
+      for (const { job, hash } of fileHashes) {
+        if (hash && job?.data instanceof File) {
+          uploadKeyByHash.set(hash, getUploadFileKey(job.data));
+        }
+      }
 
       for (const job of jobs) {
         let cacheKey;
@@ -6899,6 +7475,26 @@
               if (directVersions.length > 0) {
                 versions = directVersions;
               }
+            }
+          }
+
+          // Splice in the user's installed version (resolved via hash) when it's
+          // compatible but absent from the candidate list. Modrinth's /projects
+          // response can briefly omit a freshly-published version's ID even after
+          // /version_files already knows its SHA1, which would otherwise make us
+          // pick an older release as "latest" — leading to a downgrade suggestion.
+          if (versionDetails && Array.isArray(versions)) {
+            const isCompatible =
+              Array.isArray(versionDetails.game_versions) &&
+              versionDetails.game_versions.includes(resolutionContext.gameVersion) &&
+              (!resolutionContext.selectedLoader ||
+                (Array.isArray(versionDetails.loaders) &&
+                  versionDetails.loaders.includes(resolutionContext.selectedLoader)));
+            const alreadyPresent = versions.some(v => v && v.id === versionDetails.id);
+            if (isCompatible && !alreadyPresent) {
+              versions = [versionDetails, ...versions].sort((a, b) =>
+                (Date.parse(b.date_published) || 0) - (Date.parse(a.date_published) || 0)
+              );
             }
           }
 
@@ -7485,7 +8081,7 @@
         <button id="unignore-selected-bulk-btn">Unignore</button>
         <button id="remove-selected-bulk-btn" class="danger">Remove</button>
         <span class="bulk-divider">|</span>
-        <button id="cancel-bulk-btn">Cancel</button>
+        <button id="undo-bulk-btn" class="undo" disabled title="No actions to undo">Undo</button>
       </div>
       <div class="results-list"></div>
     </div>
@@ -7613,23 +8209,6 @@
       window.isBulkActionsMode = false;
       window.selectedModsForBulk = new Set();
       window.lastClickedModIndex = null; // Track last clicked mod for shift+click range selection
-      window.lastFullFoundRemovalState = null;
-
-      function setRemoveButtonMode(mode = 'remove') {
-        const removeSelectedBulkBtn = document.getElementById('remove-selected-bulk-btn');
-        if (!removeSelectedBulkBtn) return;
-
-        removeSelectedBulkBtn.dataset.mode = mode;
-        if (mode === 'undo') {
-          removeSelectedBulkBtn.textContent = 'Undo';
-          removeSelectedBulkBtn.classList.remove('danger');
-          removeSelectedBulkBtn.classList.add('undo');
-        } else {
-          removeSelectedBulkBtn.textContent = 'Remove';
-          removeSelectedBulkBtn.classList.remove('undo');
-          removeSelectedBulkBtn.classList.add('danger');
-        }
-      }
 
       function toggleBulkActionsMode() {
         window.isBulkActionsMode = !window.isBulkActionsMode;
@@ -7650,6 +8229,8 @@
           });
           
           updateBulkSelectionCounts();
+          // Sync the Undo button enabled/disabled state when the bar appears.
+          refreshUndoButtonState();
         } else {
           // Disable bulk actions mode
           bulkModeBtn.classList.remove('active');
@@ -7855,15 +8436,17 @@
             window.ignoredMods = new Set();
           }
           
+          // Track only mods that were not already ignored, so Undo restores the exact state.
+          const newlyIgnored = [];
           window.selectedModsForBulk.forEach(projectId => {
             const card = document.querySelector(`.result-card[data-project-id="${projectId}"]`);
             if (card) {
               const downloadLink = card.querySelector('.download-link');
-              if (downloadLink) {
+              if (downloadLink && !window.ignoredMods.has(projectId)) {
                 downloadLink.classList.add('ignored-state');
                 card.classList.add('ignored');
-                // Add to global ignoredMods set
                 window.ignoredMods.add(projectId);
+                newlyIgnored.push(projectId);
               }
             }
           });
@@ -7877,6 +8460,29 @@
           });
           updateBulkSelectionCounts();
           window.updateDownloadAllCount();
+
+          if (newlyIgnored.length > 0) {
+            pushUndoableAction({
+              description: `Ignore ${newlyIgnored.length} mod${newlyIgnored.length !== 1 ? 's' : ''}`,
+              undo: () => {
+                newlyIgnored.forEach(projectId => {
+                  if (window.ignoredMods) window.ignoredMods.delete(projectId);
+                  const card = document.querySelector(`.result-card[data-project-id="${CSS.escape(String(projectId))}"]`);
+                  if (!card) return;
+                  card.classList.remove('ignored');
+                  const downloadLink = card.querySelector('.download-link');
+                  if (downloadLink) {
+                    downloadLink.classList.remove('ignored-state');
+                    if (!window.isBulkActionsMode) {
+                      downloadLink.textContent = 'Download';
+                      downloadLink.setAttribute('title', 'Download this mod file');
+                    }
+                  }
+                });
+                if (typeof window.updateDownloadAllCount === 'function') window.updateDownloadAllCount();
+              },
+            });
+          }
         });
       }
 
@@ -7889,17 +8495,17 @@
             return;
           }
           
+          // Track only mods that were actually ignored, so Undo restores the exact state.
+          const newlyUnignored = [];
           window.selectedModsForBulk.forEach(projectId => {
             const card = document.querySelector(`.result-card[data-project-id="${projectId}"]`);
             if (card) {
               const downloadLink = card.querySelector('.download-link');
-              if (downloadLink) {
+              if (downloadLink && window.ignoredMods && window.ignoredMods.has(projectId)) {
                 downloadLink.classList.remove('ignored-state');
                 card.classList.remove('ignored');
-                // Remove from global ignoredMods set
-                if (window.ignoredMods) {
-                  window.ignoredMods.delete(projectId);
-                }
+                window.ignoredMods.delete(projectId);
+                newlyUnignored.push(projectId);
               }
             }
           });
@@ -7913,119 +8519,99 @@
           });
           updateBulkSelectionCounts();
           window.updateDownloadAllCount();
+
+          if (newlyUnignored.length > 0) {
+            pushUndoableAction({
+              description: `Unignore ${newlyUnignored.length} mod${newlyUnignored.length !== 1 ? 's' : ''}`,
+              undo: () => {
+                if (!window.ignoredMods) window.ignoredMods = new Set();
+                newlyUnignored.forEach(projectId => {
+                  window.ignoredMods.add(projectId);
+                  const card = document.querySelector(`.result-card[data-project-id="${CSS.escape(String(projectId))}"]`);
+                  if (!card) return;
+                  card.classList.add('ignored');
+                  const downloadLink = card.querySelector('.download-link');
+                  if (downloadLink) {
+                    downloadLink.classList.add('ignored-state');
+                    if (!window.isBulkActionsMode) {
+                      downloadLink.textContent = 'Ignored';
+                      downloadLink.setAttribute('title', 'This mod is ignored');
+                    }
+                  }
+                });
+                if (typeof window.updateDownloadAllCount === 'function') window.updateDownloadAllCount();
+              },
+            });
+          }
         });
       }
 
       // Remove selected button
       const removeSelectedBulkBtn = document.getElementById('remove-selected-bulk-btn');
       if (removeSelectedBulkBtn) {
-        setRemoveButtonMode('remove');
-        removeSelectedBulkBtn.addEventListener('click', async () => {
-          if (removeSelectedBulkBtn.dataset.mode === 'undo' && window.lastFullFoundRemovalState) {
-            const foundSection = document.getElementById('results-found');
-            const resultsList = foundSection ? foundSection.querySelector('.results-list') : null;
-            if (!resultsList) return;
-
-            const state = window.lastFullFoundRemovalState;
-            resultsList.innerHTML = '';
-            state.cards.forEach(card => resultsList.appendChild(card));
-
-            state.cards.forEach(card => {
-              const downloadLink = card.querySelector('.download-link');
-              if (!downloadLink) return;
-              downloadLink.classList.remove('selected');
-              if (window.isBulkActionsMode) {
-                downloadLink.classList.add('bulk-select-mode');
-                downloadLink.textContent = 'Select';
-                downloadLink.setAttribute('title', 'Select this mod for bulk actions');
-              } else if (downloadLink.classList.contains('ignored-state')) {
-                downloadLink.classList.remove('bulk-select-mode');
-                downloadLink.textContent = 'Ignored';
-                downloadLink.setAttribute('title', 'This mod is ignored');
-              } else {
-                downloadLink.classList.remove('bulk-select-mode');
-                downloadLink.textContent = 'Download';
-                downloadLink.setAttribute('title', 'Download this mod file');
-              }
-            });
-
-            successfulDownloads = state.successfulDownloads;
-            successfulDownloadKeys.clear();
-            state.successfulDownloadKeys.forEach(key => successfulDownloadKeys.add(key));
-
-            if (!window.ignoredMods) {
-              window.ignoredMods = new Set();
-            } else {
-              window.ignoredMods.clear();
-            }
-            state.ignoredMods.forEach(projectId => window.ignoredMods.add(projectId));
-
-            window.lastFullFoundRemovalState = null;
-            setRemoveButtonMode('remove');
-            syncSectionCountsFromDom();
-            updateBulkSelectionCounts();
-            if (typeof window.updateDownloadAllCount === "function") {
-              window.updateDownloadAllCount();
-            }
-            return;
-          }
-
+        removeSelectedBulkBtn.addEventListener('click', () => {
           if (window.selectedModsForBulk.size === 0) {
             showCustomAlert('No mods selected. Please select mods to remove.', 'notice');
             return;
           }
-          
-          const confirmed = await window.showCustomConfirm(
-            `Remove ${window.selectedModsForBulk.size} selected mod(s) from results?`,
-            'Remove Selected Mods'
-          );
-          
-          if (confirmed) {
-            const currentFoundCards = Array.from(document.querySelectorAll('#results-found .result-card'));
-            const isRemovingAllFoundCards = currentFoundCards.length > 0 && window.selectedModsForBulk.size === currentFoundCards.length;
 
-            if (isRemovingAllFoundCards) {
-              window.lastFullFoundRemovalState = {
-                cards: currentFoundCards,
-                successfulDownloads: successfulDownloads.slice(),
-                successfulDownloadKeys: Array.from(successfulDownloadKeys),
-                ignoredMods: Array.from(window.ignoredMods || [])
-              };
-            } else {
-              window.lastFullFoundRemovalState = null;
-              setRemoveButtonMode('remove');
+          // Snapshot the full pre-removal state so Undo can put everything back.
+          const removalCount = window.selectedModsForBulk.size;
+          const snapshot = captureMultiModRemovalSnapshot(window.selectedModsForBulk);
+
+          window.selectedModsForBulk.forEach(projectId => {
+            const entry = addedModRemovers.get(String(projectId));
+
+            // 1) Remove the upload-area pill (if any) by triggering its X button so all
+            //    pill-side cleanup runs (uploadedFiles, mrpackMods, registries, etc.).
+            if (entry && entry.pill) {
+              const xBtn = entry.pill.querySelector('.file-pill-remove');
+              if (xBtn && typeof xBtn.click === 'function') {
+                xBtn.click();
+              } else {
+                entry.pill.remove();
+              }
             }
 
-            window.selectedModsForBulk.forEach(projectId => {
-              const card = document.querySelector(`.result-card[data-project-id="${projectId}"]`);
-              if (card) card.remove();
-              successfulDownloads = successfulDownloads.filter((dl) => dl.projectId !== projectId);
-              successfulDownloadKeys.clear();
-              for (const dl of successfulDownloads) {
-                successfulDownloadKeys.add(getSuccessfulDownloadKey(dl.projectId, dl.artifactType));
-              }
-              if (window.ignoredMods) {
-                window.ignoredMods.delete(projectId);
-              }
+            // 2) Remove the result card and clean up downloads / tracking sets.
+            removeResultCardForMod({
+              projectId: entry?.projectId || projectId,
+              modId: entry?.modId,
             });
-            window.selectedModsForBulk.clear();
-            window.lastClickedModIndex = null; // Reset shift+click tracking
-            syncSectionCountsFromDom();
-            updateBulkSelectionCounts();
-            if (typeof window.updateDownloadAllCount === "function") {
-              window.updateDownloadAllCount();
-            }
-            if (isRemovingAllFoundCards) {
-              setRemoveButtonMode('undo');
-            }
+
+            // 3) Drop any leftover search/registry entries (e.g. dependencies that had
+            //    no pill, or search-added mods whose onRemove callback didn't run).
+            searchedMods.delete(projectId);
+            if (entry?.modId) searchedMods.delete(entry.modId);
+            addedModRemovers.delete(String(projectId));
+            if (entry?.modId) addedModRemovers.delete(String(entry.modId));
+          });
+          window.selectedModsForBulk.clear();
+          window.lastClickedModIndex = null; // Reset shift+click tracking
+          syncSectionCountsFromDom();
+          updateBulkSelectionCounts();
+          refreshSearchModalAddedStates();
+          if (typeof window.updateDownloadAllCount === "function") {
+            window.updateDownloadAllCount();
           }
+
+          // Register an undoable action so the Undo button can put everything back.
+          pushUndoableAction({
+            description: `Remove ${removalCount} mod${removalCount !== 1 ? 's' : ''}`,
+            undo: () => restoreMultiModRemovalSnapshot(snapshot),
+          });
         });
       }
 
-      // Cancel bulk actions button
-      const cancelBulkBtn = document.getElementById('cancel-bulk-btn');
-      if (cancelBulkBtn) {
-        cancelBulkBtn.addEventListener('click', toggleBulkActionsMode);
+      // Undo button (replaces the old Cancel button). Stays in the bulk actions bar but
+      // is enabled only when there's at least one undoable action in history.
+      const undoBulkBtn = document.getElementById('undo-bulk-btn');
+      if (undoBulkBtn) {
+        refreshUndoButtonState();
+        undoBulkBtn.addEventListener('click', () => {
+          if (undoBulkBtn.disabled) return;
+          performUndo();
+        });
       }
 
       // --- Copy to clipboard functionality ---
@@ -8801,6 +9387,8 @@
         if (result.status === "success") {
           renderedModIds.add(result.modId);
           renderedArtifactIds.add(result.modId + '|' + result.project_type);
+          // Register a remover so the search modal can remove this card later.
+          registerRenderedModRemover(result, findPillForResult(result));
         }
       }
     }
@@ -10202,7 +10790,9 @@
 
     // --- Session-Based Mod Caching System ---
     const MOD_CACHE_KEY = 'mcModUpdaterCache';
-    const CACHE_VERSION = '1.0';
+    // Bumped to invalidate caches that captured stale dropdown contents from
+    // Modrinth /projects responses missing freshly-published version IDs.
+    const CACHE_VERSION = '1.1';
     const CACHE_EXPIRY_HOURS = 2; // Short session-based expiry
     const MAX_CACHE_ENTRIES = 500; // Reasonable limit
 
