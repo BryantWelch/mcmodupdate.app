@@ -198,9 +198,9 @@
     .dropzone {
       border: 2px dashed var(--border-color);
       border-radius: 8px;
-      padding: 1rem;
+      padding: 1.25rem 1rem;
       max-width: 400px;
-      height: 150px;
+      height: 175px;
       margin-left: auto;
       margin-right: auto;
       display: flex;
@@ -227,6 +227,59 @@
 
     .dropzone-prompt {
       color: var(--secondary-text);
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      line-height: 1.3;
+    }
+
+    .dropzone-icon {
+      width: 28px;
+      height: 28px;
+      color: var(--gradient-start);
+      transition: transform 0.2s ease;
+    }
+
+    .dropzone:hover .dropzone-icon,
+    .dropzone.dragover .dropzone-icon {
+      transform: translateY(-2px);
+    }
+
+    .dropzone-cta {
+      color: var(--primary-text);
+      font-size: 0.95rem;
+      font-weight: 500;
+    }
+
+    .dropzone-types {
+      display: grid;
+      grid-template-columns: max-content max-content;
+      column-gap: 0.75rem;
+      row-gap: 0.15rem;
+      align-items: baseline;
+      margin-top: 0.1rem;
+    }
+
+    .dropzone-types .ext {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      color: var(--gradient-start);
+      font-size: 0.8rem;
+      text-align: right;
+    }
+
+    .dropzone-types .cat {
+      color: var(--secondary-text);
+      font-size: 0.8rem;
+      text-align: left;
+    }
+
+    .dropzone-hint {
+      font-size: 0.75rem;
+      color: var(--secondary-text);
+      opacity: 0.75;
+      margin-top: 0.15rem;
     }
 
     .file-list {
@@ -237,6 +290,12 @@
       padding-bottom: 1.5rem;
       scrollbar-width: auto;
       scrollbar-color: var(--border-color) rgba(255, 255, 255, 0.03);
+    }
+
+    /* When the dropzone is in its empty/non-expanded state, fully collapse the
+       file-list so its scrollbar padding doesn't push the prompt off-center. */
+    .dropzone:not(.dropzone-expanded) .file-list {
+      display: none;
     }
 
     .file-list::-webkit-scrollbar {
@@ -2856,25 +2915,29 @@
       </div>
       <div class="control-group search-container">
         <label for="mod-search">Search:</label>
-        <input type="text" id="mod-search" placeholder="Find mods by name..."
-          title="Search for mods on Modrinth to add to your collection">
+        <input type="text" id="mod-search" placeholder="Find by name or author..."
+          title="Search Modrinth by project name or author (e.g. &quot;jellysquid3&quot;)">
         <button id="search-clear-button" class="search-clear-button" title="Clear search input">&times;</button>
       </div>
     </div>
     <div id="dropzone" class="dropzone"
-      title="Drag and drop your files here or click to browse. Supports .jar (mods), .zip (resource packs/shaders), and .mrpack (modpacks)">
+      title="Drag and drop your files here or click to browse. Supports .jar (mods, plugins), .zip (resource packs, shaders, data packs), and .mrpack (modpacks)">
       <div id="file-list-container" class="file-list"></div>
-      <p id="dropzone-prompt" class="dropzone-prompt">
-        Upload your mod files (.jar),
-        <br />
-        resource packs/shaders (.zip),
-        <br />
-        modpacks (.mrpack),
-        <br />
-        or
-        <br />
-        use the search
-      </p>
+      <div id="dropzone-prompt" class="dropzone-prompt">
+        <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="17 8 12 3 7 8" />
+          <line x1="12" y1="3" x2="12" y2="15" />
+        </svg>
+        <span class="dropzone-cta">Drop files here or click to browse</span>
+        <div class="dropzone-types">
+          <span class="ext">.jar</span><span class="cat">mods &middot; plugins</span>
+          <span class="ext">.zip</span><span class="cat">resource packs &middot; shaders &middot; data packs</span>
+          <span class="ext">.mrpack</span><span class="cat">modpacks</span>
+        </div>
+        <span class="dropzone-hint">or use the search above</span>
+      </div>
     </div>
     <div class="action-buttons-container">
       <button id="update-button" class="update-button"
@@ -2911,9 +2974,9 @@
         </p>
         <h3 style="text-align: center; margin-top: 2rem">Ready to Start?</h3>
         <p style="text-align: left; line-height: 1.6">
-          To get started, you can upload an entire modpack (<code>.mrpack</code>), individual mods (<code>.jar</code>),
-          resource packs/shaders (<code>.zip</code>), or use the search bar to find new content. Then, click the
-          "Update" button to see the magic happen!
+          To get started, you can upload an entire modpack (<code>.mrpack</code>), individual mods or plugins
+          (<code>.jar</code>), resource packs, shaders, or data packs (<code>.zip</code>), or use the search bar to
+          find new content. Then, click the "Update" button to see the magic happen!
         </p>
         <p style="
               text-align: left;
@@ -2965,7 +3028,8 @@
         <li><b>Loader / Version:</b> Select your desired mod loader (Fabric, Forge, NeoForge, Quilt) and target
           Minecraft version.</li>
         <li><b>Upload Files:</b> Drop a <code>.mrpack</code> file to load a modpack, or drag and drop your local
-          <code>.jar</code> (mods) and <code>.zip</code> (resource packs, shaders) files into the upload area.
+          <code>.jar</code> (mods, plugins) and <code>.zip</code> (resource packs, shaders, data packs) files into
+          the upload area.
         </li>
         <li><b>Search for New Mods:</b> Use the search bar to find and add mods directly from Modrinth.</li>
         <li><b>Process Your List:</b> Click "Update" to find the latest compatible versions and dependencies.</li>
@@ -3119,9 +3183,9 @@
 
         <!-- Duplicate search box inside modal -->
         <div class="search-container" style="max-width: 300px; margin: 0 auto;">
-          <input type="text" id="modal-search-input" placeholder="Search by name..."
+          <input type="text" id="modal-search-input" placeholder="Search by name or author..."
             style="width: 100%; margin-left: 0;"
-            title="Search Modrinth for mods, resource packs, shaders, and modpacks">
+            title="Search Modrinth for mods, resource packs, shaders, and modpacks. You can also search by author (e.g. &quot;jellysquid3&quot;).">
           <button id="modal-search-clear-button" class="search-clear-button" title="Clear search input">&times;</button>
         </div>
 
@@ -4402,11 +4466,15 @@
 
     function debounce(func, delay) {
       let timeout;
-      return function (...args) {
+      function debounced(...args) {
         const context = this;
         clearTimeout(timeout);
         timeout = setTimeout(() => func.apply(context, args), delay);
+      }
+      debounced.cancel = () => {
+        clearTimeout(timeout);
       };
+      return debounced;
     }
 
     async function mapWithConcurrency(items, concurrencyLimit, mapper) {
@@ -4859,9 +4927,19 @@
         showModalWithScrollLock(searchModal);
         debouncedSearch(query);
       } else {
+        // Search temporarily switches sorting to Relevance. When the query is
+        // cleared, return to the prior browse/featured sort instead of showing
+        // relevance-ranked no-query results.
+        if (typeof debouncedSearch.cancel === 'function') {
+          debouncedSearch.cancel();
+        }
+        currentSearchQuery = "";
+        const featuredSort = currentFeaturedSort || sortSelect.value;
+        sortSelect.value = featuredSort;
+
         // Show featured content when search is empty - don't randomize, use current filters
         if (!isShowingFeatured) {
-          loadFeaturedContent(sortSelect.value, projectTypeSelect.value);
+          loadFeaturedContent(featuredSort, projectTypeSelect.value);
         }
       }
     }
