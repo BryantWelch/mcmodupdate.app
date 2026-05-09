@@ -1226,6 +1226,41 @@
       display: block;
     }
 
+    /* Pills shown inside the REASON panel for "Supported Loaders" and
+       "Supported Versions". `is-supported` highlights the user's currently
+       selected loader/version when the project DOES support it (green); the
+       `is-missing` variant marks an inserted chip representing the user's
+       selection when the project DOESN'T support it (red), so it's clear at a
+       glance which side of the compatibility check failed. */
+    .reason-chip {
+      background: var(--pill-bg);
+      padding: 0.15rem 0.5rem;
+      border-radius: 0.5rem;
+      font-size: 0.75em;
+      border: 1px solid var(--border-color);
+      /* Inherit the muted color from .reason-content (var(--secondary-text))
+         to match the original inline-styled pill look — only the green/red
+         variants below intentionally tint their text. */
+      display: inline-block;
+      line-height: 1.3;
+    }
+
+    .reason-chip-loader {
+      text-transform: capitalize;
+    }
+
+    .reason-chip.is-supported {
+      background: rgba(76, 175, 80, 0.18);
+      border-color: rgba(76, 175, 80, 0.55);
+      color: #c4ecc8;
+    }
+
+    .reason-chip.is-missing {
+      background: rgba(244, 67, 54, 0.20);
+      border-color: rgba(244, 67, 54, 0.60);
+      color: #f5c0bc;
+    }
+
     .gallery-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -3837,6 +3872,21 @@
     const LOADER_AGNOSTIC_TYPES = Object.entries(ARTIFACT_CONFIG)
       .filter(([_, cfg]) => !cfg.needsLoader)
       .map(([type]) => type);
+
+    // Friendly singular noun for an artifact type, used in user-facing reason
+    // text (e.g. "No data pack version available for MC 26.1.2."). Returns
+    // an empty string when the type is unknown so callers can omit it.
+    function describeArtifactTypeNoun(artifactType) {
+      switch (artifactType) {
+        case 'mod':          return 'mod';
+        case 'plugin':       return 'plugin';
+        case 'modpack':      return 'modpack';
+        case 'datapack':     return 'data pack';
+        case 'resourcepack': return 'resource pack';
+        case 'shader':       return 'shader pack';
+        default:             return '';
+      }
+    }
 
     // Returns folder for given artifact type, or null (root) if unknown.
     function getArtifactFolder(type) {
@@ -7608,31 +7658,55 @@
           const latestVersion = versions[0];
 
           if (!latestVersion) {
-            // Generate precise error message based on compatibility analysis
-            let reason = "No compatible version found for selected loader/version.";
+            // Generate precise error message based on compatibility analysis.
+            // Loader-agnostic artifact types (data packs, resource packs, shader
+            // packs) ignore the user's selected Minecraft loader, so their
+            // reason text intentionally omits Fabric/Forge/etc. — mentioning it
+            // would imply the loader was a factor, which it wasn't.
             const loader = resolutionContext.loaderDisplay || modLoaderSelect.value;
             const gameVersion = mcVersionSelect.value;
+            const loaderName = loader ? loader.charAt(0).toUpperCase() + loader.slice(1) : '';
+            const isLoaderAgnostic =
+              artifactType &&
+              ARTIFACT_CONFIG[artifactType] &&
+              ARTIFACT_CONFIG[artifactType].needsLoader === false;
+            const typeNoun = describeArtifactTypeNoun(artifactType);
+            let reason;
 
-            switch (compatibilityStatus) {
-              case 'wrong-loader':
-                reason = `Compatible with MC ${gameVersion}, but not available for ${loader.charAt(0).toUpperCase() + loader.slice(1)}.`;
-                break;
-              case 'wrong-version':
-                reason = `Available for ${loader.charAt(0).toUpperCase() + loader.slice(1)}, but no versions found for MC ${gameVersion}.`;
-                break;
-              case 'no-versions':
-                reason = `No versions available for MC ${gameVersion} or ${loader.charAt(0).toUpperCase() + loader.slice(1)}.`;
-                break;
-              case 'separate-versions':
-                reason = `Has versions for both MC ${gameVersion} and ${loader.charAt(0).toUpperCase() + loader.slice(1)}, but no single version supports both.`;
-                break;
-              default:
-                reason = "No compatible version found for selected loader/version.";
+            if (isLoaderAgnostic) {
+              // resolveVersionsForContext only ever sets 'compatible' or
+              // 'no-versions' for these types; gate on game version alone.
+              const noun = typeNoun || 'compatible';
+              reason = `No ${noun} version available for MC ${gameVersion}.`;
+            } else {
+              switch (compatibilityStatus) {
+                case 'wrong-loader':
+                  reason = `Compatible with MC ${gameVersion}, but not available for ${loaderName}.`;
+                  break;
+                case 'wrong-version':
+                  reason = `Available for ${loaderName}, but no versions found for MC ${gameVersion}.`;
+                  break;
+                case 'no-versions':
+                  reason = `No versions available for MC ${gameVersion} or ${loaderName}.`;
+                  break;
+                case 'separate-versions':
+                  reason = `Has versions for both MC ${gameVersion} and ${loaderName}, but no single version supports both.`;
+                  break;
+                default: {
+                  const nounPart = typeNoun ? `${typeNoun} ` : '';
+                  reason = `No compatible ${nounPart}version found for MC ${gameVersion}${loaderName ? ` on ${loaderName}` : ''}.`;
+                }
+              }
             }
 
             const supportedVersions = [...new Set(versionInfo.allVersions?.flatMap(v => v.game_versions) || [])];
             const supportedLoaders = [...new Set(versionInfo.allVersions?.flatMap(v => v.loaders) || [])];
 
+            // Pass selection context through so the REASON panel can color-code
+            // the loader/version chips (green for "your selection IS supported",
+            // red-with-insertion for "your selection is what's missing"). For
+            // loader-agnostic types we deliberately omit selectedLoader so the
+            // renderer doesn't imply Fabric/Forge/etc. mattered when it didn't.
             results.push({
               status: "warning",
               modId: projectDetails.slug,
@@ -7653,6 +7727,8 @@
               reason: reason,
               supportedVersions,
               supportedLoaders,
+              selectedLoader: isLoaderAgnostic ? null : (resolutionContext.selectedLoader || null),
+              selectedGameVersion: gameVersion,
               installedVersion: originalModInfo.version || null,
             });
             continue;
@@ -7663,6 +7739,10 @@
           if (!primaryFile) {
             const supportedVersions = [...new Set(versionInfo.allVersions?.flatMap(v => v.game_versions) || [])];
             const supportedLoaders = [...new Set(versionInfo.allVersions?.flatMap(v => v.loaders) || [])];
+            const fallbackIsLoaderAgnostic =
+              artifactType &&
+              ARTIFACT_CONFIG[artifactType] &&
+              ARTIFACT_CONFIG[artifactType].needsLoader === false;
             results.push({
               status: "warning",
               modId: projectDetails.slug,
@@ -7683,6 +7763,8 @@
               reason: "No primary file found for latest version.",
               supportedVersions,
               supportedLoaders,
+              selectedLoader: fallbackIsLoaderAgnostic ? null : (resolutionContext.selectedLoader || null),
+              selectedGameVersion: mcVersionSelect.value,
               installedVersion: originalModInfo.version || null,
             });
             continue;
@@ -10384,17 +10466,51 @@
     reasonToggle.classList.toggle("active");
   });
 
-  // Set the reason content (but keep it hidden initially)
+  // Set the reason content (but keep it hidden initially).
+  // Color-coding rules:
+  //   - Green (`is-supported`): the user's currently-selected loader/version is
+  //     in the project's supported list. Confirms that side of compatibility.
+  //   - Red (`is-missing`): the user's selection is NOT in the supported list,
+  //     so we splice a chip for it into the sorted position to surface exactly
+  //     what's missing.
+  //   - Loader-agnostic project types (data pack / resource pack / shader pack)
+  //     pass selectedLoader=null, so loader chips render with no highlighting —
+  //     they're informational only because the loader wasn't part of the check.
+  const escapeChip = (value) =>
+    String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+
+  const userLoader = mod.selectedLoader ? String(mod.selectedLoader).toLowerCase() : null;
+  const userGameVersion = mod.selectedGameVersion ? String(mod.selectedGameVersion).trim() : null;
+
   let chipsHtml = '';
   if (mod.supportedLoaders && mod.supportedLoaders.length) {
     const sortedLoaders = [...mod.supportedLoaders].sort((a, b) => a.localeCompare(b));
+    const loaderInList = userLoader
+      ? sortedLoaders.some(l => String(l).toLowerCase() === userLoader)
+      : false;
+    const loaderIsMissing = !!userLoader && !loaderInList;
+    if (loaderIsMissing) {
+      sortedLoaders.push(userLoader);
+      sortedLoaders.sort((a, b) => a.localeCompare(b));
+    }
+    const loaderChips = sortedLoaders.map(l => {
+      const isUserLoader = userLoader && String(l).toLowerCase() === userLoader;
+      let cls = 'reason-chip reason-chip-loader';
+      if (isUserLoader) cls += loaderIsMissing ? ' is-missing' : ' is-supported';
+      return `<span class="${cls}">${escapeChip(l)}</span>`;
+    }).join('');
     chipsHtml += `<div style="margin-top:0.6rem;">
       <span style="font-size:0.75em;color:var(--secondary-text);display:block;margin-bottom:0.3rem;">Supported Loaders</span>
-      <div style="display:flex;flex-wrap:wrap;gap:0.3rem;">${sortedLoaders.map(l => `<span style="background:var(--pill-bg);padding:0.15rem 0.5rem;border-radius:0.5rem;font-size:0.75em;border:1px solid var(--border-color);text-transform:capitalize;">${l}</span>`).join('')}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:0.3rem;">${loaderChips}</div>
     </div>`;
   }
+
   if (mod.supportedVersions && mod.supportedVersions.length) {
-    const sortedVersions = [...mod.supportedVersions].sort((a, b) => {
+    const sortDescending = (a, b) => {
       const pa = a.split('.').map(n => parseInt(n, 10) || 0);
       const pb = b.split('.').map(n => parseInt(n, 10) || 0);
       for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
@@ -10402,17 +10518,49 @@
         if (diff !== 0) return diff;
       }
       return 0;
-    });
+    };
+    let sortedVersions = [...mod.supportedVersions].sort(sortDescending);
+    const versionInList = userGameVersion
+      ? sortedVersions.some(v => v === userGameVersion)
+      : false;
+    const versionIsMissing = !!userGameVersion && !versionInList;
+    if (versionIsMissing) {
+      sortedVersions = [...sortedVersions, userGameVersion].sort(sortDescending);
+    }
+
     const VISIBLE_COUNT = 25;
-    const visibleVersions = sortedVersions.slice(0, VISIBLE_COUNT);
-    const hiddenVersions = sortedVersions.slice(VISIBLE_COUNT);
-    const chipStyle = `background:var(--pill-bg);padding:0.15rem 0.5rem;border-radius:0.5rem;font-size:0.75em;border:1px solid var(--border-color);`;
+    const naturalVisibleVersions = sortedVersions.slice(0, VISIBLE_COUNT);
+    const naturalHiddenVersions = sortedVersions.slice(VISIBLE_COUNT);
+    let collapsedVisibleVersions = [...naturalVisibleVersions];
+
+    // If the user's selected version sorts past the collapsed chunk, promote it
+    // into the last visible slot while collapsed. This applies to both missing
+    // red chips and supported green chips, so the compatibility signal is
+    // visible before expanding. The expanded view renders the full sorted list
+    // separately, so the promoted marker doesn't break sort order after
+    // "Show all" is clicked.
+    if (userGameVersion && naturalHiddenVersions.includes(userGameVersion)) {
+      collapsedVisibleVersions = [...naturalVisibleVersions.slice(0, -1), userGameVersion];
+    }
+
+    const renderVersionChip = (v) => {
+      const isUserVersion = userGameVersion && v === userGameVersion;
+      let cls = 'reason-chip';
+      if (isUserVersion) cls += versionIsMissing ? ' is-missing' : ' is-supported';
+      return `<span class="${cls}">${escapeChip(v)}</span>`;
+    };
+
     let versionsHtml = `<div style="margin-top:0.6rem;">
       <span style="font-size:0.75em;color:var(--secondary-text);display:block;margin-bottom:0.3rem;">Supported Versions</span>
-      <div style="display:flex;flex-wrap:wrap;gap:0.3rem;">${visibleVersions.map(v => `<span style="${chipStyle}">${v}</span>`).join('')}</div>`;
-    if (hiddenVersions.length) {
-      versionsHtml += `<div class="version-chips-hidden" style="display:none;flex-wrap:wrap;gap:0.3rem;margin-top:0.3rem;">${hiddenVersions.map(v => `<span style="${chipStyle}">${v}</span>`).join('')}</div>
-      <button type="button" class="show-more-versions" style="margin-top:0.4rem;background:transparent;border:none;color:var(--secondary-text);font-size:0.75em;cursor:pointer;text-decoration:underline;padding:0;">Show all ${sortedVersions.length} versions</button>`;
+      <div class="version-chips-collapsed" style="display:flex;flex-wrap:wrap;gap:0.3rem;">${collapsedVisibleVersions.map(renderVersionChip).join('')}</div>`;
+    if (naturalHiddenVersions.length) {
+      // The toggle counts the project's actual supported versions only — the
+      // user's inserted "missing" chip (when present) doesn't count toward
+      // that total because it represents a version the project does NOT
+      // support.
+      const supportedCount = mod.supportedVersions.length;
+      versionsHtml += `<div class="version-chips-expanded" style="display:none;flex-wrap:wrap;gap:0.3rem;">${sortedVersions.map(renderVersionChip).join('')}</div>
+      <button type="button" class="show-more-versions" data-total-count="${supportedCount}" style="margin-top:0.4rem;background:transparent;border:none;color:var(--secondary-text);font-size:0.75em;cursor:pointer;text-decoration:underline;padding:0;">Show all ${supportedCount} versions</button>`;
     }
     versionsHtml += `</div>`;
     chipsHtml += versionsHtml;
@@ -10422,11 +10570,17 @@
   // Attach toggle listener for expandable version chips
   const showMoreBtn = reasonContent.querySelector('.show-more-versions');
   if (showMoreBtn) {
+    // The total reflects the project's actual supported version count, which
+    // intentionally excludes any inserted "missing" chip representing the
+    // user's unsupported selection.
+    const totalCount = showMoreBtn.dataset.totalCount || (mod.supportedVersions ? mod.supportedVersions.length : 0);
     showMoreBtn.addEventListener('click', () => {
-      const hidden = reasonContent.querySelector('.version-chips-hidden');
-      const isHidden = hidden.style.display === 'none';
-      hidden.style.display = isHidden ? 'flex' : 'none';
-      showMoreBtn.textContent = isHidden ? 'Show fewer versions' : `Show all ${mod.supportedVersions.length} versions`;
+      const collapsed = reasonContent.querySelector('.version-chips-collapsed');
+      const expanded = reasonContent.querySelector('.version-chips-expanded');
+      const isCollapsed = expanded.style.display === 'none';
+      collapsed.style.display = isCollapsed ? 'none' : 'flex';
+      expanded.style.display = isCollapsed ? 'flex' : 'none';
+      showMoreBtn.textContent = isCollapsed ? 'Show fewer versions' : `Show all ${totalCount} versions`;
     });
   }
 
