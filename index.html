@@ -4493,8 +4493,10 @@
         statusMessage.classList.remove("visible");
       }
 
-      // Reset the dropzone to its initial, non-expanded state
-      dropzonePrompt.style.display = "block";
+      // Reset the dropzone to its initial, non-expanded state. Clear the
+      // inline display value so .dropzone-prompt's default flex layout applies
+      // again; using "block" breaks the centered icon/text arrangement.
+      dropzonePrompt.style.display = "";
       dropzone.classList.remove("dropzone-expanded");
 
       // Hide the "Clear All" button since there's nothing to clear
@@ -6131,7 +6133,7 @@
         refreshUpdateButtonLabel();
         refreshSearchModalAddedStates();
         if (uploadedFiles.size === 0 && searchedMods.size === 0 && mrpackMods.size === 0) {
-          dropzonePrompt.style.display = "block";
+          dropzonePrompt.style.display = "";
           dropzone.classList.remove("dropzone-expanded");
           clearAllButton.style.display = "none"; // HIDE THE BUTTON
         }
