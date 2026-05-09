@@ -18,53 +18,98 @@
   <meta name="google-site-verification" content="d-Z4KwHExUTAtvp9VwSdNKAgimNP8hglF61av3rrC1E">
   <meta name="google-adsense-account" content="ca-pub-1728229586138721">
   <link rel="canonical" href="https://mcmodupdate.app/">
+  <link rel="alternate" hreflang="en" href="https://mcmodupdate.app/">
+  <link rel="alternate" hreflang="x-default" href="https://mcmodupdate.app/">
+
+  <!-- Origins touched early — warm connections before first fetch (Core Web Vitals) -->
+  <link rel="preconnect" href="https://api.modrinth.com" crossorigin>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="dns-prefetch" href="https://unpkg.com">
+  <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
 
   <!-- Favicon and Theme Configuration -->
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+  <link rel="icon" href="favicon.ico" sizes="any" type="image/x-icon">
   <link rel="manifest" href="site.webmanifest">
-  <meta name="msapplication-TileColor" content="#6366f1">
+  <meta name="msapplication-TileColor" content="#11101d">
   <meta name="theme-color" content="#11101d">
+  <meta name="application-name" content="Minecraft Mod Updater">
 
   <!-- Open Graph / Social Media Tags -->
   <meta property="og:title" content="Minecraft Mod Updater | Update & Build Minecraft Modpacks">
   <meta property="og:description"
-    content="A powerful web tool to update existing mods and discover new ones via the Modrinth API.">
+    content="Easily update your Minecraft mods or build a new modpack from scratch. Upload your .jar files or search for mods on Modrinth to find the latest compatible versions and dependencies.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://mcmodupdate.app/">
+  <meta property="og:site_name" content="Minecraft Mod Updater">
+  <meta property="og:locale" content="en_US">
   <meta property="og:image" content="https://mcmodupdate.app/social-preview.png">
+  <meta property="og:image:width" content="192">
+  <meta property="og:image:height" content="192">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:alt"
+    content="Minecraft Mod Updater — update mods and build Modrinth modpacks in your browser">
 
   <!-- Twitter Card Tags -->
-  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="Minecraft Mod Updater | Update Your Minecraft Mods">
   <meta name="twitter:description"
-    content="Easily update your Minecraft mods or build a new modpack from scratch. Upload your .jar files or search for mods on Modrinth.">
+    content="Easily update your Minecraft mods or build a new modpack from scratch. Upload your .jar files or search for mods on Modrinth to find the latest compatible versions and dependencies.">
   <meta name="twitter:image" content="https://mcmodupdate.app/social-preview.png">
+  <meta name="twitter:image:alt"
+    content="Minecraft Mod Updater — update mods and build Modrinth modpacks in your browser">
 
   <!-- Structured Data for SEO -->
   <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "WebApplication",
-      "name": "Minecraft Mod Updater",
-      "description": "Easily update your Minecraft mods or build a new modpack from scratch. Upload your .jar files or search for mods on Modrinth to find the latest compatible versions and dependencies.",
-      "url": "https://mcmodupdate.app/",
-      "applicationCategory": "UtilitiesApplication",
-      "operatingSystem": "Web Browser",
-      "offers": {
-        "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "USD"
-      },
-      "author": {
-        "@type": "Person",
-        "name": "Bryant Welch"
-      },
-      "keywords": "Minecraft, Mod, Updater, Modpack, Builder, Modrinth, Fabric, Forge, NeoForge, Quilt",
-      "inLanguage": "en-US",
-      "browserRequirements": "Requires JavaScript",
-      "softwareVersion": "1.0"
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": "https://mcmodupdate.app/#website",
+          "name": "Minecraft Mod Updater",
+          "url": "https://mcmodupdate.app/",
+          "description": "Easily update your Minecraft mods or build a new modpack from scratch. Upload your .jar files or search for mods on Modrinth to find the latest compatible versions and dependencies.",
+          "inLanguage": "en-US",
+          "publisher": { "@id": "https://mcmodupdate.app/#person" },
+          "sameAs": ["https://github.com/BryantWelch/mcmodupdate.app"]
+        },
+        {
+          "@type": "WebApplication",
+          "@id": "https://mcmodupdate.app/#webapp",
+          "name": "Minecraft Mod Updater",
+          "description": "Easily update your Minecraft mods or build a new modpack from scratch. Upload your .jar files or search for mods on Modrinth to find the latest compatible versions and dependencies.",
+          "url": "https://mcmodupdate.app/",
+          "isPartOf": { "@id": "https://mcmodupdate.app/#website" },
+          "image": "https://mcmodupdate.app/android-chrome-512x512.png",
+          "applicationCategory": "UtilitiesApplication",
+          "operatingSystem": "Web Browser",
+          "featureList": [
+            "Update local mods and plugins against Modrinth-compatible releases",
+            "Search Modrinth for mods, modpacks, shaders, resource packs, and data packs",
+            "Resolve and include dependencies automatically",
+            "Export results as a Modrinth-format modpack (.mrpack)",
+            "Choose Fabric, Forge, NeoForge, or Quilt loaders and a target Minecraft version"
+          ],
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+          },
+          "author": { "@id": "https://mcmodupdate.app/#person" },
+          "keywords": "Minecraft, Mod, Updater, Modpack, Builder, Modrinth, Fabric, Forge, NeoForge, Quilt",
+          "inLanguage": "en-US",
+          "browserRequirements": "Requires JavaScript"
+        },
+        {
+          "@type": "Person",
+          "@id": "https://mcmodupdate.app/#person",
+          "name": "Bryant Welch",
+          "url": "https://github.com/BryantWelch"
+        }
+      ]
     }
   </script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -2913,6 +2958,11 @@
 </head>
 
 <body>
+  <noscript>
+    <p style="max-width:40rem;margin:1rem auto;padding:0 1rem;text-align:center;font-family:system-ui,sans-serif;">
+      Minecraft Mod Updater needs JavaScript. Enable it to update mods, search Modrinth, and export modpacks from this page.
+    </p>
+  </noscript>
 
   <div class="main-container">
     <header>
