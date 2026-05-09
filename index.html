@@ -5527,24 +5527,26 @@
       return null;
     }
 
-    // Zip analyzer: detects container zips and returns extracted inner files if found.
-    async function analyzeZipArchive(file) {
+    // Zip inspector: parses just the zip's table of contents to decide whether
+    // it's a single self-contained artifact (mod, resource pack, shader pack,
+    // data pack, etc.) or a multi-artifact container. Does NOT read any inner
+    // file contents, so it produces no UI noise and is safe to call silently.
+    async function inspectZipArchive(file) {
       try {
         const zip = await JSZip.loadAsync(file);
         const zipEntries = Object.entries(zip.files);
         const paths = zipEntries.map(([path]) => path);
-
-        // Skip: single-artifact zips are classified later; root-level check only.
-   
         const lowerPaths = paths.map(p => p.toLowerCase());
         const totalEntries = zipEntries.reduce((count, [, entry]) => count + (entry.dir ? 0 : 1), 0);
+
         if (isSingleArtifactZip(lowerPaths)) {
           return {
-            extractedFiles: [],
-            totalEntries,
-            matchedEntries: 0,
+            file,
             isContainer: false,
             zipContentType: classifyZipContentTypeFromLowerPaths(lowerPaths),
+            totalEntries,
+            pendingExtractions: [],
+            processedEntries: 0,
           };
         }
 
@@ -5573,7 +5575,7 @@
           // - <wrapper>/<folder>/<file> (known wrapper)
           // - Nested <folder>/<file> under known wrappers
           // - .mrpack files: always extract (not under standard artifact dirs)
-     
+
           let innerName = parts[parts.length - 1];
           const innerIsMrpack = hasAnyExtension(innerName, [".mrpack"]);
 
@@ -5601,29 +5603,38 @@
           pendingExtractions.push({ path, entry, innerName });
         }
 
-        const extracted = await mapWithConcurrency(
-          pendingExtractions,
-          ZIP_ENTRY_EXTRACTION_CONCURRENCY,
-          async ({ path, entry, innerName }) => {
-            const blob = await entry.async("blob");
-            const extractedFile = new File([blob], innerName, { type: "application/octet-stream" });
-            assignUploadFileKey(extractedFile, `${file.name}::${path.toLowerCase()}`);
-            return extractedFile;
-          }
-        );
-        const matchedEntries = extracted.length;
         return {
-          extractedFiles: extracted,
-          totalEntries,
-          matchedEntries,
-          isContainer: extracted.length > 0,
-          processedEntries,
+          file,
+          isContainer: pendingExtractions.length > 0,
           zipContentType: null,
+          totalEntries,
+          pendingExtractions,
+          processedEntries,
         };
       } catch (e) {
         // Corrupt/non-zip payload — let the normal path handle/validate it.
         return null;
       }
+    }
+
+    // Reads the inner files identified by inspectZipArchive. This is the slow,
+    // I/O-heavy phase, so callers should only invoke it for true container
+    // archives (where progress UI is appropriate).
+    async function extractInspectedZip(inspection) {
+      if (!inspection || !Array.isArray(inspection.pendingExtractions) || inspection.pendingExtractions.length === 0) {
+        return [];
+      }
+      const file = inspection.file;
+      return mapWithConcurrency(
+        inspection.pendingExtractions,
+        ZIP_ENTRY_EXTRACTION_CONCURRENCY,
+        async ({ path, entry, innerName }) => {
+          const blob = await entry.async("blob");
+          const extractedFile = new File([blob], innerName, { type: "application/octet-stream" });
+          assignUploadFileKey(extractedFile, `${file.name}::${path.toLowerCase()}`);
+          return extractedFile;
+        }
+      );
     }
 
     function getMrpackUploadContext(allFiles) {
@@ -5655,82 +5666,89 @@
 
       const expandedFiles = [];
       const expansionSummary = [];
-      const processingPills = [];
-      const totalZipCount = zipCandidates.length;
-      let completedArchiveCount = 0;
-      let extractionProgressActive = false;
       const expandedContainerNames = new Set();
 
-      for (const candidate of zipCandidates) {
-        const pill = createFilePill({ name: `Processing: ${candidate.name}...` });
-        processingPills.push(pill);
+      // Phase 1: silent inspection of every .zip. We only read the zip's table
+      // of contents (no inner-file reads), so this is fast and produces no UI
+      // noise. Single-artifact zips (Distant Horizons, resource packs, shader
+      // packs, data packs, etc.) need to be looked at to know they ARE single
+      // artifacts, but they should appear in the upload area as quietly as a
+      // .jar drop — no processing pills, no progress bar, no status text.
+      const inspectionResults = await mapWithConcurrency(
+        zipCandidates,
+        ZIP_ANALYSIS_CONCURRENCY,
+        async (candidate, i) => ({
+          candidate,
+          inspection: await inspectZipArchive(candidate),
+          index: i,
+        })
+      );
+
+      // Cache types for single-artifact zips silently so later update resolution
+      // can skip re-parsing them.
+      for (const { candidate, inspection } of inspectionResults) {
+        if (inspection && inspection.isContainer === false) {
+          cacheZipContentType(candidate, inspection.zipContentType ?? null);
+        }
       }
 
-      if (processingPills.length > 0) {
+      // Phase 2: extraction. Only true container archives reach this stage, so
+      // the progress bar / status message / processing pills only appear when
+      // there's actually inner content to pull out.
+      const containerJobs = inspectionResults.filter(
+        (r) => r.inspection && r.inspection.isContainer === true
+      );
+
+      if (containerJobs.length > 0) {
+        const totalContainers = containerJobs.length;
+        let completedContainerCount = 0;
+
+        const processingPills = [];
+        for (const { candidate } of containerJobs) {
+          processingPills.push(createFilePill({ name: `Processing: ${candidate.name}...` }));
+        }
+
         dropzonePrompt.style.display = "none";
         dropzone.classList.add("dropzone-expanded");
         progressBarContainer.style.display = "block";
         progressBar.style.width = "0%";
-        extractionProgressActive = true;
-      }
+        statusMessage.textContent = `Extracting ${totalContainers} archive${totalContainers !== 1 ? "s" : ""}...`;
+        statusMessage.classList.add("visible");
 
-      const updateExtractionProgressBar = (archiveIndex, processedEntries, totalEntries) => {
-        if (!extractionProgressActive || totalZipCount === 0) return;
-        const safeTotalEntries = Math.max(totalEntries || 0, 1);
-        const perArchiveProgress = Math.min(processedEntries / safeTotalEntries, 1);
-        const completedPortion = (archiveIndex - 1) / totalZipCount;
-        const currentPortion = perArchiveProgress / totalZipCount;
-        const totalProgress = Math.min((completedPortion + currentPortion) * 100, 100);
-        progressBar.style.width = `${totalProgress}%`;
-      };
-
-      statusMessage.textContent = `Inspecting ${totalZipCount} archive${totalZipCount !== 1 ? "s" : ""}...`;
-      statusMessage.classList.add("visible");
-
-      const archiveResults = await mapWithConcurrency(
-        zipCandidates,
-        ZIP_ANALYSIS_CONCURRENCY,
-        async (candidate, i) => {
-          const analysis = await analyzeZipArchive(candidate);
-          completedArchiveCount++;
-          updateExtractionProgressBar(completedArchiveCount, 1, 1);
-
-          if (analysis) {
+        const extractionResults = await mapWithConcurrency(
+          containerJobs,
+          ZIP_ANALYSIS_CONCURRENCY,
+          async ({ candidate, inspection }, i) => {
+            const extractedFiles = await extractInspectedZip(inspection);
+            completedContainerCount++;
+            const progressPct = Math.min((completedContainerCount / totalContainers) * 100, 100);
+            progressBar.style.width = `${progressPct}%`;
             statusMessage.textContent =
-              `Inspecting archives (${completedArchiveCount}/${totalZipCount} complete): ${candidate.name} (${analysis.totalEntries} scanned, ${analysis.matchedEntries} extracted)`;
-          } else {
-            statusMessage.textContent =
-              `Inspecting archives (${completedArchiveCount}/${totalZipCount} complete): ${candidate.name} (unreadable archive)`;
+              `Extracting archives (${completedContainerCount}/${totalContainers} complete): ${candidate.name} (${extractedFiles.length} extracted)`;
+            return { candidate, extractedFiles, index: i };
           }
+        );
 
-          return { candidate, analysis, index: i };
+        for (const { candidate, extractedFiles } of extractionResults) {
+          if (extractedFiles.length > 0) {
+            expandedFiles.push(...extractedFiles);
+            expandedContainerNames.add(candidate.name);
+            expansionSummary.push({ name: candidate.name, count: extractedFiles.length });
+          }
         }
-      );
 
-      for (const result of archiveResults) {
-        const { candidate, analysis } = result;
-        if (analysis && analysis.extractedFiles.length > 0) {
-          expandedFiles.push(...analysis.extractedFiles);
-          expandedContainerNames.add(candidate.name);
-          expansionSummary.push({ name: candidate.name, count: analysis.extractedFiles.length });
-        } else if (analysis && analysis.isContainer === false) {
-          // Cache type classification so later update resolution can avoid reparsing this zip.
-          cacheZipContentType(candidate, analysis.zipContentType ?? null);
+        for (const pill of processingPills) {
+          if (pill && pill.parentNode) pill.parentNode.removeChild(pill);
         }
-      }
 
-      for (const pill of processingPills) {
-        if (pill && pill.parentNode) pill.parentNode.removeChild(pill);
-      }
-      refreshUpdateButtonLabel();
-
-      if (extractionProgressActive) {
         progressBar.style.width = "100%";
         setTimeout(() => {
           progressBarContainer.style.display = "none";
           progressBar.style.width = "0%";
         }, 250);
       }
+
+      refreshUpdateButtonLabel();
 
       const effectiveFiles = [
         ...allFiles.filter((f) => !expandedContainerNames.has(f.name)),
