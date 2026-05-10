@@ -2098,7 +2098,9 @@
       border-color: #d32f2f;
     }
 
-    #toggle-select-all-bulk-btn {
+    #toggle-select-all-bulk-btn,
+    #toggle-select-all-bulk-warning-btn,
+    #toggle-select-all-bulk-failure-btn {
       width: 96px;
       text-align: center;
     }
@@ -2136,6 +2138,39 @@
     .bulk-actions-bar .bulk-divider {
       color: var(--border-color);
       margin: 0 0.5rem;
+    }
+
+    /* Disabled bulk action buttons (e.g. Download/Ignore on warning + failure bars) */
+    .bulk-actions-bar button:disabled,
+    .bulk-actions-bar button.primary:disabled,
+    .bulk-actions-bar button.danger:disabled {
+      cursor: not-allowed;
+      opacity: 0.45;
+      filter: grayscale(0.6);
+    }
+
+    .bulk-actions-bar button:disabled:hover,
+    .bulk-actions-bar button.primary:disabled:hover,
+    .bulk-actions-bar button.danger:disabled:hover {
+      background-color: var(--pill-bg);
+      border-color: var(--border-color);
+    }
+
+    .bulk-actions-bar button.primary:disabled:hover {
+      background-color: var(--gradient-mid);
+      border-color: var(--gradient-mid);
+    }
+
+    .bulk-actions-bar button.danger:disabled:hover {
+      background-color: var(--error-color);
+      border-color: var(--error-color);
+    }
+
+    /* Injected Select button for warning + failure cards in bulk mode.
+       Mirrors the .download-link.bulk-select-mode styling used by success cards. */
+    .bulk-select-action {
+      cursor: pointer;
+      user-select: none;
     }
 
     /* -- Bulk Actions Mode Styling -- */
@@ -3646,32 +3681,46 @@
     }
 
     // ---------- Undo history (bulk-actions Undo button) ----------
-    // Each entry is { description, undo: fn }. The most recent action is at the end of
-    // the array; performUndo pops from the end.
-    const undoHistory = [];
+    // Each section has its own independent stack. The most recent action is at the
+    // end of its array; performUndo(section) pops from the end of that section.
+    // Each entry is { description, undo: fn }.
+    const undoHistory = { found: [], warning: [], failure: [] };
+
+    // Map section name → DOM id of its Undo button.
+    const UNDO_BUTTON_IDS = {
+      found: 'undo-bulk-btn',
+      warning: 'undo-bulk-warning-btn',
+      failure: 'undo-bulk-failure-btn',
+    };
 
     function refreshUndoButtonState() {
-      const btn = document.getElementById('undo-bulk-btn');
-      if (!btn) return;
-      if (undoHistory.length === 0) {
-        btn.disabled = true;
-        btn.title = 'No actions to undo';
-      } else {
-        btn.disabled = false;
-        const last = undoHistory[undoHistory.length - 1];
-        btn.title = `Undo: ${last.description || 'last action'}`;
-      }
+      Object.entries(UNDO_BUTTON_IDS).forEach(([section, id]) => {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        const stack = undoHistory[section] || [];
+        if (stack.length === 0) {
+          btn.disabled = true;
+          btn.title = 'No actions to undo';
+        } else {
+          btn.disabled = false;
+          const last = stack[stack.length - 1];
+          btn.title = `Undo: ${last.description || 'last action'}`;
+        }
+      });
     }
 
-    function pushUndoableAction(action) {
+    function pushUndoableAction(action, section = 'found') {
       if (!action || typeof action.undo !== 'function') return;
-      undoHistory.push(action);
+      const stack = undoHistory[section];
+      if (!stack) return;
+      stack.push(action);
       refreshUndoButtonState();
     }
 
-    function performUndo() {
-      if (undoHistory.length === 0) return;
-      const action = undoHistory.pop();
+    function performUndo(section = 'found') {
+      const stack = undoHistory[section];
+      if (!stack || stack.length === 0) return;
+      const action = stack.pop();
       try {
         action.undo();
       } catch (e) {
@@ -3681,7 +3730,9 @@
     }
 
     function clearUndoHistory() {
-      undoHistory.length = 0;
+      Object.keys(undoHistory).forEach((section) => {
+        undoHistory[section].length = 0;
+      });
       refreshUndoButtonState();
     }
 
@@ -5391,6 +5442,12 @@
         if (!mapKey) return false;
         if (searchedMods.has(mapKey)) return true;
         if (mod.slug && renderedModIds.has(mod.slug)) return true;
+        // renderedModIds only tracks successful (Updates Found) mods, so warning
+        // cards (Not Compatible) aren't covered by the check above. Fall back to
+        // addedModRemovers, which we register for both success and warning cards
+        // at render time, so Search recognizes incompatible mods as already added.
+        if (addedModRemovers.has(String(mapKey))) return true;
+        if (mod.slug && addedModRemovers.has(String(mod.slug))) return true;
         return false;
       };
 
@@ -5440,6 +5497,26 @@
           const idsForSnapshot = new Set([projectId, mod.slug, entry?.projectId, entry?.modId].filter(Boolean));
           const snapshot = captureMultiModRemovalSnapshot(idsForSnapshot);
 
+          // Determine which results section the card is currently in so the
+          // undoable action ends up on the matching section's Undo stack.
+          // (A search-added mod can resolve as success → Updates Found, or as
+          // incompatible → Not Compatible.)
+          let undoSection = 'found';
+          for (const id of idsForSnapshot) {
+            const existingCard = document.querySelector(
+              `.result-card[data-project-id="${CSS.escape(String(id))}"]`
+            );
+            if (existingCard) {
+              const sectionEl = existingCard.closest('.results-section');
+              if (sectionEl) {
+                if (sectionEl.id === 'results-warning') undoSection = 'warning';
+                else if (sectionEl.id === 'results-failure') undoSection = 'failure';
+                else undoSection = 'found';
+              }
+              break;
+            }
+          }
+
           // 1) If we have a tracked pill, trigger its X button so the existing pill-side
           //    cleanup runs (uploadedFiles, mrpackMods, registries, renderedModIds, etc.).
           if (entry && entry.pill) {
@@ -5467,11 +5544,17 @@
 
           refreshSearchModalAddedStates();
 
-          // Register an undoable action so the bulk-actions Undo button can put the mod back.
+          // Register an undoable action on the section that owned the card, so the
+          // matching section's Undo button can put the mod back.
           pushUndoableAction({
             description: `Remove "${mod.title || projectId}"`,
-            undo: () => restoreMultiModRemovalSnapshot(snapshot),
-          });
+            undo: () => {
+              restoreMultiModRemovalSnapshot(snapshot);
+              if (typeof window.refreshExtraBulkSelectButtons === 'function') {
+                window.refreshExtraBulkSelectButtons();
+              }
+            },
+          }, undoSection);
           return;
         }
 
@@ -8112,12 +8195,8 @@
         `;
         const modTitleDiv = card.querySelector('.mod-title');
         if (modTitleDiv) {
-          const firstTag = modTitleDiv.querySelector('.mod-title-tag, .dependency-tooltip-container');
-          if (firstTag) {
-            modTitleDiv.insertBefore(indicator, firstTag);
-          } else {
-            modTitleDiv.appendChild(indicator);
-          }
+          modTitleDiv.appendChild(indicator);
+          standardizeModTitleIcons(modTitleDiv);
         }
 
         // Build the detailed conflicts panel HTML from each pair's declarations.
@@ -8331,7 +8410,7 @@
             <input type="text" id="search-warning" class="search-box" placeholder="Filter mods..." title="Filter incompatible results by mod name">
             <button class="search-clear-btn" id="search-warning-clear" title="Clear filter" style="display: none;">×</button>
           </div>
-
+          <button id="bulk-actions-mode-warning-btn" class="layout-toggle header-button" title="Toggle bulk actions mode - manage multiple incompatible mods at once">${checkboxIcon}</button>
           <div class="sort-dropdown-container">
             <button id="sort-warning-btn" class="layout-toggle" title="Sort and filter incompatible mods by name, downloads, or followers">${sortIcon}</button>
             <div id="sort-warning-dropdown" class="sort-dropdown">
@@ -8415,10 +8494,45 @@
           <button id="copy-warning-btn" class="layout-toggle" title="Copy list of incompatible mod names to clipboard">${copyIcon}</button>
         </div>
       </div>
+      <!-- Bulk actions bar for incompatible mods (hidden by default) -->
+      <div id="bulk-actions-bar-warning" class="bulk-actions-bar">
+        <button id="toggle-select-all-bulk-warning-btn" title="Select every visible incompatible mod">Select All</button>
+        <span id="bulk-selection-count-warning" class="bulk-selection-count">0 selected</span>
+        <span class="bulk-divider">|</span>
+        <button class="primary" disabled title="Download is not available for incompatible mods">Download</button>
+        <button disabled title="Ignore is not available for incompatible mods">Ignore</button>
+        <button disabled title="Unignore is not available for incompatible mods">Unignore</button>
+        <button id="remove-selected-bulk-warning-btn" class="danger" title="Remove the selected incompatible mods from the results and the upload area">Remove</button>
+        <span class="bulk-divider">|</span>
+        <button id="undo-bulk-warning-btn" class="undo" disabled title="No actions to undo">Undo</button>
+      </div>
       <div class="results-list"></div>
     </div>
     <div id="results-failure" class="results-section">
-      <h2 id="header-failure">Could Not Find Mod</h2>
+      <!-- Header container for title and buttons -->
+      <div class="results-header-container">
+        <h2 id="header-failure">Could Not Find Mod</h2>
+        <div class="header-buttons">
+          <div class="search-box-wrapper" style="position: relative; margin-right: 0.5rem;">
+            <input type="text" id="search-failure" class="search-box" placeholder="Filter mods..." title="Filter not-found results by mod name">
+            <button class="search-clear-btn" id="search-failure-clear" title="Clear filter" style="display: none;">×</button>
+          </div>
+          <button id="bulk-actions-mode-failure-btn" class="layout-toggle header-button" title="Toggle bulk actions mode - manage multiple not-found mods at once">${checkboxIcon}</button>
+          <button id="copy-failure-btn" class="layout-toggle" title="Copy list of not-found mod names to clipboard">${copyIcon}</button>
+        </div>
+      </div>
+      <!-- Bulk actions bar for not-found mods (hidden by default) -->
+      <div id="bulk-actions-bar-failure" class="bulk-actions-bar">
+        <button id="toggle-select-all-bulk-failure-btn" title="Select every visible not-found mod">Select All</button>
+        <span id="bulk-selection-count-failure" class="bulk-selection-count">0 selected</span>
+        <span class="bulk-divider">|</span>
+        <button class="primary" disabled title="Download is not available for not-found mods">Download</button>
+        <button disabled title="Ignore is not available for not-found mods">Ignore</button>
+        <button disabled title="Unignore is not available for not-found mods">Unignore</button>
+        <button id="remove-selected-bulk-failure-btn" class="danger" title="Remove the selected not-found mods from the results and the upload area">Remove</button>
+        <span class="bulk-divider">|</span>
+        <button id="undo-bulk-failure-btn" class="undo" disabled title="No actions to undo">Undo</button>
+      </div>
       <div class="results-list"></div>
     </div>
   `;
@@ -8475,8 +8589,10 @@
           window.selectedModsForBulk.clear();
           window.lastClickedModIndex = null; // Reset shift+click tracking
           
-          // Reset all buttons to normal download buttons
-          document.querySelectorAll('.download-link').forEach(btn => {
+          // Reset all buttons to normal download buttons (scoped to the Updates Found
+          // section so we don't clobber Select buttons injected into warning / failure
+          // cards by their own per-section bulk modes).
+          document.querySelectorAll('#results-found .download-link').forEach(btn => {
             btn.classList.remove('bulk-select-mode', 'selected');
             // Check if this mod is ignored
             if (btn.classList.contains('ignored-state')) {
@@ -8589,7 +8705,7 @@
             // Deselect all
             window.selectedModsForBulk.clear();
             window.lastClickedModIndex = null; // Reset shift+click tracking
-            document.querySelectorAll('.download-link.selected').forEach(btn => {
+            document.querySelectorAll('#results-found .download-link.selected').forEach(btn => {
               btn.classList.remove('selected');
               btn.textContent = 'Select';
             });
@@ -8694,7 +8810,7 @@
           // Clear selection after ignoring
           window.selectedModsForBulk.clear();
           window.lastClickedModIndex = null; // Reset shift+click tracking
-          document.querySelectorAll('.download-link.selected').forEach(btn => {
+          document.querySelectorAll('#results-found .download-link.selected').forEach(btn => {
             btn.classList.remove('selected');
             btn.textContent = 'Select';
           });
@@ -8753,7 +8869,7 @@
           // Clear selection after unignoring
           window.selectedModsForBulk.clear();
           window.lastClickedModIndex = null; // Reset shift+click tracking
-          document.querySelectorAll('.download-link.selected').forEach(btn => {
+          document.querySelectorAll('#results-found .download-link.selected').forEach(btn => {
             btn.classList.remove('selected');
             btn.textContent = 'Select';
           });
@@ -8854,6 +8970,440 @@
         });
       }
 
+      // ============================================================
+      // Per-section bulk actions for "Not Compatible" and "Could Not Find Mod"
+      // Each section has its own toggle, selection set, Select All, Remove, and Undo.
+      // Undo stacks are now per-section (see undoHistory above), so undoing in one
+      // section never affects another section's history.
+      // Download/Ignore/Unignore are intentionally disabled in these bars since they
+      // don't apply to incompatible / not-found mods.
+      // ============================================================
+
+      // Find an upload-area pill whose displayed filename matches the given name.
+      // Used by the failure section's bulk Remove since failure cards aren't tied to
+      // a project ID and so can't be looked up via addedModRemovers.
+      function findPillByFilename(filename) {
+        if (!filename || !fileListContainer) return null;
+        const pills = fileListContainer.querySelectorAll('.file-pill');
+        for (const pill of pills) {
+          const span = pill.querySelector('span');
+          if (span && span.textContent === filename) return pill;
+        }
+        return null;
+      }
+
+      // Configuration for the two extra bulk-action sections.
+      const extraBulkSections = [
+        {
+          name: 'warning',
+          label: 'incompatible',
+          sectionSelector: '#results-warning',
+          modeBtnId: 'bulk-actions-mode-warning-btn',
+          barId: 'bulk-actions-bar-warning',
+          selectAllBtnId: 'toggle-select-all-bulk-warning-btn',
+          countId: 'bulk-selection-count-warning',
+          removeBtnId: 'remove-selected-bulk-warning-btn',
+          undoBtnId: 'undo-bulk-warning-btn',
+          // Card identity: data-project-id (set on warning cards).
+          getCardKey: (card) => card.getAttribute('data-project-id'),
+          findCard: (key) => document.querySelector(
+            `#results-warning .result-card[data-project-id="${CSS.escape(String(key))}"]`
+          ),
+        },
+        {
+          name: 'failure',
+          label: 'not-found',
+          sectionSelector: '#results-failure',
+          modeBtnId: 'bulk-actions-mode-failure-btn',
+          barId: 'bulk-actions-bar-failure',
+          selectAllBtnId: 'toggle-select-all-bulk-failure-btn',
+          countId: 'bulk-selection-count-failure',
+          removeBtnId: 'remove-selected-bulk-failure-btn',
+          undoBtnId: 'undo-bulk-failure-btn',
+          // Card identity: data-failure-key (filename, set on failure cards).
+          getCardKey: (card) => card.getAttribute('data-failure-key'),
+          findCard: (key) => document.querySelector(
+            `#results-failure .result-card[data-failure-key="${CSS.escape(String(key))}"]`
+          ),
+        },
+      ];
+
+      // Per-section state: { mode: bool, selected: Set<string> }.
+      const sectionBulkState = {};
+      extraBulkSections.forEach((cfg) => {
+        sectionBulkState[cfg.name] = { mode: false, selected: new Set() };
+      });
+
+      function getVisibleCardsForSection(cfg) {
+        return Array.from(document.querySelectorAll(`${cfg.sectionSelector} .result-card`))
+          .filter((card) => card.style.display !== 'none');
+      }
+
+      function updateSectionBulkCount(cfg) {
+        const state = sectionBulkState[cfg.name];
+        const visible = getVisibleCardsForSection(cfg);
+        const visibleKeys = new Set(visible.map(cfg.getCardKey).filter(Boolean));
+
+        // Drop any selections that are no longer visible (e.g. filtered out).
+        state.selected.forEach((key) => {
+          if (!visibleKeys.has(key)) state.selected.delete(key);
+        });
+
+        const countEl = document.getElementById(cfg.countId);
+        if (countEl) countEl.textContent = `${state.selected.size} selected`;
+
+        const selectAllBtn = document.getElementById(cfg.selectAllBtnId);
+        if (selectAllBtn) {
+          const allSelected = visible.length > 0 && visible.every((card) =>
+            state.selected.has(cfg.getCardKey(card))
+          );
+          selectAllBtn.textContent = allSelected ? 'Clear All' : 'Select All';
+          selectAllBtn.title = allSelected
+            ? 'Deselect every mod currently selected'
+            : `Select every visible ${cfg.label} mod`;
+        }
+      }
+
+      // Inject a "Select" button into a single card. Mirrors the success section's
+      // .download-link.bulk-select-mode styling so the button looks identical.
+      function injectSelectButtonIntoCard(cfg, card) {
+        if (!card || card.querySelector('.bulk-select-action')) return;
+        const main = card.querySelector('.result-card-main');
+        if (!main) return;
+        const actions = document.createElement('div');
+        actions.className = 'mod-actions bulk-select-actions';
+        const btn = document.createElement('a');
+        btn.href = '#';
+        btn.className = 'download-link bulk-select-mode bulk-select-action';
+        btn.textContent = 'Select';
+        btn.setAttribute('title', 'Select this mod for bulk actions');
+        // Reflect any existing selection state.
+        const key = cfg.getCardKey(card);
+        if (key && sectionBulkState[cfg.name].selected.has(key)) {
+          btn.classList.add('selected');
+          btn.textContent = 'Selected';
+        }
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          toggleCardSelection(cfg, card);
+        });
+        actions.appendChild(btn);
+        main.appendChild(actions);
+      }
+
+      function injectSelectButtonsForSection(cfg) {
+        const cards = document.querySelectorAll(`${cfg.sectionSelector} .result-card`);
+        cards.forEach((card) => injectSelectButtonIntoCard(cfg, card));
+      }
+
+      function removeSelectButtonsForSection(cfg) {
+        const containers = document.querySelectorAll(
+          `${cfg.sectionSelector} .bulk-select-actions`
+        );
+        containers.forEach((el) => el.remove());
+      }
+
+      function setSectionBulkMode(cfg, enabled) {
+        const state = sectionBulkState[cfg.name];
+        state.mode = enabled;
+        const bar = document.getElementById(cfg.barId);
+        const modeBtn = document.getElementById(cfg.modeBtnId);
+
+        if (enabled) {
+          if (bar) bar.classList.add('show');
+          if (modeBtn) modeBtn.classList.add('active');
+          injectSelectButtonsForSection(cfg);
+        } else {
+          if (bar) bar.classList.remove('show');
+          if (modeBtn) modeBtn.classList.remove('active');
+          state.selected.clear();
+          removeSelectButtonsForSection(cfg);
+        }
+        updateSectionBulkCount(cfg);
+        refreshUndoButtonState();
+      }
+
+      function setCardSelectionVisual(card, isSelected) {
+        const btn = card.querySelector('.bulk-select-action');
+        if (!btn) return;
+        // Defensively re-apply styling classes in case another code path (e.g.
+        // restoreMultiModRemovalSnapshot) stripped them while restoring the card.
+        btn.classList.add('download-link', 'bulk-select-mode', 'bulk-select-action');
+        if (isSelected) {
+          btn.classList.add('selected');
+          btn.textContent = 'Selected';
+          btn.setAttribute('title', 'Click to deselect this mod');
+        } else {
+          btn.classList.remove('selected');
+          btn.textContent = 'Select';
+          btn.setAttribute('title', 'Select this mod for bulk actions');
+        }
+      }
+
+      function toggleCardSelection(cfg, card) {
+        const key = cfg.getCardKey(card);
+        if (!key) return;
+        const state = sectionBulkState[cfg.name];
+        if (state.selected.has(key)) {
+          state.selected.delete(key);
+          setCardSelectionVisual(card, false);
+        } else {
+          state.selected.add(key);
+          setCardSelectionVisual(card, true);
+        }
+        updateSectionBulkCount(cfg);
+      }
+
+      // Sync Select buttons on newly-rendered or restored cards. When a section is
+      // in bulk mode, ensure all its cards have a Select button (with the right
+      // visual state). When it's not, ensure no leftover Select buttons remain.
+      window.refreshExtraBulkSelectButtons = function () {
+        extraBulkSections.forEach((cfg) => {
+          if (sectionBulkState[cfg.name].mode) {
+            injectSelectButtonsForSection(cfg);
+            // Re-sync visual state for any pre-existing buttons (e.g. restored from Undo).
+            const state = sectionBulkState[cfg.name];
+            document.querySelectorAll(`${cfg.sectionSelector} .result-card`).forEach((card) => {
+              const key = cfg.getCardKey(card);
+              setCardSelectionVisual(card, key && state.selected.has(key));
+            });
+          } else {
+            removeSelectButtonsForSection(cfg);
+          }
+          updateSectionBulkCount(cfg);
+        });
+      };
+
+      // Wire up each extra section.
+      extraBulkSections.forEach((cfg) => {
+        const modeBtn = document.getElementById(cfg.modeBtnId);
+        const selectAllBtn = document.getElementById(cfg.selectAllBtnId);
+        const removeBtn = document.getElementById(cfg.removeBtnId);
+        const undoBtn = document.getElementById(cfg.undoBtnId);
+
+        if (modeBtn) {
+          modeBtn.addEventListener('click', () => {
+            setSectionBulkMode(cfg, !sectionBulkState[cfg.name].mode);
+          });
+        }
+
+        if (selectAllBtn) {
+          selectAllBtn.addEventListener('click', () => {
+            const state = sectionBulkState[cfg.name];
+            const visible = getVisibleCardsForSection(cfg);
+            const allSelected = visible.length > 0 && visible.every((card) =>
+              state.selected.has(cfg.getCardKey(card))
+            );
+            if (allSelected) {
+              state.selected.clear();
+              visible.forEach((card) => setCardSelectionVisual(card, false));
+            } else {
+              visible.forEach((card) => {
+                const key = cfg.getCardKey(card);
+                if (key) {
+                  state.selected.add(key);
+                  setCardSelectionVisual(card, true);
+                }
+              });
+            }
+            updateSectionBulkCount(cfg);
+          });
+        }
+
+        if (removeBtn) {
+          removeBtn.addEventListener('click', () => {
+            const state = sectionBulkState[cfg.name];
+            if (state.selected.size === 0) {
+              showCustomAlert(`No mods selected. Please select ${cfg.label} mods to remove.`, 'notice');
+              return;
+            }
+
+            const removalCount = state.selected.size;
+            const selectedKeys = Array.from(state.selected);
+
+            if (cfg.name === 'warning') {
+              // Reuse the success-section snapshot/restore machinery: warning cards are
+              // registered in addedModRemovers and use data-project-id, so the existing
+              // captureMultiModRemovalSnapshot / restoreMultiModRemovalSnapshot work.
+              const snapshot = captureMultiModRemovalSnapshot(new Set(selectedKeys));
+
+              selectedKeys.forEach((projectId) => {
+                const entry = addedModRemovers.get(String(projectId));
+                if (entry && entry.pill) {
+                  const xBtn = entry.pill.querySelector('.file-pill-remove');
+                  if (xBtn && typeof xBtn.click === 'function') {
+                    xBtn.click();
+                  } else {
+                    entry.pill.remove();
+                  }
+                }
+                removeResultCardForMod({
+                  projectId: entry?.projectId || projectId,
+                  modId: entry?.modId,
+                });
+                searchedMods.delete(projectId);
+                if (entry?.modId) searchedMods.delete(entry.modId);
+                addedModRemovers.delete(String(projectId));
+                if (entry?.modId) addedModRemovers.delete(String(entry.modId));
+              });
+
+              state.selected.clear();
+              syncSectionCountsFromDom();
+              updateSectionBulkCount(cfg);
+              refreshSearchModalAddedStates();
+              if (typeof window.updateDownloadAllCount === 'function') {
+                window.updateDownloadAllCount();
+              }
+
+              pushUndoableAction({
+                description: `Remove ${removalCount} incompatible mod${removalCount !== 1 ? 's' : ''}`,
+                undo: () => {
+                  restoreMultiModRemovalSnapshot(snapshot);
+                  if (typeof window.refreshExtraBulkSelectButtons === 'function') {
+                    window.refreshExtraBulkSelectButtons();
+                  }
+                },
+              }, 'warning');
+            } else {
+              // Failure section: cards aren't backed by a project ID. We snapshot the
+              // card DOM + position, find the matching upload pill by filename, capture
+              // the upload-area state for that pill, then click the pill's X button to
+              // run the full upload-area cleanup.
+              const cardSnapshots = [];
+              const filenamesForUploadSnap = new Set();
+
+              selectedKeys.forEach((filename) => {
+                const card = cfg.findCard(filename);
+                if (!card) return;
+                const parent = card.parentNode;
+                const cardIndex = parent ? Array.from(parent.children).indexOf(card) : -1;
+                cardSnapshots.push({
+                  card,
+                  parentNode: parent,
+                  nextSibling: card.nextSibling,
+                  cardIndex,
+                  filename,
+                });
+                filenamesForUploadSnap.add(filename);
+              });
+
+              // Build a synthetic "upload area" snapshot for the matched pills so Undo
+              // can restore them. Reuse capture logic by walking pills directly.
+              const uploadSnapshots = [];
+              filenamesForUploadSnap.forEach((filename) => {
+                const pill = findPillByFilename(filename);
+                if (!pill) return;
+                const pillIndex = Array.from(fileListContainer.children).indexOf(pill);
+                const snap = { pillIndex, kind: 'dependency' };
+                for (const [key, file] of uploadedFiles) {
+                  if (pillByUploadKey.get(key) === pill) {
+                    snap.kind = 'upload';
+                    snap.uploadKey = key;
+                    snap.file = file;
+                    break;
+                  }
+                }
+                if (snap.kind === 'dependency') {
+                  for (const [key, info] of mrpackMods) {
+                    if (pillByMrpackKey.get(key) === pill) {
+                      snap.kind = 'mrpack';
+                      snap.mrpackKey = key;
+                      snap.mrpackInfo = info;
+                      break;
+                    }
+                  }
+                }
+                uploadSnapshots.push(snap);
+              });
+
+              // Now actually remove: click each pill's X (full upload-area cleanup) then
+              // remove the result cards.
+              filenamesForUploadSnap.forEach((filename) => {
+                const pill = findPillByFilename(filename);
+                if (pill) {
+                  const xBtn = pill.querySelector('.file-pill-remove');
+                  if (xBtn && typeof xBtn.click === 'function') {
+                    xBtn.click();
+                  } else {
+                    pill.remove();
+                  }
+                }
+              });
+              cardSnapshots.forEach((entry) => entry.card.remove());
+
+              state.selected.clear();
+              syncSectionCountsFromDom();
+              updateSectionBulkCount(cfg);
+              if (typeof window.updateDownloadAllCount === 'function') {
+                window.updateDownloadAllCount();
+              }
+
+              pushUndoableAction({
+                description: `Remove ${removalCount} not-found mod${removalCount !== 1 ? 's' : ''}`,
+                undo: () => {
+                  // 1) Restore upload pills + uploadedFiles / mrpackMods.
+                  if (uploadSnapshots.length > 0) {
+                    restoreUploadAreaSnapshot(uploadSnapshots);
+                  }
+                  // 2) Restore failure cards in their original positions.
+                  const ordered = cardSnapshots.slice().sort((a, b) => {
+                    const ai = Number.isInteger(a.cardIndex) ? a.cardIndex : Number.MAX_SAFE_INTEGER;
+                    const bi = Number.isInteger(b.cardIndex) ? b.cardIndex : Number.MAX_SAFE_INTEGER;
+                    return ai - bi;
+                  });
+                  for (const entry of ordered) {
+                    const parent = entry.parentNode;
+                    if (!parent) continue;
+                    const idx = Number.isInteger(entry.cardIndex) && entry.cardIndex >= 0
+                      ? entry.cardIndex
+                      : null;
+                    let inserted = false;
+                    if (idx !== null) {
+                      const currentChildren = Array.from(parent.children).filter((c) => c !== entry.card);
+                      const referenceNode = currentChildren[idx] || null;
+                      if (referenceNode) {
+                        parent.insertBefore(entry.card, referenceNode);
+                        inserted = true;
+                      }
+                    }
+                    if (!inserted && entry.nextSibling && entry.nextSibling.parentNode === parent) {
+                      parent.insertBefore(entry.card, entry.nextSibling);
+                      inserted = true;
+                    }
+                    if (!inserted) parent.appendChild(entry.card);
+                    const section = parent.closest('.results-section');
+                    if (section) section.classList.add('visible');
+                  }
+                  syncSectionCountsFromDom();
+                  if (typeof window.updateDownloadAllCount === 'function') {
+                    window.updateDownloadAllCount();
+                  }
+                  if (typeof window.refreshExtraBulkSelectButtons === 'function') {
+                    window.refreshExtraBulkSelectButtons();
+                  }
+                  updateSectionBulkCount(cfg);
+                },
+              }, 'failure');
+            }
+          });
+        }
+
+        if (undoBtn) {
+          undoBtn.addEventListener('click', () => {
+            if (undoBtn.disabled) return;
+            performUndo(cfg.name);
+          });
+        }
+      });
+
+      // Make the section count updater available so filter inputs can re-sync.
+      window.updateExtraBulkSelectionCounts = function () {
+        extraBulkSections.forEach((cfg) => {
+          if (sectionBulkState[cfg.name].mode) updateSectionBulkCount(cfg);
+        });
+      };
+
       // --- Copy to clipboard functionality ---
       const copyFoundBtn = document.getElementById("copy-found-btn");
       const copyWarningBtn = document.getElementById("copy-warning-btn");
@@ -8875,6 +9425,22 @@
         }).filter(name => name).join('\n');
         copyToClipboard(modNames, copyWarningBtn, "Incompatible mods");
       });
+
+      const copyFailureBtn = document.getElementById("copy-failure-btn");
+      if (copyFailureBtn) {
+        copyFailureBtn.addEventListener("click", () => {
+          const failureCards = document.querySelectorAll("#results-failure .result-card");
+          const modNames = Array.from(failureCards)
+            .filter(card => card.style.display !== "none")
+            .map(card => {
+              const titleLink = card.querySelector(".mod-title a");
+              return titleLink ? titleLink.textContent.trim() : "";
+            })
+            .filter(name => name)
+            .join('\n');
+          copyToClipboard(modNames, copyFailureBtn, "Not-found mods");
+        });
+      }
 
       // --- Search functionality ---
       const searchFoundInput = document.getElementById("search-found");
@@ -8900,6 +9466,12 @@
           updateFoundSectionActionVisibility();
         } else if (sectionSelector === "#results-warning") {
           updateWarningSectionFilterVisibility();
+        } else if (sectionSelector === "#results-failure") {
+          updateFailureSectionFilterVisibility();
+        }
+        // Keep per-section bulk selection counts in sync when filtering hides cards.
+        if (typeof window.updateExtraBulkSelectionCounts === 'function') {
+          window.updateExtraBulkSelectionCounts();
         }
       }
 
@@ -8939,6 +9511,27 @@
           searchWarningClearBtn.style.display = "none";
           filterCards("", "#results-warning");
           searchWarningInput.focus();
+        });
+      }
+
+      const searchFailureInput = document.getElementById("search-failure");
+      const searchFailureClearBtn = document.getElementById("search-failure-clear");
+
+      if (searchFailureInput) {
+        searchFailureInput.addEventListener("input", (e) => {
+          filterCards(e.target.value, "#results-failure");
+          if (searchFailureClearBtn) {
+            searchFailureClearBtn.style.display = e.target.value ? "flex" : "none";
+          }
+        });
+      }
+
+      if (searchFailureClearBtn) {
+        searchFailureClearBtn.addEventListener("click", () => {
+          searchFailureInput.value = "";
+          searchFailureClearBtn.style.display = "none";
+          filterCards("", "#results-failure");
+          searchFailureInput.focus();
         });
       }
 
@@ -9189,6 +9782,12 @@
           updateFoundSectionActionVisibility();
         } else if (sectionSelector === "#results-warning") {
           updateWarningSectionFilterVisibility();
+        } else if (sectionSelector === "#results-failure") {
+          updateFailureSectionFilterVisibility();
+        }
+        // Keep per-section bulk selection counts in sync when filtering hides cards.
+        if (typeof window.updateExtraBulkSelectionCounts === 'function') {
+          window.updateExtraBulkSelectionCounts();
         }
       }
 
@@ -9204,6 +9803,12 @@
           updateFoundSectionActionVisibility();
         } else if (sectionSelector === "#results-warning") {
           updateWarningSectionFilterVisibility();
+        } else if (sectionSelector === "#results-failure") {
+          updateFailureSectionFilterVisibility();
+        }
+        // Keep per-section bulk selection counts in sync when filtering hides cards.
+        if (typeof window.updateExtraBulkSelectionCounts === 'function') {
+          window.updateExtraBulkSelectionCounts();
         }
       }
 
@@ -9509,6 +10114,16 @@
       updateSectionHeader("found", foundCount);
       updateSectionHeader("warning", warningCount);
       updateSectionHeader("failure", failureCount);
+
+      // Refresh empty-state messages so removing the last card shows
+      // "No incompatible mods remaining." / "No not-found mods remaining."
+      // (mirroring the found section's "No updates remaining.").
+      if (typeof updateWarningSectionFilterVisibility === 'function') {
+        updateWarningSectionFilterVisibility();
+      }
+      if (typeof updateFailureSectionFilterVisibility === 'function') {
+        updateFailureSectionFilterVisibility();
+      }
     }
 
     function ensureFoundEmptyInlineMessage(foundSection) {
@@ -9531,6 +10146,18 @@
         messageEl.className = 'found-empty-inline-message';
         messageEl.textContent = 'No incompatible mods match the current filters.';
         warningSection.appendChild(messageEl);
+      }
+      return messageEl;
+    }
+
+    function ensureFailureEmptyInlineMessage(failureSection) {
+      let messageEl = document.getElementById('failure-empty-inline-message');
+      if (!messageEl && failureSection) {
+        messageEl = document.createElement('p');
+        messageEl.id = 'failure-empty-inline-message';
+        messageEl.className = 'found-empty-inline-message';
+        messageEl.textContent = 'No unmatched mods remaining.';
+        failureSection.appendChild(messageEl);
       }
       return messageEl;
     }
@@ -9579,8 +10206,36 @@
       const messageEl = ensureWarningEmptyInlineMessage(warningSection);
 
       if (!messageEl) return;
-      const shouldShow = warningCardCount > 0 && visibleWarningCardCount === 0;
-      messageEl.style.display = shouldShow ? 'block' : 'none';
+      const hasVisibleCards = visibleWarningCardCount > 0;
+      if (!hasVisibleCards) {
+        messageEl.textContent = warningCardCount === 0
+          ? 'No incompatible mods remaining.'
+          : 'No incompatible mods match the current filters.';
+        messageEl.style.display = 'block';
+      } else {
+        messageEl.style.display = 'none';
+      }
+    }
+
+    function updateFailureSectionFilterVisibility() {
+      const failureSection = document.getElementById('results-failure');
+      if (!failureSection) return;
+
+      const failureCards = Array.from(failureSection.querySelectorAll('.result-card'));
+      const failureCardCount = failureCards.length;
+      const visibleFailureCardCount = failureCards.filter(card => card.style.display !== 'none').length;
+      const messageEl = ensureFailureEmptyInlineMessage(failureSection);
+
+      if (!messageEl) return;
+      const hasVisibleCards = visibleFailureCardCount > 0;
+      if (!hasVisibleCards) {
+        messageEl.textContent = failureCardCount === 0
+          ? 'No unmatched mods remaining.'
+          : 'No unmatched mods match the current filters.';
+        messageEl.style.display = 'block';
+      } else {
+        messageEl.style.display = 'none';
+      }
     }
 
     function renderSingleResult(result) {
@@ -9629,6 +10284,27 @@
           renderedArtifactIds.add(result.modId + '|' + result.project_type);
           // Register a remover so the search modal can remove this card later.
           registerRenderedModRemover(result, findPillForResult(result));
+        }
+        // If a section is currently in bulk mode, give the new card a Select button.
+        if (typeof window.refreshExtraBulkSelectButtons === 'function') {
+          window.refreshExtraBulkSelectButtons();
+        }
+        // Also register warning cards so bulk-action Remove + Undo can locate the pill.
+        if (result.status === "warning" && result.projectId) {
+          registerAddedModRemover(
+            result.projectId,
+            findPillForResult(result),
+            "rendered",
+            { projectId: result.projectId, modId: result.modId || null }
+          );
+          if (result.modId && result.modId !== result.projectId) {
+            registerAddedModRemover(
+              result.modId,
+              findPillForResult(result),
+              "rendered",
+              { projectId: result.projectId, modId: result.modId }
+            );
+          }
         }
       }
     }
@@ -9914,6 +10590,30 @@
       }
     }
 
+    // --- Standardize the order of icons next to a mod title ---
+    // The mod title can collect up to 6 icons (project type, dependency chain,
+    // required-by puzzle, conflict triangle, up-to-date bolt, cache). They get
+    // injected from many different code paths, so we run this helper after each
+    // injection (and at the end of card creation) to enforce a single canonical
+    // order. The title <a> link stays first; everything not in the order list
+    // keeps its existing relative position.
+    const MOD_TITLE_ICON_ORDER = [
+      'project-type-icon-container',
+      'dependency-chain-tooltip-container',
+      'dependency-tooltip-container',
+      'conflict-tooltip-container',
+      'up-to-date-icon-container',
+      'cache-indicator-container',
+    ];
+
+    function standardizeModTitleIcons(modTitleDiv) {
+      if (!modTitleDiv) return;
+      for (const cls of MOD_TITLE_ICON_ORDER) {
+        const els = modTitleDiv.querySelectorAll(`:scope > .${cls}`);
+        els.forEach((el) => modTitleDiv.appendChild(el));
+      }
+    }
+
     // --- Update Dependency Chain on Existing Card ---
     function updateDependencyChainOnCard(projectId) {
       const card = document.querySelector(`.result-card[data-project-id="${projectId}"]`);
@@ -9944,12 +10644,8 @@
       <span class="dependency-chain-tooltip">${tooltipText}</span>
     `;
 
-        const firstTag = modTitleDiv.querySelector('.mod-title-tag, .dependency-tooltip-container');
-        if (firstTag) {
-          modTitleDiv.insertBefore(chainContainer, firstTag);
-        } else {
-          modTitleDiv.appendChild(chainContainer);
-        }
+        modTitleDiv.appendChild(chainContainer);
+        standardizeModTitleIcons(modTitleDiv);
       }
     }
 
@@ -10324,13 +11020,8 @@
       <span class="dependency-chain-tooltip">${initialTooltipText}</span>
     `;
 
-        // Insert before any existing tags
-        const firstTag = modTitleDiv.querySelector('.mod-title-tag, .dependency-tooltip-container');
-        if (firstTag) {
-          modTitleDiv.insertBefore(chainContainer, firstTag);
-        } else {
-          modTitleDiv.appendChild(chainContainer);
-        }
+        // Order is enforced by standardizeModTitleIcons at the end of the card.
+        modTitleDiv.appendChild(chainContainer);
       }
 
       // --- Add project_type icon if available ---
@@ -10343,37 +11034,7 @@
           <span class="project-type-icon">${iconData.svg}</span>
           <span class="project-type-tooltip">${iconData.tooltip}</span>
         `;
-
-        // Insert after any chain icon but ensure dependency tag remains first
-        const chainContainer = titleElement.querySelector('.dependency-chain-tooltip-container');
-        const dependencyContainer = titleElement.querySelector('.dependency-tooltip-container');
-        const conflictContainer = titleElement.querySelector('.conflict-tooltip-container');
-
-        if (chainContainer) {
-          // Insert after chain icon
-          if (chainContainer.nextSibling) {
-            titleElement.insertBefore(iconContainer, chainContainer.nextSibling);
-          } else {
-            titleElement.appendChild(iconContainer);
-          }
-        } else if (dependencyContainer) {
-          // Insert after dependency container
-          if (dependencyContainer.nextSibling) {
-            titleElement.insertBefore(iconContainer, dependencyContainer.nextSibling);
-          } else {
-            titleElement.appendChild(iconContainer);
-          }
-        } else if (conflictContainer) {
-          // Insert after conflict container
-          if (conflictContainer.nextSibling) {
-            titleElement.insertBefore(iconContainer, conflictContainer.nextSibling);
-          } else {
-            titleElement.appendChild(iconContainer);
-          }
-        } else {
-          // No special containers, insert as first icon
-          titleElement.appendChild(iconContainer);
-        }
+        titleElement.appendChild(iconContainer);
       }
 
       // --- Handle the "Already Up-to-Date" state ---
@@ -10388,29 +11049,7 @@
           </svg>
           <span class="up-to-date-tooltip">Already Up-to-Date</span>
         `;
-
-        // Insert after dependency container and chain container if they exist
-        const dependencyContainer = titleElement.querySelector('.dependency-tooltip-container');
-        const chainContainer = titleElement.querySelector('.dependency-chain-tooltip-container');
-        const conflictContainer = titleElement.querySelector('.conflict-tooltip-container');
-        const projectTypeIcon = titleElement.querySelector('.project-type-icon-container');
-
-        if (dependencyContainer && dependencyContainer.nextSibling) {
-          titleElement.insertBefore(upToDateContainer, dependencyContainer.nextSibling);
-        } else if (chainContainer && chainContainer.nextSibling) {
-          titleElement.insertBefore(upToDateContainer, chainContainer.nextSibling);
-        } else if (conflictContainer && conflictContainer.nextSibling) {
-          titleElement.insertBefore(upToDateContainer, conflictContainer.nextSibling);
-        } else if (projectTypeIcon) {
-          // If we already have a project type icon, insert after it
-          if (projectTypeIcon.nextSibling) {
-            titleElement.insertBefore(upToDateContainer, projectTypeIcon.nextSibling);
-          } else {
-            titleElement.appendChild(upToDateContainer);
-          }
-        } else {
-          titleElement.appendChild(upToDateContainer);
-        }
+        titleElement.appendChild(upToDateContainer);
       }
 
       // --- Populate Category Tooltip ---
@@ -10436,15 +11075,11 @@
     </svg>
     <span class="cache-tooltip">Loaded from cache</span>
   `;
-
-        // Insert after any existing icons but before tags
-        const firstTag = modTitleDiv.querySelector('.mod-title-tag, .dependency-tooltip-container');
-        if (firstTag) {
-          modTitleDiv.insertBefore(cacheContainer, firstTag);
-        } else {
-          modTitleDiv.appendChild(cacheContainer);
-        }
+        modTitleDiv.appendChild(cacheContainer);
       }
+
+      // Standardize the icon order before returning.
+      standardizeModTitleIcons(card.querySelector('.mod-title'));
 
       return card;
     }
@@ -10672,15 +11307,11 @@
       </svg>
       <span class="cache-tooltip">Loaded from cache</span>
     `;
-
-    // Insert after any existing icons but before tags
-    const firstTag = modTitleDiv.querySelector('.mod-title-tag, .dependency-tooltip-container');
-    if (firstTag) {
-      modTitleDiv.insertBefore(cacheContainer, firstTag);
-    } else {
-      modTitleDiv.appendChild(cacheContainer);
-    }
+    modTitleDiv.appendChild(cacheContainer);
   }
+
+  // Standardize the icon order before returning.
+  standardizeModTitleIcons(card.querySelector('.mod-title'));
 
   return card;
 }
@@ -10689,6 +11320,8 @@
     function createFailureCard(mod) {
       const card = document.createElement("div");
       card.className = "result-card failure";
+      // Stable selection key for bulk actions: original filename (mod.title)
+      if (mod.title) card.setAttribute('data-failure-key', mod.title);
       const cleanName = cleanModFileName(mod.title);
       const displayName = cleanName || mod.title;
       const modrinthUrl = `https://modrinth.com/mods?q=${encodeURIComponent(cleanName || mod.title)}`;
@@ -10710,7 +11343,11 @@
               <span style="opacity:0.5;font-size:0.85em;margin-left:0.3rem;">(${mod.title})</span>
             </div>
             <div class="mod-description">${mod.reason}</div>
-            <div class="mod-meta-toggles" style="margin-top:0.4rem;">
+            <div class="mod-meta-toggles" style="margin-top:0.4rem;display:flex;gap:0.75rem;flex-wrap:wrap;">
+              <a class="mod-meta-item" href="${modrinthUrl}" target="_blank" rel="noopener"
+                 style="color:inherit;text-decoration:underline;cursor:pointer;"
+                 onmouseover="this.style.color='#1bd96a'"
+                 onmouseout="this.style.color='inherit'">Search Modrinth</a>
               <a class="mod-meta-item" href="${curseForgeUrl}" target="_blank" rel="noopener"
                  style="color:inherit;text-decoration:underline;cursor:pointer;"
                  onmouseover="this.style.color='#f44336'"
