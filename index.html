@@ -2479,12 +2479,24 @@
 
       white-space: nowrap;
       font-size: 0.85rem;
-      text-align: center;
+      text-align: left;
     }
 
     .dependency-chain-tooltip-container:hover .dependency-chain-tooltip {
       visibility: visible;
       opacity: 1;
+    }
+
+    .dependency-chain-tooltip .dep-chain-line {
+      display: block;
+    }
+
+    .dependency-chain-tooltip .dep-chain-line + .dep-chain-line {
+      margin-top: 0.15rem;
+    }
+
+    .dependency-chain-tooltip .dep-chain-optional {
+      color: var(--secondary-text);
     }
 
     /* Cache indicator styling */
@@ -3595,6 +3607,7 @@
         if (window.ignoredMods) window.ignoredMods.delete(id);
         dependencyMap.delete(id);
         reverseDependencyMap.delete(id);
+        optionalDependencyMap.delete(id);
         dependencyDependents.delete(id);
       }
 
@@ -3915,7 +3928,8 @@
     let pipelineMetrics = null; // Lightweight per-run metrics for fetch/resolve phases
     let resultsSectionsSetup = false; // Track if result sections have been set up
     let dependencyMap = new Map(); // Track which mod requires each dependency
-    let reverseDependencyMap = new Map(); // Track what dependencies each mod has
+    let reverseDependencyMap = new Map(); // Track what required dependencies each mod has
+    let optionalDependencyMap = new Map(); // Track what optional dependencies each mod has
     let incompatibleMap = new Map(); // Track incompatible relationships between mods (sourceProjectId -> Set<targetProjectId>)
     let modIdToNameMap = new Map(); // Track mod ID to name mapping
     let installedModVersions = new Map(); // Track installed version of each uploaded mod (projectId -> versionString)
@@ -6723,6 +6737,7 @@
         renderedArtifactIds.clear();
         dependencyMap.clear(); // Reset dependency tracking
         reverseDependencyMap.clear(); // Reset reverse dependency tracking
+        optionalDependencyMap.clear(); // Reset optional dependency tracking
         dependencyDependents.clear();
         incompatibleMap.clear(); // Reset incompatible dependency tracking
         modIdToNameMap.clear(); // Reset mod name mapping
@@ -6788,6 +6803,7 @@
             // Collect dependencies BEFORE rendering the card
             if (result.status === "success" && result.dependencies) {
               const requiredDeps = [];
+              const optionalDeps = [];
               const incompatibleDeps = [];
               for (const dep of result.dependencies) {
                 if (dep.dependency_type === "required") {
@@ -6796,6 +6812,9 @@
                   trackDependencyRequirement(dep.project_id, result.title);
                   // Track dependencies for this mod (reverse mapping)
                   requiredDeps.push(dep.project_id);
+                  trackDependencyParent(dep.project_id, result.projectId);
+                } else if (dep.dependency_type === "optional") {
+                  optionalDeps.push(dep.project_id);
                   trackDependencyParent(dep.project_id, result.projectId);
                 } else if (dep.dependency_type === "incompatible") {
                   // Track incompatible dependencies
@@ -6810,6 +6829,9 @@
               if (requiredDeps.length > 0) {
                 // Store dependencies for reverse lookup
                 reverseDependencyMap.set(result.projectId, requiredDeps);
+              }
+              if (optionalDeps.length > 0) {
+                optionalDependencyMap.set(result.projectId, optionalDeps);
               }
             }
 
@@ -6951,6 +6973,20 @@
                         updateDependencyChainOnCard(parentProjectId);
                       }
                     }
+                  } else if (dep.dependency_type === "optional") {
+                    const depKey = dep.project_id;
+                    const parentProjectId = result.projectId;
+                    if (parentProjectId) {
+                      if (!optionalDependencyMap.has(parentProjectId)) {
+                        optionalDependencyMap.set(parentProjectId, []);
+                      }
+                      const optList = optionalDependencyMap.get(parentProjectId);
+                      if (!optList.includes(depKey)) {
+                        optList.push(depKey);
+                        trackDependencyParent(depKey, parentProjectId);
+                        updateDependencyChainOnCard(parentProjectId);
+                      }
+                    }
                   } else if (dep.dependency_type === "incompatible") {
                     // Track incompatible dependencies during dependency resolution
                     if (!incompatibleMap.has(result.projectId)) {
@@ -6969,6 +7005,11 @@
           const depProgressPercentage = 50 + (Math.min(processedDependencyCount / (totalDependencies || 1), 1) * 45);
           progressBar.style.width = `${depProgressPercentage}%`;
         }
+
+        // Optional dependencies aren't auto-resolved, so fetch their titles in one
+        // batch (fire-and-forget) so the chain tooltip can show real names instead
+        // of "Loading...".
+        enrichOptionalDependencyNames();
 
         // Conflict detection uses only Modrinth 'incompatible' metadata for the target version.
         // Uploaded JAR conflicts are ignored; incompatibleMap is filled during dependency resolution.
@@ -10309,6 +10350,75 @@
       }
     }
 
+    // --- Dependency Chain Tooltip Helpers ---
+    function hasDependencyChainEntries(projectId) {
+      return reverseDependencyMap.has(projectId) || optionalDependencyMap.has(projectId);
+    }
+
+    // Optional deps aren't auto-resolved like required deps, so their names won't
+    // appear in modIdToNameMap unless we ask Modrinth for them. Fetches titles in
+    // one batch and refreshes any chain tooltips that referenced unresolved ids.
+    async function enrichOptionalDependencyNames() {
+      const unresolved = new Set();
+      for (const ids of optionalDependencyMap.values()) {
+        for (const id of ids) {
+          if (!modIdToNameMap.has(id)) unresolved.add(id);
+        }
+      }
+      if (unresolved.size === 0) return;
+      try {
+        const idsParam = JSON.stringify(Array.from(unresolved));
+        const response = await fetchWithRetry(
+          `https://api.modrinth.com/v2/projects?ids=${encodeURIComponent(idsParam)}`
+        );
+        if (!response.ok) return;
+        const projects = await response.json();
+        for (const p of projects) {
+          if (p && p.id && p.title) {
+            if (!modIdToNameMap.has(p.id)) {
+              modIdToNameMap.set(p.id, p.title);
+            }
+          }
+        }
+        // Refresh any cards whose tooltip referenced one of these optional deps.
+        for (const [parentProjectId, ids] of optionalDependencyMap.entries()) {
+          if (!ids.some(id => unresolved.has(id))) continue;
+          const card = document.querySelector(`.result-card[data-project-id="${CSS.escape(String(parentProjectId))}"]`);
+          if (!card) continue;
+          const chainTooltip = card.querySelector('.dependency-chain-tooltip');
+          if (!chainTooltip) continue;
+          chainTooltip.innerHTML = buildDependencyChainTooltipHTML(parentProjectId);
+        }
+      } catch (e) {
+        console.warn('Failed to enrich optional dependency names:', e);
+      }
+    }
+
+    function escapeHtmlForTooltip(str) {
+      return String(str).replace(/[&<>"']/g, (ch) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      })[ch]);
+    }
+
+    function buildDependencyChainTooltipHTML(projectId) {
+      const requiredIds = reverseDependencyMap.get(projectId) || [];
+      const optionalIds = optionalDependencyMap.get(projectId) || [];
+      const lines = [];
+      if (requiredIds.length > 0) {
+        const names = requiredIds.map(id => escapeHtmlForTooltip(modIdToNameMap.get(id) || 'Loading...'));
+        lines.push(`<span class="dep-chain-line">Depends on: ${names.join(", ")}</span>`);
+      }
+      if (optionalIds.length > 0) {
+        const names = optionalIds.map(id => escapeHtmlForTooltip(modIdToNameMap.get(id) || 'Loading...'));
+        lines.push(`<span class="dep-chain-line dep-chain-optional">Optional: ${names.join(", ")}</span>`);
+      }
+      return lines.join('');
+    }
+
     // --- Update Dependency Chain Tooltip ---
     function updateDependencyChainTooltip(projectId) {
       const parentIds = dependencyDependents.get(projectId);
@@ -10317,18 +10427,12 @@
           const card = document.querySelector(`.result-card[data-project-id="${parentProjectId}"]`);
           if (!card) continue;
 
-          const dependencyIds = reverseDependencyMap.get(parentProjectId);
-          if (!dependencyIds) continue;
+          if (!hasDependencyChainEntries(parentProjectId)) continue;
 
           const chainTooltip = card.querySelector('.dependency-chain-tooltip');
           if (!chainTooltip) continue;
 
-          const dependencyNames = [];
-          for (const depId of dependencyIds) {
-            const modName = modIdToNameMap.get(depId);
-            dependencyNames.push(modName || depId);
-          }
-          chainTooltip.textContent = `Depends on: ${dependencyNames.join(", ")}`;
+          chainTooltip.innerHTML = buildDependencyChainTooltipHTML(parentProjectId);
         }
         return;
       }
@@ -10337,20 +10441,16 @@
       const resultCards = document.querySelectorAll('.result-card');
       resultCards.forEach(card => {
         const cardProjectId = card.dataset.projectId;
-        if (!cardProjectId || !reverseDependencyMap.has(cardProjectId)) return;
+        if (!cardProjectId || !hasDependencyChainEntries(cardProjectId)) return;
 
-        const dependencyIds = reverseDependencyMap.get(cardProjectId);
-        if (!dependencyIds.includes(projectId)) return;
+        const requiredIds = reverseDependencyMap.get(cardProjectId) || [];
+        const optionalIds = optionalDependencyMap.get(cardProjectId) || [];
+        if (!requiredIds.includes(projectId) && !optionalIds.includes(projectId)) return;
 
         const chainTooltip = card.querySelector('.dependency-chain-tooltip');
         if (!chainTooltip) return;
 
-        const dependencyNames = [];
-        for (const depId of dependencyIds) {
-          const modName = modIdToNameMap.get(depId);
-          dependencyNames.push(modName || depId);
-        }
-        chainTooltip.textContent = `Depends on: ${dependencyNames.join(", ")}`;
+        chainTooltip.innerHTML = buildDependencyChainTooltipHTML(cardProjectId);
       });
     }
 
@@ -10617,20 +10717,18 @@
     // --- Update Dependency Chain on Existing Card ---
     function updateDependencyChainOnCard(projectId) {
       const card = document.querySelector(`.result-card[data-project-id="${projectId}"]`);
-      if (!card || !reverseDependencyMap.has(projectId)) return;
+      if (!card || !hasDependencyChainEntries(projectId)) return;
 
       const modTitleDiv = card.querySelector('.mod-title');
       let chainContainer = card.querySelector('.dependency-chain-tooltip-container');
 
-      const dependencyIds = reverseDependencyMap.get(projectId);
-      const dependencyNames = dependencyIds.map(id => modIdToNameMap.get(id) || 'Loading...');
-      const tooltipText = `Depends on: ${dependencyNames.join(", ")}`;
+      const tooltipHTML = buildDependencyChainTooltipHTML(projectId);
 
       if (chainContainer) {
         // If the icon already exists, just update its tooltip
         const tooltip = chainContainer.querySelector('.dependency-chain-tooltip');
         if (tooltip) {
-          tooltip.textContent = tooltipText;
+          tooltip.innerHTML = tooltipHTML;
         }
       } else {
         // If the icon doesn't exist, create and add it
@@ -10641,7 +10739,7 @@
         <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
         <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
       </svg>
-      <span class="dependency-chain-tooltip">${tooltipText}</span>
+      <span class="dependency-chain-tooltip">${tooltipHTML}</span>
     `;
 
         modTitleDiv.appendChild(chainContainer);
@@ -10996,17 +11094,8 @@
       });
 
       // --- Add Dependency Chain Icon if needed ---
-      if (reverseDependencyMap.has(mod.projectId)) {
-        const dependencyIds = reverseDependencyMap.get(mod.projectId);
-        const dependencyNames = [];
-
-        // Get dependency names (some might still be "Loading...")
-        for (const depId of dependencyIds) {
-          const modName = modIdToNameMap.get(depId);
-          dependencyNames.push(modName || "Loading...");
-        }
-
-        const initialTooltipText = `Depends on: ${dependencyNames.join(", ")}`;
+      if (hasDependencyChainEntries(mod.projectId)) {
+        const initialTooltipHTML = buildDependencyChainTooltipHTML(mod.projectId);
 
         // Create and add the chain icon
         const modTitleDiv = card.querySelector('.mod-title');
@@ -11017,7 +11106,7 @@
         <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
         <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
       </svg>
-      <span class="dependency-chain-tooltip">${initialTooltipText}</span>
+      <span class="dependency-chain-tooltip">${initialTooltipHTML}</span>
     `;
 
         // Order is enforced by standardizeModTitleIcons at the end of the card.
