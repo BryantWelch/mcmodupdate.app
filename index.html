@@ -2015,6 +2015,98 @@
       color: var(--primary-text);
     }
 
+    /* Clear-filters action row at the bottom of the filter dropdown. */
+    .sort-clear-filters {
+      padding: 0.6rem 1rem;
+      cursor: pointer;
+      font-size: 0.85rem;
+      color: var(--secondary-text);
+      text-align: center;
+      border-top: 1px solid var(--border-color);
+      transition: background-color 0.2s ease, color 0.2s ease;
+      border-bottom-left-radius: 12px;
+      border-bottom-right-radius: 12px;
+    }
+
+    .sort-clear-filters:hover {
+      background-color: var(--dropzone-hover-bg);
+      color: var(--primary-text);
+    }
+
+    .sort-clear-filters.disabled {
+      opacity: 0.4;
+      pointer-events: none;
+    }
+
+    /* Active-filter chip bar shown below a section's header when filters are on. */
+    .active-filters-bar {
+      display: none;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      align-items: center;
+      margin: 0.25rem 0 0.75rem;
+    }
+
+    .active-filters-bar.visible {
+      display: flex;
+    }
+
+    .active-filters-label {
+      font-size: 0.8rem;
+      color: var(--secondary-text);
+      margin-right: 0.2rem;
+    }
+
+    .active-filter-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.2rem 0.55rem;
+      font-size: 0.8rem;
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 999px;
+      color: var(--primary-text);
+      cursor: pointer;
+      transition: background-color 0.2s ease, border-color 0.2s ease;
+    }
+
+    .active-filter-chip:hover {
+      background-color: var(--dropzone-hover-bg);
+      border-color: var(--gradient-start);
+    }
+
+    .active-filter-chip .chip-x {
+      font-size: 0.9rem;
+      line-height: 1;
+      color: var(--secondary-text);
+    }
+
+    .active-filter-chip:hover .chip-x {
+      color: var(--primary-text);
+    }
+
+    .active-filter-chip-category {
+      font-size: 0.7rem;
+      color: var(--secondary-text);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .active-filters-clear-all {
+      font-size: 0.78rem;
+      color: var(--secondary-text);
+      cursor: pointer;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      transition: color 0.2s ease, background-color 0.2s ease;
+    }
+
+    .active-filters-clear-all:hover {
+      color: var(--primary-text);
+      background-color: var(--dropzone-hover-bg);
+    }
+
     /* -- Styles for the layout toggle button itself -- */
     .layout-toggle {
       background: transparent;
@@ -3492,12 +3584,21 @@
       return `${projectId}|${artifactType || "unknown"}`;
     }
 
-    function trackDependencyParent(depId, parentProjectId) {
-      if (!depId || !parentProjectId) return;
+    // Composite key used by the dependency-chain maps. Different artifact types
+    // (mod vs datapack) of the same Modrinth project share a projectId but have
+    // their own dependency lists, so the parent side of those maps must include
+    // the artifact type. Dep IDs on the value side stay as plain project_ids
+    // (that's what Modrinth gives us in `dep.project_id`).
+    function makeArtifactKey(projectId, projectType) {
+      return `${projectId}|${projectType || "unknown"}`;
+    }
+
+    function trackDependencyParent(depId, parentArtifactKey) {
+      if (!depId || !parentArtifactKey) return;
       if (!dependencyDependents.has(depId)) {
         dependencyDependents.set(depId, new Set());
       }
-      dependencyDependents.get(depId).add(parentProjectId);
+      dependencyDependents.get(depId).add(parentArtifactKey);
     }
     let sectionCounts = {};
     let renderedModIds = new Set();
@@ -3606,9 +3707,23 @@
         }
         if (window.ignoredMods) window.ignoredMods.delete(id);
         dependencyMap.delete(id);
-        reverseDependencyMap.delete(id);
-        optionalDependencyMap.delete(id);
+        // reverseDependencyMap/optionalDependencyMap are keyed by composite
+        // ("projectId|project_type"), so we wipe every artifact type for this id.
+        for (const key of Array.from(reverseDependencyMap.keys())) {
+          if (key.startsWith(id + '|')) reverseDependencyMap.delete(key);
+        }
+        for (const key of Array.from(optionalDependencyMap.keys())) {
+          if (key.startsWith(id + '|')) optionalDependencyMap.delete(key);
+        }
+        // dependencyDependents is keyed by depProjectId; its values are Sets
+        // of parent composite keys. Drop the entry for this id and prune any
+        // remaining Sets that referenced this id as a parent.
         dependencyDependents.delete(id);
+        for (const parentSet of dependencyDependents.values()) {
+          for (const k of Array.from(parentSet)) {
+            if (k.startsWith(id + '|')) parentSet.delete(k);
+          }
+        }
       }
 
       if (removedAny) {
@@ -3962,10 +4077,17 @@
         if (e.target.closest('.sort-dropdown-container')) return;
         // Lazily lookup dropdowns to avoid storing stale DOM references.
    
-        const found = document.getElementById('sort-found-dropdown');
-        const warning = document.getElementById('sort-warning-dropdown');
-        if (found) found.classList.remove('show');
-        if (warning) warning.classList.remove('show');
+        const dropdownIds = [
+          'sort-found-dropdown',
+          'filter-found-dropdown',
+          'sort-warning-dropdown',
+          'filter-warning-dropdown',
+          'sort-failure-dropdown',
+        ];
+        for (const id of dropdownIds) {
+          const el = document.getElementById(id);
+          if (el) el.classList.remove('show');
+        }
       });
     }
 
@@ -4845,9 +4967,18 @@
       const shouldApplyLoaderFilters = !projectType || !LOADER_AGNOSTIC_TYPES.includes(projectType);
       
       if (shouldApplyLoaderFilters) {
-        // Add loader facet - use categories for loader filtering
+        // Add loader facet - use categories for loader filtering.
+        // When "All Projects" is selected, OR in the loader-agnostic project
+        // types so resource packs / shaders / data packs (which don't carry
+        // loader category tags on Modrinth) still come through.
         if (modalLoaderSelect.value) {
-          facets.push(`["categories:${modalLoaderSelect.value}"]`);
+          if (projectType) {
+            facets.push(`["categories:${modalLoaderSelect.value}"]`);
+          } else {
+            const orTerms = [`"categories:${modalLoaderSelect.value}"`]
+              .concat(LOADER_AGNOSTIC_TYPES.map(t => `"project_type:${t}"`));
+            facets.push(`[${orTerms.join(",")}]`);
+          }
         }
 
         // For plugin searches, allow additional proxy/platform filtering.
@@ -4932,9 +5063,17 @@
         const shouldApplyLoaderFilters = !projectType || !LOADER_AGNOSTIC_TYPES.includes(projectType);
         
         if (shouldApplyLoaderFilters) {
-          // Add loader facet from modal select
+          // Add loader facet from modal select. For "All Projects", OR in the
+          // loader-agnostic project types so resource packs / shaders / data
+          // packs are not filtered out by the loader category.
           if (modalLoaderSelect.value) {
-            facets.push(`["categories:${modalLoaderSelect.value}"]`);
+            if (projectType) {
+              facets.push(`["categories:${modalLoaderSelect.value}"]`);
+            } else {
+              const orTerms = [`"categories:${modalLoaderSelect.value}"`]
+                .concat(LOADER_AGNOSTIC_TYPES.map(t => `"project_type:${t}"`));
+              facets.push(`[${orTerms.join(",")}]`);
+            }
           }
 
           // For plugin featured results, allow additional proxy/platform filtering.
@@ -6802,6 +6941,7 @@
 
             // Collect dependencies BEFORE rendering the card
             if (result.status === "success" && result.dependencies) {
+              const parentArtifactKey = makeArtifactKey(result.projectId, result.project_type);
               const requiredDeps = [];
               const optionalDeps = [];
               const incompatibleDeps = [];
@@ -6812,10 +6952,10 @@
                   trackDependencyRequirement(dep.project_id, result.title);
                   // Track dependencies for this mod (reverse mapping)
                   requiredDeps.push(dep.project_id);
-                  trackDependencyParent(dep.project_id, result.projectId);
+                  trackDependencyParent(dep.project_id, parentArtifactKey);
                 } else if (dep.dependency_type === "optional") {
                   optionalDeps.push(dep.project_id);
-                  trackDependencyParent(dep.project_id, result.projectId);
+                  trackDependencyParent(dep.project_id, parentArtifactKey);
                 } else if (dep.dependency_type === "incompatible") {
                   // Track incompatible dependencies
                   if (!incompatibleMap.has(result.projectId)) {
@@ -6825,13 +6965,14 @@
                   incompatibleDeps.push(dep.project_id);
                 }
               }
-              // Store what dependencies this mod has
+              // Store what dependencies this artifact has (keyed by composite
+              // artifact key so a datapack version doesn't inherit the mod
+              // version's deps just because they share a projectId).
               if (requiredDeps.length > 0) {
-                // Store dependencies for reverse lookup
-                reverseDependencyMap.set(result.projectId, requiredDeps);
+                reverseDependencyMap.set(parentArtifactKey, requiredDeps);
               }
               if (optionalDeps.length > 0) {
-                optionalDependencyMap.set(result.projectId, optionalDeps);
+                optionalDependencyMap.set(parentArtifactKey, optionalDeps);
               }
             }
 
@@ -6952,6 +7093,7 @@
 
               // Check for nested dependencies
               if (result.dependencies) {
+                const parentArtifactKey = makeArtifactKey(result.projectId, result.project_type);
                 for (const dep of result.dependencies) {
                   if (dep.dependency_type === "required") {
                     const depKey = dep.project_id;
@@ -6962,29 +7104,27 @@
                       trackDependencyRequirement(depKey, result.title); // Track who requires this
 
                       // A new dependency relationship was found, so we might need to update the parent's card
-                      const parentProjectId = result.projectId;
-                      if (parentProjectId) {
+                      if (result.projectId) {
                         // Update the reverse map before calling the card update
-                        if (!reverseDependencyMap.has(parentProjectId)) {
-                          reverseDependencyMap.set(parentProjectId, []);
+                        if (!reverseDependencyMap.has(parentArtifactKey)) {
+                          reverseDependencyMap.set(parentArtifactKey, []);
                         }
-                        reverseDependencyMap.get(parentProjectId).push(depKey);
-                        trackDependencyParent(depKey, parentProjectId);
-                        updateDependencyChainOnCard(parentProjectId);
+                        reverseDependencyMap.get(parentArtifactKey).push(depKey);
+                        trackDependencyParent(depKey, parentArtifactKey);
+                        updateDependencyChainOnCard(parentArtifactKey);
                       }
                     }
                   } else if (dep.dependency_type === "optional") {
                     const depKey = dep.project_id;
-                    const parentProjectId = result.projectId;
-                    if (parentProjectId) {
-                      if (!optionalDependencyMap.has(parentProjectId)) {
-                        optionalDependencyMap.set(parentProjectId, []);
+                    if (result.projectId) {
+                      if (!optionalDependencyMap.has(parentArtifactKey)) {
+                        optionalDependencyMap.set(parentArtifactKey, []);
                       }
-                      const optList = optionalDependencyMap.get(parentProjectId);
+                      const optList = optionalDependencyMap.get(parentArtifactKey);
                       if (!optList.includes(depKey)) {
                         optList.push(depKey);
-                        trackDependencyParent(depKey, parentProjectId);
-                        updateDependencyChainOnCard(parentProjectId);
+                        trackDependencyParent(depKey, parentArtifactKey);
+                        updateDependencyChainOnCard(parentArtifactKey);
                       }
                     }
                   } else if (dep.dependency_type === "incompatible") {
@@ -8311,6 +8451,7 @@
     function setupResultSections() {
       const copyIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="m5 15-1 0c-1.1 0-2-.9-2-2l0-9c0-1.1.9-2 2-2l9 0c1.1 0 2 .9 2 2l0 1"></path></svg>`;
       const sortIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="7,10 12,5 17,10"></polyline><polyline points="7,14 12,19 17,14"></polyline></svg>`;
+      const filterIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>`;
       const checkboxIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><polyline points="9 11 12 14 16 10"></polyline></svg>`;
 
       resultsArea.innerHTML = `
@@ -8320,17 +8461,57 @@
         <h2 id="header-found">Updates Found</h2>
         <div class="header-buttons">
           <div class="search-box-wrapper" style="position: relative; margin-right: 0.5rem;">
-            <input type="text" id="search-found" class="search-box" placeholder="Filter mods..." title="Filter successful results by mod name">
+            <input type="text" id="search-found" class="search-box" placeholder="Search mods..." title="Search successful results by mod name">
             <button class="search-clear-btn" id="search-found-clear" title="Clear filter" style="display: none;">×</button>
           </div>
           <button id="bulk-actions-mode-btn" class="layout-toggle header-button" title="Toggle bulk actions mode - manage multiple mods at once">${checkboxIcon}</button>
           <div class="sort-dropdown-container">
-            <button id="sort-found-btn" class="layout-toggle" title="Sort and filter results by name, downloads, followers, or environment">${sortIcon}</button>
+            <button id="sort-found-btn" class="layout-toggle" title="Sort results by name, downloads, followers, or last updated">${sortIcon}</button>
             <div id="sort-found-dropdown" class="sort-dropdown">
-              <div class="sort-option active" data-sort="default">Default</div>
               <div class="sort-option has-submenu">
-                Categories <span class="submenu-arrow">▶</span>
+                Downloads <span class="submenu-arrow">▶</span>
                 <div class="sort-submenu">
+                  <div class="sort-option" data-sort="downloads" data-direction="false">High to Low</div>
+                  <div class="sort-option" data-sort="downloads" data-direction="true">Low to High</div>
+                </div>
+              </div>
+              <div class="sort-option has-submenu" title="Sort by the size of the currently-selected version's primary file">
+                File Size <span class="submenu-arrow">▶</span>
+                <div class="sort-submenu">
+                  <div class="sort-option" data-sort="file_size" data-direction="false">Largest First</div>
+                  <div class="sort-option" data-sort="file_size" data-direction="true">Smallest First</div>
+                </div>
+              </div>
+              <div class="sort-option has-submenu">
+                Followers <span class="submenu-arrow">▶</span>
+                <div class="sort-submenu">
+                  <div class="sort-option" data-sort="followers" data-direction="false">High to Low</div>
+                  <div class="sort-option" data-sort="followers" data-direction="true">Low to High</div>
+                </div>
+              </div>
+              <div class="sort-option has-submenu">
+                Last Updated <span class="submenu-arrow">▶</span>
+                <div class="sort-submenu">
+                  <div class="sort-option" data-sort="updated" data-direction="false">Newest First</div>
+                  <div class="sort-option" data-sort="updated" data-direction="true">Oldest First</div>
+                </div>
+              </div>
+              <div class="sort-option has-submenu">
+                Name <span class="submenu-arrow">▶</span>
+                <div class="sort-submenu">
+                  <div class="sort-option" data-sort="name" data-direction="false">A-Z</div>
+                  <div class="sort-option" data-sort="name" data-direction="true">Z-A</div>
+                </div>
+              </div>
+              <div class="sort-clear-filters disabled" data-action="clear-sort" title="Restore default ordering">Clear Sort</div>
+            </div>
+          </div>
+          <div class="sort-dropdown-container">
+            <button id="filter-found-btn" class="layout-toggle" title="Filter results by category, source, environment, conflict, ignore state, and more">${filterIcon}</button>
+            <div id="filter-found-dropdown" class="sort-dropdown filter-dropdown">
+              <div class="sort-option has-submenu" title="Filter by Modrinth category tag(s)">
+                Categories <span class="submenu-arrow">▶</span>
+                <div class="sort-submenu" data-dynamic-categories="true">
                   <div class="sort-option" data-sort="category" data-filter="adventure">Adventure</div>
                   <div class="sort-option" data-sort="category" data-filter="cursed">Cursed</div>
                   <div class="sort-option" data-sort="category" data-filter="decoration">Decoration</div>
@@ -8352,49 +8533,44 @@
                   <div class="sort-option" data-sort="category" data-filter="worldgen">Worldgen</div>
                 </div>
               </div>
-              <div class="sort-option has-submenu">
-                Name <span class="submenu-arrow">▶</span>
-                <div class="sort-submenu">
-                  <div class="sort-option" data-sort="name" data-direction="false">A-Z</div>
-                  <div class="sort-option" data-sort="name" data-direction="true">Z-A</div>
-                </div>
-              </div>
-              <div class="sort-option has-submenu">
-                Downloads <span class="submenu-arrow">▶</span>
-                <div class="sort-submenu">
-                  <div class="sort-option" data-sort="downloads" data-direction="false">High to Low</div>
-                  <div class="sort-option" data-sort="downloads" data-direction="true">Low to High</div>
-                </div>
-              </div>
-              <div class="sort-option has-submenu">
-                Followers <span class="submenu-arrow">▶</span>
-                <div class="sort-submenu">
-                  <div class="sort-option" data-sort="followers" data-direction="false">High to Low</div>
-                  <div class="sort-option" data-sort="followers" data-direction="true">Low to High</div>
-                </div>
-              </div>
-              <div class="sort-option has-submenu">
-                Last Updated <span class="submenu-arrow">▶</span>
-                <div class="sort-submenu">
-                  <div class="sort-option" data-sort="updated" data-direction="false">Newest First</div>
-                  <div class="sort-option" data-sort="updated" data-direction="true">Oldest First</div>
-                </div>
-              </div>
-              <div class="sort-option has-submenu">
-                Environments <span class="submenu-arrow">▶</span>
-                <div class="sort-submenu">
-                  <div class="sort-option" data-sort="clientserver" data-filter="client">Client Only</div>
-                  <div class="sort-option" data-sort="clientserver" data-filter="server">Server Only</div>
-                  <div class="sort-option" data-sort="clientserver" data-filter="both_required">Client &amp; Server</div>
-                  <div class="sort-option" data-sort="clientserver" data-filter="both_optional">Client or Server</div>
-                </div>
-              </div>
-              <div class="sort-option has-submenu">
+              <div class="sort-option has-submenu" title="Filter by the release channel of the currently-selected version">
                 Channels <span class="submenu-arrow">▶</span>
                 <div class="sort-submenu">
-                  <div class="sort-option" data-sort="channel" data-filter="release">Release</div>
-                  <div class="sort-option" data-sort="channel" data-filter="beta">Beta</div>
-                  <div class="sort-option" data-sort="channel" data-filter="alpha">Alpha</div>
+                  <div class="sort-option" data-sort="channel" data-filter="release" title="Stable release builds">Release</div>
+                  <div class="sort-option" data-sort="channel" data-filter="beta" title="Beta / pre-release builds">Beta</div>
+                  <div class="sort-option" data-sort="channel" data-filter="alpha" title="Early experimental builds">Alpha</div>
+                </div>
+              </div>
+              <div class="sort-option has-submenu" title="Filter by whether the mod conflicts with another mod in the list">
+                Conflicts <span class="submenu-arrow">▶</span>
+                <div class="sort-submenu">
+                  <div class="sort-option" data-sort="conflict_status" data-filter="has_conflict" title="Mods that conflict with another selected mod">Has Conflict</div>
+                  <div class="sort-option" data-sort="conflict_status" data-filter="no_conflict" title="Mods that have no detected conflicts">No Conflict</div>
+                </div>
+              </div>
+              <div class="sort-option has-submenu">
+                Dependencies <span class="submenu-arrow">▶</span>
+                <div class="sort-submenu">
+                  <div class="sort-option" data-sort="dependency_status" data-filter="has_required_deps" title="Mods that require at least one other mod">Has Required</div>
+                  <div class="sort-option" data-sort="dependency_status" data-filter="has_optional_deps" title="Mods that list at least one optional dependency">Has Optional</div>
+                  <div class="sort-option" data-sort="dependency_status" data-filter="standalone" title="Mods with no required or optional dependencies">Standalone</div>
+                  <div class="sort-option" data-sort="dependency_status" data-filter="is_dependency" title="Mods that were added because another mod requires them">Is Dependency</div>
+                </div>
+              </div>
+              <div class="sort-option has-submenu" title="Filter by which side(s) of Minecraft the mod runs on">
+                Environments <span class="submenu-arrow">▶</span>
+                <div class="sort-submenu">
+                  <div class="sort-option" data-sort="clientserver" data-filter="client" title="Runs only on the player's client (singleplayer or client-side multiplayer)">Client Only</div>
+                  <div class="sort-option" data-sort="clientserver" data-filter="server" title="Runs only on the server">Server Only</div>
+                  <div class="sort-option" data-sort="clientserver" data-filter="both_required" title="Required on both client and server to function">Client &amp; Server</div>
+                  <div class="sort-option" data-sort="clientserver" data-filter="both_optional" title="Works on either side; not required on both">Client or Server</div>
+                </div>
+              </div>
+              <div class="sort-option has-submenu" title="Filter by whether you've toggled the mod's ignore state">
+                Ignored <span class="submenu-arrow">▶</span>
+                <div class="sort-submenu">
+                  <div class="sort-option" data-sort="ignore_status" data-filter="ignored" title="Mods you've ignored (skipped from downloads)">Ignored</div>
+                  <div class="sort-option" data-sort="ignore_status" data-filter="active" title="Mods that are still active (not ignored)">Active</div>
                 </div>
               </div>
               <div class="sort-option has-submenu">
@@ -8408,21 +8584,22 @@
                   <div class="sort-option" data-sort="project_type" data-filter="plugin">Plugins</div>
                 </div>
               </div>
-              <div class="sort-option has-submenu">
-                Dependencies <span class="submenu-arrow">▶</span>
+              <div class="sort-option has-submenu" title="Filter by how the mod was added to the list">
+                Source <span class="submenu-arrow">▶</span>
                 <div class="sort-submenu">
-                  <div class="sort-option" data-sort="dependency_status" data-filter="has_dependencies">Requires Mods</div>
-                  <div class="sort-option" data-sort="dependency_status" data-filter="no_dependencies">Standalone</div>
-                  <div class="sort-option" data-sort="dependency_status" data-filter="is_dependency">Is Dependency</div>
+                  <div class="sort-option" data-sort="source" data-filter="upload" title="Anything you dropped into the upload area (.jar, .zip, .mrpack, including mods extracted from a .mrpack manifest)">Manual Upload</div>
+                  <div class="sort-option" data-sort="source" data-filter="search" title="Mods you added via the search modal">Search</div>
+                  <div class="sort-option" data-sort="source" data-filter="dependency" title="Mods automatically added because another mod requires them">Dependency</div>
                 </div>
               </div>
               <div class="sort-option has-submenu">
                 Updates <span class="submenu-arrow">▶</span>
                 <div class="sort-submenu">
-                  <div class="sort-option" data-sort="update_status" data-filter="updated">Updated</div>
-                  <div class="sort-option" data-sort="update_status" data-filter="available">Available</div>
+                  <div class="sort-option" data-sort="update_status" data-filter="updated" title="Mods that are already on the latest compatible version">Up-to-Date</div>
+                  <div class="sort-option" data-sort="update_status" data-filter="available" title="Mods that have a newer version available than what you uploaded">Update Available</div>
                 </div>
               </div>
+              <div class="sort-clear-filters" data-action="clear-filters" title="Remove all active filters">Clear Filters</div>
             </div>
           </div>
           <button id="copy-found-btn" class="layout-toggle" title="Copy list of successful mod names to clipboard">${copyIcon}</button>
@@ -8448,17 +8625,50 @@
         <h2 id="header-warning">Not Compatible</h2>
         <div class="header-buttons">
           <div class="search-box-wrapper" style="position: relative; margin-right: 0.5rem;">
-            <input type="text" id="search-warning" class="search-box" placeholder="Filter mods..." title="Filter incompatible results by mod name">
+            <input type="text" id="search-warning" class="search-box" placeholder="Search mods..." title="Search incompatible results by mod name">
             <button class="search-clear-btn" id="search-warning-clear" title="Clear filter" style="display: none;">×</button>
           </div>
           <button id="bulk-actions-mode-warning-btn" class="layout-toggle header-button" title="Toggle bulk actions mode - manage multiple incompatible mods at once">${checkboxIcon}</button>
           <div class="sort-dropdown-container">
-            <button id="sort-warning-btn" class="layout-toggle" title="Sort and filter incompatible mods by name, downloads, or followers">${sortIcon}</button>
+            <button id="sort-warning-btn" class="layout-toggle" title="Sort incompatible mods by name, downloads, followers, or last updated">${sortIcon}</button>
             <div id="sort-warning-dropdown" class="sort-dropdown">
-              <div class="sort-option active" data-sort="default">Default</div>
               <div class="sort-option has-submenu">
-                Categories <span class="submenu-arrow">▶</span>
+                Downloads <span class="submenu-arrow">▶</span>
                 <div class="sort-submenu">
+                  <div class="sort-option" data-sort="downloads" data-direction="false">High to Low</div>
+                  <div class="sort-option" data-sort="downloads" data-direction="true">Low to High</div>
+                </div>
+              </div>
+              <div class="sort-option has-submenu">
+                Followers <span class="submenu-arrow">▶</span>
+                <div class="sort-submenu">
+                  <div class="sort-option" data-sort="followers" data-direction="false">High to Low</div>
+                  <div class="sort-option" data-sort="followers" data-direction="true">Low to High</div>
+                </div>
+              </div>
+              <div class="sort-option has-submenu">
+                Last Updated <span class="submenu-arrow">▶</span>
+                <div class="sort-submenu">
+                  <div class="sort-option" data-sort="updated" data-direction="false">Newest First</div>
+                  <div class="sort-option" data-sort="updated" data-direction="true">Oldest First</div>
+                </div>
+              </div>
+              <div class="sort-option has-submenu">
+                Name <span class="submenu-arrow">▶</span>
+                <div class="sort-submenu">
+                  <div class="sort-option" data-sort="name" data-direction="false">A-Z</div>
+                  <div class="sort-option" data-sort="name" data-direction="true">Z-A</div>
+                </div>
+              </div>
+              <div class="sort-clear-filters disabled" data-action="clear-sort" title="Restore default ordering">Clear Sort</div>
+            </div>
+          </div>
+          <div class="sort-dropdown-container">
+            <button id="filter-warning-btn" class="layout-toggle" title="Filter incompatible mods by category, source, environment, supported loader, or project type">${filterIcon}</button>
+            <div id="filter-warning-dropdown" class="sort-dropdown filter-dropdown">
+              <div class="sort-option has-submenu" title="Filter by Modrinth category tag(s)">
+                Categories <span class="submenu-arrow">▶</span>
+                <div class="sort-submenu" data-dynamic-categories="true">
                   <div class="sort-option" data-sort="category" data-filter="adventure">Adventure</div>
                   <div class="sort-option" data-sort="category" data-filter="cursed">Cursed</div>
                   <div class="sort-option" data-sort="category" data-filter="decoration">Decoration</div>
@@ -8480,37 +8690,16 @@
                   <div class="sort-option" data-sort="category" data-filter="worldgen">Worldgen</div>
                 </div>
               </div>
-              <div class="sort-option has-submenu">
-                Name <span class="submenu-arrow">▶</span>
-                <div class="sort-submenu">
-                  <div class="sort-option" data-sort="name" data-direction="false">A-Z</div>
-                  <div class="sort-option" data-sort="name" data-direction="true">Z-A</div>
-                </div>
-              </div>
-              <div class="sort-option has-submenu">
-                Downloads <span class="submenu-arrow">▶</span>
-                <div class="sort-submenu">
-                  <div class="sort-option" data-sort="downloads" data-direction="false">High to Low</div>
-                  <div class="sort-option" data-sort="downloads" data-direction="true">Low to High</div>
-                </div>
-              </div>
-              <div class="sort-option has-submenu">
-                Followers <span class="submenu-arrow">▶</span>
-                <div class="sort-submenu">
-                  <div class="sort-option" data-sort="followers" data-direction="false">High to Low</div>
-                  <div class="sort-option" data-sort="followers" data-direction="true">Low to High</div>
-                </div>
-              </div>
-              <div class="sort-option has-submenu">
+              <div class="sort-option has-submenu" title="Filter by which side(s) of Minecraft the mod runs on">
                 Environments <span class="submenu-arrow">▶</span>
                 <div class="sort-submenu">
-                  <div class="sort-option" data-sort="clientserver" data-filter="client">Client Only</div>
-                  <div class="sort-option" data-sort="clientserver" data-filter="server">Server Only</div>
-                  <div class="sort-option" data-sort="clientserver" data-filter="both_required">Client &amp; Server</div>
-                  <div class="sort-option" data-sort="clientserver" data-filter="both_optional">Client or Server</div>
+                  <div class="sort-option" data-sort="clientserver" data-filter="client" title="Runs only on the player's client (singleplayer or client-side multiplayer)">Client Only</div>
+                  <div class="sort-option" data-sort="clientserver" data-filter="server" title="Runs only on the server">Server Only</div>
+                  <div class="sort-option" data-sort="clientserver" data-filter="both_required" title="Required on both client and server to function">Client &amp; Server</div>
+                  <div class="sort-option" data-sort="clientserver" data-filter="both_optional" title="Works on either side; not required on both">Client or Server</div>
                 </div>
               </div>
-              <div class="sort-option has-submenu">
+              <div class="sort-option has-submenu" title="Filter by which mod loader(s) the mod supports">
                 Loaders <span class="submenu-arrow">▶</span>
                 <div class="sort-submenu">
                   <div class="sort-option" data-sort="supported_loader" data-filter="fabric">Fabric</div>
@@ -8530,6 +8719,15 @@
                   <div class="sort-option" data-sort="project_type" data-filter="plugin">Plugins</div>
                 </div>
               </div>
+              <div class="sort-option has-submenu" title="Filter by how the mod was added to the list">
+                Source <span class="submenu-arrow">▶</span>
+                <div class="sort-submenu">
+                  <div class="sort-option" data-sort="source" data-filter="upload" title="Anything you dropped into the upload area (.jar, .zip, .mrpack, including mods extracted from a .mrpack manifest)">Manual Upload</div>
+                  <div class="sort-option" data-sort="source" data-filter="search" title="Mods you added via the search modal">Search</div>
+                  <div class="sort-option" data-sort="source" data-filter="dependency" title="Mods automatically added because another mod requires them">Dependency</div>
+                </div>
+              </div>
+              <div class="sort-clear-filters" data-action="clear-filters" title="Remove all active filters">Clear Filters</div>
             </div>
           </div>
           <button id="copy-warning-btn" class="layout-toggle" title="Copy list of incompatible mod names to clipboard">${copyIcon}</button>
@@ -8555,10 +8753,23 @@
         <h2 id="header-failure">Could Not Find Mod</h2>
         <div class="header-buttons">
           <div class="search-box-wrapper" style="position: relative; margin-right: 0.5rem;">
-            <input type="text" id="search-failure" class="search-box" placeholder="Filter mods..." title="Filter not-found results by mod name">
+            <input type="text" id="search-failure" class="search-box" placeholder="Search mods..." title="Search not-found results by mod name">
             <button class="search-clear-btn" id="search-failure-clear" title="Clear filter" style="display: none;">×</button>
           </div>
           <button id="bulk-actions-mode-failure-btn" class="layout-toggle header-button" title="Toggle bulk actions mode - manage multiple not-found mods at once">${checkboxIcon}</button>
+          <div class="sort-dropdown-container">
+            <button id="sort-failure-btn" class="layout-toggle" title="Sort not-found mods by name">${sortIcon}</button>
+            <div id="sort-failure-dropdown" class="sort-dropdown">
+              <div class="sort-option has-submenu">
+                Name <span class="submenu-arrow">▶</span>
+                <div class="sort-submenu">
+                  <div class="sort-option" data-sort="name" data-direction="false">A-Z</div>
+                  <div class="sort-option" data-sort="name" data-direction="true">Z-A</div>
+                </div>
+              </div>
+              <div class="sort-clear-filters disabled" data-action="clear-sort" title="Restore default ordering">Clear Sort</div>
+            </div>
+          </div>
           <button id="copy-failure-btn" class="layout-toggle" title="Copy list of not-found mod names to clipboard">${copyIcon}</button>
         </div>
       </div>
@@ -8847,7 +9058,10 @@
               }
             }
           });
-          
+          // Re-evaluate the Ignored filter if it's active so newly-ignored
+          // mods drop out of "Active" view (or come into "Ignored" view).
+          if (typeof applyAllFiltersToSection === 'function') applyAllFiltersToSection('#results-found');
+
           // Clear selection after ignoring
           window.selectedModsForBulk.clear();
           window.lastClickedModIndex = null; // Reset shift+click tracking
@@ -8876,6 +9090,7 @@
                     }
                   }
                 });
+                if (typeof applyAllFiltersToSection === 'function') applyAllFiltersToSection('#results-found');
                 if (typeof window.updateDownloadAllCount === 'function') window.updateDownloadAllCount();
               },
             });
@@ -8906,7 +9121,8 @@
               }
             }
           });
-          
+          if (typeof applyAllFiltersToSection === 'function') applyAllFiltersToSection('#results-found');
+
           // Clear selection after unignoring
           window.selectedModsForBulk.clear();
           window.lastClickedModIndex = null; // Reset shift+click tracking
@@ -8936,6 +9152,7 @@
                     }
                   }
                 });
+                if (typeof applyAllFiltersToSection === 'function') applyAllFiltersToSection('#results-found');
                 if (typeof window.updateDownloadAllCount === 'function') window.updateDownloadAllCount();
               },
             });
@@ -9488,31 +9705,15 @@
       const searchWarningInput = document.getElementById("search-warning");
 
       // Function to filter cards based on search term
+      // The text-search box just stores the new term on sectionState; visibility
+      // is then recomputed via applyAllFiltersToSection so search + dropdown
+      // filters compose instead of stomping on each other.
       function filterCards(searchTerm, sectionSelector) {
-        const cards = document.querySelectorAll(`${sectionSelector} .result-card`);
-        const lowerSearchTerm = searchTerm.toLowerCase();
-
-        cards.forEach(card => {
-          const titleElement = card.querySelector(".mod-title a");
-          const title = titleElement ? titleElement.textContent.toLowerCase() : "";
-
-          if (title.includes(lowerSearchTerm)) {
-            card.style.display = "";
-          } else {
-            card.style.display = "none";
-          }
-        });
-
-        if (sectionSelector === "#results-found") {
-          updateFoundSectionActionVisibility();
-        } else if (sectionSelector === "#results-warning") {
-          updateWarningSectionFilterVisibility();
-        } else if (sectionSelector === "#results-failure") {
-          updateFailureSectionFilterVisibility();
+        if (sectionState && sectionState[sectionSelector]) {
+          sectionState[sectionSelector].searchTerm = searchTerm || '';
         }
-        // Keep per-section bulk selection counts in sync when filtering hides cards.
-        if (typeof window.updateExtraBulkSelectionCounts === 'function') {
-          window.updateExtraBulkSelectionCounts();
+        if (typeof applyAllFiltersToSection === 'function') {
+          applyAllFiltersToSection(sectionSelector);
         }
       }
 
@@ -9580,138 +9781,404 @@
 
       const sortFoundBtn = document.getElementById("sort-found-btn");
       const sortFoundDropdown = document.getElementById("sort-found-dropdown");
+      const filterFoundBtn = document.getElementById("filter-found-btn");
+      const filterFoundDropdown = document.getElementById("filter-found-dropdown");
       const sortWarningBtn = document.getElementById("sort-warning-btn");
       const sortWarningDropdown = document.getElementById("sort-warning-dropdown");
+      const filterWarningBtn = document.getElementById("filter-warning-btn");
+      const filterWarningDropdown = document.getElementById("filter-warning-dropdown");
+      const sortFailureBtn = document.getElementById("sort-failure-btn");
+      const sortFailureDropdown = document.getElementById("sort-failure-dropdown");
 
-      let currentFoundSort = 'default';
-      let currentWarningSort = 'default';
-      let foundSortDirection = {}; // Track sort direction for each sort type
-      let warningSortDirection = {}; // Track sort direction for each sort type
+      const ALL_SORT_DROPDOWNS = [sortFoundDropdown, sortWarningDropdown, sortFailureDropdown];
+      const ALL_FILTER_DROPDOWNS = [filterFoundDropdown, filterWarningDropdown];
+      const ALL_DROPDOWNS = [...ALL_SORT_DROPDOWNS, ...ALL_FILTER_DROPDOWNS].filter(Boolean);
 
-      function updateSortButtonActiveStates() {
-        if (sortFoundBtn) {
-          sortFoundBtn.classList.toggle('active', currentFoundSort !== 'default');
+      // Inject an active-filter chip bar below each section's header so chips can
+      // appear when filters are toggled. Stored inside the section so a section
+      // reset (resetSortStates / clearResults) clears them along with the cards.
+      function ensureActiveFiltersBar(sectionSelector) {
+        const section = document.querySelector(sectionSelector);
+        if (!section) return null;
+        let bar = section.querySelector(':scope > .active-filters-bar');
+        if (!bar) {
+          bar = document.createElement('div');
+          bar.className = 'active-filters-bar';
+          const header = section.querySelector(':scope > .results-header-container');
+          if (header && header.nextSibling) section.insertBefore(bar, header.nextSibling);
+          else section.appendChild(bar);
         }
-        if (sortWarningBtn) {
-          sortWarningBtn.classList.toggle('active', currentWarningSort !== 'default');
+        return bar;
+      }
+      ensureActiveFiltersBar('#results-found');
+      ensureActiveFiltersBar('#results-warning');
+      ensureActiveFiltersBar('#results-failure');
+
+      // Per-section sort + filter state. Filters are stored as Map<filterType,
+      // Set<filterValue>>; a card must match at least one value in every active
+      // filterType (AND across types, OR within a type) to remain visible.
+      const sectionState = {
+        '#results-found':   { sort: { type: 'default', reversed: false }, filters: new Map(), searchTerm: '' },
+        '#results-warning': { sort: { type: 'default', reversed: false }, filters: new Map(), searchTerm: '' },
+        '#results-failure': { sort: { type: 'default', reversed: false }, filters: new Map(), searchTerm: '' },
+      };
+
+      function getSectionSortDropdown(sectionSelector) {
+        if (sectionSelector === '#results-found') return sortFoundDropdown;
+        if (sectionSelector === '#results-warning') return sortWarningDropdown;
+        if (sectionSelector === '#results-failure') return sortFailureDropdown;
+        return null;
+      }
+
+      function getSectionFilterDropdown(sectionSelector) {
+        if (sectionSelector === '#results-found') return filterFoundDropdown;
+        if (sectionSelector === '#results-warning') return filterWarningDropdown;
+        return null;
+      }
+
+      function getSectionSortButton(sectionSelector) {
+        if (sectionSelector === '#results-found') return sortFoundBtn;
+        if (sectionSelector === '#results-warning') return sortWarningBtn;
+        if (sectionSelector === '#results-failure') return sortFailureBtn;
+        return null;
+      }
+
+      function getSectionFilterButton(sectionSelector) {
+        if (sectionSelector === '#results-found') return filterFoundBtn;
+        if (sectionSelector === '#results-warning') return filterWarningBtn;
+        return null;
+      }
+
+      function extractFilterValuesForType(card, type) {
+        switch (type) {
+          case 'clientserver': return [extractClientServer(card)];
+          case 'channel': return [extractChannel(card)];
+          case 'category': return extractCategories(card);
+          case 'project_type': return [extractProjectType(card)];
+          case 'supported_loader': return extractSupportedLoaders(card);
+          case 'dependency_status': return extractDependencyStatus(card);
+          case 'update_status': return [extractUpdateStatus(card)];
+          case 'source': return [extractSource(card)];
+          case 'conflict_status': return [extractConflictStatus(card)];
+          case 'ignore_status': return [extractIgnoreStatus(card)];
+          default: return [];
         }
       }
 
-      // Toggle dropdown visibility
-      function toggleSortDropdown(dropdown, otherDropdown) {
-        dropdown.classList.toggle('show');
-        otherDropdown.classList.remove('show'); // Close other dropdown
+      function applyAllFiltersToSection(sectionSelector) {
+        const state = sectionState[sectionSelector];
+        const section = document.querySelector(sectionSelector);
+        if (!section) return;
+        const cards = section.querySelectorAll('.result-card');
+        const term = (state.searchTerm || '').toLowerCase();
+        cards.forEach(card => {
+          let visible = true;
+          // Dropdown filter pass: must match every active filterType.
+          for (const [type, valueSet] of state.filters) {
+            const cardValues = extractFilterValuesForType(card, type) || [];
+            const matches = cardValues.some(v => valueSet.has(v));
+            if (!matches) { visible = false; break; }
+          }
+          // Text-search pass (combined with dropdown filters via AND).
+          if (visible && term) {
+            const titleEl = card.querySelector('.mod-title a');
+            const title = titleEl ? titleEl.textContent.toLowerCase() : '';
+            if (!title.includes(term)) visible = false;
+          }
+          card.style.display = visible ? '' : 'none';
+        });
+
+        if (sectionSelector === "#results-found") {
+          updateFoundSectionActionVisibility();
+        } else if (sectionSelector === "#results-warning") {
+          updateWarningSectionFilterVisibility();
+        } else if (sectionSelector === "#results-failure") {
+          updateFailureSectionFilterVisibility();
+        }
+        if (typeof window.updateExtraBulkSelectionCounts === 'function') {
+          window.updateExtraBulkSelectionCounts();
+        }
+        refreshSectionFilterUI(sectionSelector);
+      }
+
+      function toggleFilterForSection(sectionSelector, type, value) {
+        const state = sectionState[sectionSelector];
+        if (!state.filters.has(type)) state.filters.set(type, new Set());
+        const set = state.filters.get(type);
+        if (set.has(value)) set.delete(value);
+        else set.add(value);
+        if (set.size === 0) state.filters.delete(type);
+        applyAllFiltersToSection(sectionSelector);
+      }
+
+      function clearAllFiltersForSection(sectionSelector) {
+        sectionState[sectionSelector].filters.clear();
+        applyAllFiltersToSection(sectionSelector);
+      }
+
+      // Expose so renderSingleResult (top-level) can re-apply visibility after
+      // appending new cards, keeping freshly added cards in sync with active
+      // dropdown filters and the text search box.
+      window.applyAllFiltersToSection = applyAllFiltersToSection;
+
+      function applySortToSection(sectionSelector, sortType, reversed) {
+        sectionState[sectionSelector].sort = { type: sortType, reversed };
+        if (sortType === 'default') {
+          restoreOriginalOrder(sectionSelector);
+        } else {
+          applySorting(sectionSelector, sortType, reversed);
+        }
+        refreshSectionFilterUI(sectionSelector);
+      }
+
+      // Highlight active sort/filter rows in their respective dropdowns, sync
+      // the sort + filter button "active" states, and (re)render the chip bar.
+      function refreshSectionFilterUI(sectionSelector) {
+        const state = sectionState[sectionSelector];
+        const sortDropdown = getSectionSortDropdown(sectionSelector);
+        const filterDropdown = getSectionFilterDropdown(sectionSelector);
+
+        if (sortDropdown) {
+          sortDropdown.querySelectorAll('.sort-option').forEach(o => o.classList.remove('active'));
+          const sortActive = state.sort.type !== 'default';
+          if (sortActive) {
+            const reversedAttr = String(state.sort.reversed);
+            const sortOpt = sortDropdown.querySelector(
+              `[data-sort="${state.sort.type}"][data-direction="${reversedAttr}"]`
+            );
+            if (sortOpt) {
+              sortOpt.classList.add('active');
+              sortOpt.closest('.sort-option.has-submenu')?.classList.add('active');
+            }
+          }
+          const clearSortBtn = sortDropdown.querySelector('.sort-clear-filters[data-action="clear-sort"]');
+          if (clearSortBtn) clearSortBtn.classList.toggle('disabled', !sortActive);
+        }
+
+        if (filterDropdown) {
+          filterDropdown.querySelectorAll('.sort-option').forEach(o => o.classList.remove('active'));
+          for (const [type, valueSet] of state.filters) {
+            for (const v of valueSet) {
+              const opt = filterDropdown.querySelector(
+                `[data-sort="${type}"][data-filter="${CSS.escape(v)}"]`
+              );
+              if (opt) {
+                opt.classList.add('active');
+                opt.closest('.sort-option.has-submenu')?.classList.add('active');
+              }
+            }
+          }
+          const clearBtn = filterDropdown.querySelector('.sort-clear-filters');
+          if (clearBtn) clearBtn.classList.toggle('disabled', state.filters.size === 0);
+        }
+
+        const sortBtn = getSectionSortButton(sectionSelector);
+        if (sortBtn) sortBtn.classList.toggle('active', state.sort.type !== 'default');
+        const filterBtn = getSectionFilterButton(sectionSelector);
+        if (filterBtn) filterBtn.classList.toggle('active', state.filters.size > 0);
+
+        renderActiveFilterChips(sectionSelector);
+      }
+
+      function renderActiveFilterChips(sectionSelector) {
+        const sectionEl = document.querySelector(sectionSelector);
+        if (!sectionEl) return;
+        const bar = sectionEl.querySelector(':scope > .active-filters-bar');
+        if (!bar) return;
+        const state = sectionState[sectionSelector];
+        const filterDropdown = getSectionFilterDropdown(sectionSelector);
+        bar.innerHTML = '';
+        if (state.filters.size === 0) {
+          bar.classList.remove('visible');
+          return;
+        }
+
+        const label = document.createElement('span');
+        label.className = 'active-filters-label';
+        label.textContent = 'Filters:';
+        bar.appendChild(label);
+
+        for (const [type, valueSet] of state.filters) {
+          for (const v of valueSet) {
+            const chip = document.createElement('span');
+            chip.className = 'active-filter-chip';
+            let labelText = v;
+            if (filterDropdown) {
+              const opt = filterDropdown.querySelector(
+                `[data-sort="${type}"][data-filter="${CSS.escape(v)}"]`
+              );
+              if (opt) labelText = opt.textContent.trim();
+            }
+            const labelSpan = document.createElement('span');
+            labelSpan.textContent = labelText;
+            const x = document.createElement('span');
+            x.className = 'chip-x';
+            x.textContent = '×';
+            chip.appendChild(labelSpan);
+            chip.appendChild(x);
+            chip.title = 'Click to remove this filter';
+            chip.addEventListener('click', () => toggleFilterForSection(sectionSelector, type, v));
+            bar.appendChild(chip);
+          }
+        }
+
+        const clearAll = document.createElement('span');
+        clearAll.className = 'active-filters-clear-all';
+        clearAll.textContent = 'Clear all';
+        clearAll.addEventListener('click', () => clearAllFiltersForSection(sectionSelector));
+        bar.appendChild(clearAll);
+
+        bar.classList.add('visible');
+      }
+
+      function updateSortButtonActiveStates() {
+        ['#results-found', '#results-warning', '#results-failure'].forEach(refreshSectionFilterUI);
+      }
+
+      // Capture the original Categories list once so dynamic rebuilds can
+      // preserve the canonical order and display labels.
+      const originalCategoryOptions = (() => {
+        const list = [];
+        const seen = new Set();
+        document.querySelectorAll('.sort-submenu[data-dynamic-categories="true"] > [data-sort="category"]').forEach(opt => {
+          const value = opt.dataset.filter;
+          const label = opt.textContent.trim();
+          if (value && !seen.has(value)) {
+            seen.add(value);
+            list.push({ value, label });
+          }
+        });
+        return list;
+      })();
+
+      // Rebuild the Categories submenu for a section to only show categories
+      // that at least one card actually has. Hide the Categories parent row
+      // entirely when nothing in the section has any categories.
+      function refreshDynamicCategoriesForSection(sectionSelector) {
+        const sectionEl = document.querySelector(sectionSelector);
+        const filterDropdown = getSectionFilterDropdown(sectionSelector);
+        if (!sectionEl || !filterDropdown) return;
+        const submenu = filterDropdown.querySelector('.sort-submenu[data-dynamic-categories="true"]');
+        if (!submenu) return;
+        const parentRow = submenu.closest('.sort-option.has-submenu');
+
+        const present = new Set();
+        sectionEl.querySelectorAll('.result-card').forEach(card => {
+          extractCategories(card).forEach(c => present.add(c));
+        });
+
+        const state = sectionState[sectionSelector];
+        const stillActive = state.filters.get('category');
+        if (stillActive) {
+          for (const v of Array.from(stillActive)) {
+            if (!present.has(v)) stillActive.delete(v);
+          }
+          if (stillActive.size === 0) state.filters.delete('category');
+        }
+
+        submenu.innerHTML = '';
+        for (const { value, label } of originalCategoryOptions) {
+          if (!present.has(value)) continue;
+          const opt = document.createElement('div');
+          opt.className = 'sort-option';
+          opt.dataset.sort = 'category';
+          opt.dataset.filter = value;
+          opt.textContent = label;
+          submenu.appendChild(opt);
+        }
+
+        if (parentRow) {
+          parentRow.style.display = submenu.children.length === 0 ? 'none' : '';
+        }
+      }
+
+      // Show one dropdown, hiding any others. Also refreshes dynamic content.
+      function openDropdownExclusive(targetDropdown) {
+        const willShow = !targetDropdown.classList.contains('show');
+        ALL_DROPDOWNS.forEach(d => { if (d !== targetDropdown) d.classList.remove('show'); });
+        if (willShow) {
+          if (targetDropdown === filterFoundDropdown) {
+            refreshDynamicCategoriesForSection('#results-found');
+            refreshSectionFilterUI('#results-found');
+          } else if (targetDropdown === filterWarningDropdown) {
+            refreshDynamicCategoriesForSection('#results-warning');
+            refreshSectionFilterUI('#results-warning');
+          }
+        }
+        targetDropdown.classList.toggle('show', willShow);
       }
 
       // Register one-time global click handler to close sort dropdowns when clicking outside.
       registerGlobalSortDropdownCloser();
 
-      // Sort button click handlers
-      sortFoundBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        toggleSortDropdown(sortFoundDropdown, sortWarningDropdown);
-      });
-
-      sortWarningBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        toggleSortDropdown(sortWarningDropdown, sortFoundDropdown);
-      });
-
-      // Sort option selection handlers
-      sortFoundDropdown.addEventListener('click', (e) => {
-        if (e.target.classList.contains('sort-option') && e.target.dataset.sort) {
-          const sortType = e.target.dataset.sort;
-
-          // First clear any existing filters when switching options
-          clearFilters('#results-found');
-
-          if (sortType === 'default') {
-            // Default order - just clear everything and show all cards
-            selectSortOption(sortFoundDropdown, 'default');
-            currentFoundSort = 'default';
-            clearFilters('#results-found');
-            restoreOriginalOrder('#results-found');
-          } else if (e.target.dataset.filter) {
-            // This is a filter option
-            const filterValue = e.target.dataset.filter;
-            selectSortOption(sortFoundDropdown, sortType, false, e.target.textContent, filterValue);
-            currentFoundSort = sortType;
-            applyFiltering('#results-found', sortType, filterValue);
-          } else if (e.target.dataset.direction !== undefined) {
-            // This is a sorting option
-            const isReversed = e.target.dataset.direction === 'true';
-            foundSortDirection[sortType] = isReversed;
-            selectSortOption(sortFoundDropdown, sortType, isReversed, e.target.textContent);
-            currentFoundSort = sortType;
-            applySorting('#results-found', sortType, isReversed);
-          }
-
-          updateSortButtonActiveStates();
-          sortFoundDropdown.classList.remove('show');
-        }
-      });
-
-      sortWarningDropdown.addEventListener('click', (e) => {
-        if (e.target.classList.contains('sort-option') && e.target.dataset.sort) {
-          const sortType = e.target.dataset.sort;
-
-          // First clear any existing filters when switching options
-          clearFilters('#results-warning');
-
-          if (sortType === 'default') {
-            // Default order - just clear everything and show all cards
-            selectSortOption(sortWarningDropdown, 'default');
-            currentWarningSort = 'default';
-            clearFilters('#results-warning');
-            restoreOriginalOrder('#results-warning');
-          } else if (e.target.dataset.filter) {
-            // This is a filter option
-            const filterValue = e.target.dataset.filter;
-            selectSortOption(sortWarningDropdown, sortType, false, e.target.textContent, filterValue);
-            currentWarningSort = sortType;
-            applyFiltering('#results-warning', sortType, filterValue);
-          } else if (e.target.dataset.direction !== undefined) {
-            // This is a sorting option
-            const isReversed = e.target.dataset.direction === 'true';
-            warningSortDirection[sortType] = isReversed;
-            selectSortOption(sortWarningDropdown, sortType, isReversed, e.target.textContent);
-            currentWarningSort = sortType;
-            applySorting('#results-warning', sortType, isReversed);
-          }
-
-          updateSortButtonActiveStates();
-          sortWarningDropdown.classList.remove('show');
-        }
-      });
-
-      // Update active sort option
-      function selectSortOption(dropdown, sortType, isReversed = false, optionText = '', filterValue = '') {
-        // Remove active class from all options
-        dropdown.querySelectorAll('.sort-option').forEach(option => {
-          option.classList.remove('active');
+      // Sort/Filter button click handlers
+      function bindToggleButton(btn, dropdown) {
+        if (!btn || !dropdown) return;
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openDropdownExclusive(dropdown);
         });
-
-        if (sortType === 'default') {
-          const defaultOption = dropdown.querySelector('[data-sort="default"]');
-          if (defaultOption) defaultOption.classList.add('active');
-        } else if (filterValue) {
-          // Find the specific filter option that was clicked
-          const targetOption = dropdown.querySelector(`[data-sort="${sortType}"][data-filter="${filterValue}"]`);
-          if (targetOption) targetOption.classList.add('active');
-
-          // Also highlight the root option (the parent menu item)
-          const rootOption = targetOption.closest('.sort-option.has-submenu');
-          if (rootOption) rootOption.classList.add('active');
-        } else {
-          // Find the specific sorting option that was clicked
-          const targetOption = dropdown.querySelector(`[data-sort="${sortType}"][data-direction="${isReversed}"]`);
-          if (targetOption) targetOption.classList.add('active');
-
-          // Also highlight the root option (the parent menu item)
-          const rootOption = targetOption.closest('.sort-option.has-submenu');
-          if (rootOption) rootOption.classList.add('active');
-        }
       }
+      bindToggleButton(sortFoundBtn, sortFoundDropdown);
+      bindToggleButton(filterFoundBtn, filterFoundDropdown);
+      bindToggleButton(sortWarningBtn, sortWarningDropdown);
+      bindToggleButton(filterWarningBtn, filterWarningDropdown);
+      bindToggleButton(sortFailureBtn, sortFailureDropdown);
+
+      // Sort-dropdown click handler: applies a sort or resets to default.
+      function attachSortDropdownHandler(sectionSelector) {
+        const dropdown = getSectionSortDropdown(sectionSelector);
+        if (!dropdown) return;
+        dropdown.addEventListener('click', (e) => {
+          const clearTarget = e.target.closest('.sort-clear-filters[data-action="clear-sort"]');
+          if (clearTarget) {
+            if (clearTarget.classList.contains('disabled')) return;
+            applySortToSection(sectionSelector, 'default', false);
+            dropdown.classList.remove('show');
+            return;
+          }
+
+          const target = e.target.closest('.sort-option');
+          if (!target || !target.dataset.sort) return;
+          if (target.classList.contains('has-submenu')) return;
+
+          const sortType = target.dataset.sort;
+
+          if (target.dataset.direction !== undefined) {
+            const reversed = target.dataset.direction === 'true';
+            applySortToSection(sectionSelector, sortType, reversed);
+            dropdown.classList.remove('show');
+          }
+        });
+      }
+
+      // Filter-dropdown click handler: toggles individual filters and stays open.
+      function attachFilterDropdownHandler(sectionSelector) {
+        const dropdown = getSectionFilterDropdown(sectionSelector);
+        if (!dropdown) return;
+        dropdown.addEventListener('click', (e) => {
+          const clearTarget = e.target.closest('.sort-clear-filters');
+          if (clearTarget) {
+            if (clearTarget.classList.contains('disabled')) return;
+            clearAllFiltersForSection(sectionSelector);
+            return; // keep open
+          }
+
+          const target = e.target.closest('.sort-option');
+          if (!target || !target.dataset.sort) return;
+          if (target.classList.contains('has-submenu')) return;
+          if (target.dataset.filter === undefined) return;
+
+          toggleFilterForSection(sectionSelector, target.dataset.sort, target.dataset.filter);
+          // keep open for multi-select
+        });
+      }
+
+      attachSortDropdownHandler('#results-found');
+      attachSortDropdownHandler('#results-warning');
+      attachSortDropdownHandler('#results-failure');
+      attachFilterDropdownHandler('#results-found');
+      attachFilterDropdownHandler('#results-warning');
 
       // Apply sorting to a section
       function applySorting(sectionSelector, sortType, isReversed = false) {
@@ -9750,6 +10217,11 @@
                 const followersB = extractFollowers(b);
                 return followersB - followersA; // High to low
 
+              case 'file_size':
+                const sizeA = extractFileSize(a);
+                const sizeB = extractFileSize(b);
+                return sizeB - sizeA; // Largest first by default
+
               case 'updated':
                 const dateA = extractDate(a);
                 const dateB = extractDate(b);
@@ -9780,78 +10252,6 @@
         cards.forEach(card => resultsList.appendChild(card));
       }
 
-      // Apply filtering to a section
-      function applyFiltering(sectionSelector, filterType, filterValue) {
-        const section = document.querySelector(sectionSelector);
-        const resultsList = section.querySelector('.results-list');
-        const cards = Array.from(resultsList.querySelectorAll('.result-card'));
-
-        cards.forEach(card => {
-          let shouldShow = true;
-
-          if (filterType === 'clientserver') {
-            const cardSupport = extractClientServer(card);
-            shouldShow = cardSupport === filterValue;
-          } else if (filterType === 'channel') {
-            const cardChannel = extractChannel(card);
-            shouldShow = cardChannel === filterValue;
-          } else if (filterType === 'category') {
-            const cardCategories = extractCategories(card);
-            shouldShow = cardCategories.includes(filterValue);
-          } else if (filterType === 'project_type') {
-            const cardProjectType = extractProjectType(card);
-            shouldShow = cardProjectType === filterValue;
-          } else if (filterType === 'supported_loader') {
-            const cardSupportedLoaders = extractSupportedLoaders(card);
-            shouldShow = cardSupportedLoaders.includes(filterValue);
-          } else if (filterType === 'dependency_status') {
-            const cardDependencyStatus = extractDependencyStatus(card);
-            shouldShow = cardDependencyStatus === filterValue;
-          } else if (filterType === 'update_status') {
-            const cardUpdateStatus = extractUpdateStatus(card);
-            shouldShow = cardUpdateStatus === filterValue;
-          }
-
-          if (shouldShow) {
-            card.style.display = '';
-          } else {
-            card.style.display = 'none';
-          }
-        });
-
-        if (sectionSelector === "#results-found") {
-          updateFoundSectionActionVisibility();
-        } else if (sectionSelector === "#results-warning") {
-          updateWarningSectionFilterVisibility();
-        } else if (sectionSelector === "#results-failure") {
-          updateFailureSectionFilterVisibility();
-        }
-        // Keep per-section bulk selection counts in sync when filtering hides cards.
-        if (typeof window.updateExtraBulkSelectionCounts === 'function') {
-          window.updateExtraBulkSelectionCounts();
-        }
-      }
-
-      // Clear all filters for a section
-      function clearFilters(sectionSelector) {
-        const section = document.querySelector(sectionSelector);
-        const cards = section.querySelectorAll('.result-card');
-        cards.forEach(card => {
-          card.style.display = '';
-        });
-
-        if (sectionSelector === "#results-found") {
-          updateFoundSectionActionVisibility();
-        } else if (sectionSelector === "#results-warning") {
-          updateWarningSectionFilterVisibility();
-        } else if (sectionSelector === "#results-failure") {
-          updateFailureSectionFilterVisibility();
-        }
-        // Keep per-section bulk selection counts in sync when filtering hides cards.
-        if (typeof window.updateExtraBulkSelectionCounts === 'function') {
-          window.updateExtraBulkSelectionCounts();
-        }
-      }
 
       // Restore original order for a section
       function restoreOriginalOrder(sectionSelector) {
@@ -10039,20 +10439,29 @@
       }
 
       function extractDependencyStatus(card) {
-        // Check if this mod is a dependency (has dependency tag)
-        const dependencyTag = card.querySelector('.dependency-tag');
-        if (dependencyTag) {
-          return 'is_dependency';
+        // A card can fall into multiple buckets now: it can both have its own
+        // required/optional deps AND be a dependency of another mod. Return all
+        // applicable statuses so the filter can match any of them.
+        const statuses = [];
+
+        if (card.querySelector('.dependency-tag')) {
+          statuses.push('is_dependency');
         }
 
-        // Check if this mod has dependencies (has dependency chain icon)
-        const dependencyChainIcon = card.querySelector('.dependency-chain-icon');
-        if (dependencyChainIcon) {
-          return 'has_dependencies';
-        }
+        const projectId = card.dataset.projectId;
+        const artifactKey = projectId
+          ? makeArtifactKey(projectId, card.dataset.projectType)
+          : null;
+        const hasRequired = artifactKey && reverseDependencyMap.has(artifactKey)
+          && (reverseDependencyMap.get(artifactKey) || []).length > 0;
+        const hasOptional = artifactKey && optionalDependencyMap.has(artifactKey)
+          && (optionalDependencyMap.get(artifactKey) || []).length > 0;
 
-        // Default to no dependencies
-        return 'no_dependencies';
+        if (hasRequired) statuses.push('has_required_deps');
+        if (hasOptional) statuses.push('has_optional_deps');
+        if (!hasRequired && !hasOptional) statuses.push('standalone');
+
+        return statuses;
       }
 
       function extractUpdateStatus(card) {
@@ -10065,26 +10474,49 @@
         return 'available';
       }
 
-      // Reset sort states when results are cleared
+      function extractSource(card) {
+        return card.dataset.source || 'upload';
+      }
+
+      function extractConflictStatus(card) {
+        return card.querySelector('.conflict-tooltip-container') ? 'has_conflict' : 'no_conflict';
+      }
+
+      function extractIgnoreStatus(card) {
+        return card.classList.contains('ignored') ? 'ignored' : 'active';
+      }
+
+      function extractFileSize(card) {
+        const raw = card.dataset.fileSize;
+        const n = raw ? parseFloat(raw) : NaN;
+        return Number.isFinite(n) ? n : 0;
+      }
+
+      // Reset sort + filter + search-term state for all sections when results
+      // are cleared.
       window.resetSortStates = function () {
-        currentFoundSort = 'default';
-        currentWarningSort = 'default';
-        foundSortDirection = {};
-        warningSortDirection = {};
-
-        // Reset dropdown selections
-        if (sortFoundDropdown) {
-          selectSortOption(sortFoundDropdown, 'default');
+        for (const section of ['#results-found', '#results-warning', '#results-failure']) {
+          const state = sectionState[section];
+          if (state) {
+            state.sort = { type: 'default', reversed: false };
+            state.filters.clear();
+            state.searchTerm = '';
+          }
+          refreshSectionFilterUI(section);
         }
-        if (sortWarningDropdown) {
-          selectSortOption(sortWarningDropdown, 'default');
-        }
-        updateSortButtonActiveStates();
-
-        // Clear any applied filters by showing all cards
         document.querySelectorAll('.result-card').forEach(card => {
           card.style.display = '';
         });
+        // Also blank out the visible search inputs so they don't read out of
+        // sync after the next render.
+        for (const id of ['search-found', 'search-warning', 'search-failure']) {
+          const el = document.getElementById(id);
+          if (el) el.value = '';
+        }
+        for (const id of ['search-found-clear', 'search-warning-clear', 'search-failure-clear']) {
+          const el = document.getElementById(id);
+          if (el) el.style.display = 'none';
+        }
       };
 
       updateSortButtonActiveStates();
@@ -10318,6 +10750,11 @@
         if (section) {
           section.querySelector(".results-list").appendChild(card);
           section.classList.add("visible");
+          // Newly appended cards default to display:'' and would ignore any
+          // active filters/search. Re-evaluate the section so they conform.
+          if (typeof window.applyAllFiltersToSection === 'function') {
+            window.applyAllFiltersToSection('#' + sectionId);
+          }
         }
         // And if it was a new success, we add it to our tracking set.
         if (result.status === "success") {
@@ -10351,8 +10788,25 @@
     }
 
     // --- Dependency Chain Tooltip Helpers ---
-    function hasDependencyChainEntries(projectId) {
-      return reverseDependencyMap.has(projectId) || optionalDependencyMap.has(projectId);
+    // Internal lookups take an artifactKey ("projectId|project_type"); see the
+    // makeArtifactKey docstring near the top of this script for the rationale.
+    function hasDependencyChainEntries(artifactKey) {
+      return reverseDependencyMap.has(artifactKey) || optionalDependencyMap.has(artifactKey);
+    }
+
+    // Resolve an artifact key back to a DOM card. Falls back to data-project-id
+    // alone if data-project-type was never stamped (legacy callsites).
+    function findCardForArtifactKey(artifactKey) {
+      const sep = artifactKey.lastIndexOf('|');
+      const projectId = sep >= 0 ? artifactKey.slice(0, sep) : artifactKey;
+      const projectType = sep >= 0 ? artifactKey.slice(sep + 1) : '';
+      if (projectType) {
+        const exact = document.querySelector(
+          `.result-card[data-project-id="${CSS.escape(projectId)}"][data-project-type="${CSS.escape(projectType)}"]`
+        );
+        if (exact) return exact;
+      }
+      return document.querySelector(`.result-card[data-project-id="${CSS.escape(projectId)}"]`);
     }
 
     // Optional deps aren't auto-resolved like required deps, so their names won't
@@ -10381,13 +10835,13 @@
           }
         }
         // Refresh any cards whose tooltip referenced one of these optional deps.
-        for (const [parentProjectId, ids] of optionalDependencyMap.entries()) {
+        for (const [parentArtifactKey, ids] of optionalDependencyMap.entries()) {
           if (!ids.some(id => unresolved.has(id))) continue;
-          const card = document.querySelector(`.result-card[data-project-id="${CSS.escape(String(parentProjectId))}"]`);
+          const card = findCardForArtifactKey(parentArtifactKey);
           if (!card) continue;
           const chainTooltip = card.querySelector('.dependency-chain-tooltip');
           if (!chainTooltip) continue;
-          chainTooltip.innerHTML = buildDependencyChainTooltipHTML(parentProjectId);
+          chainTooltip.innerHTML = buildDependencyChainTooltipHTML(parentArtifactKey);
         }
       } catch (e) {
         console.warn('Failed to enrich optional dependency names:', e);
@@ -10404,9 +10858,9 @@
       })[ch]);
     }
 
-    function buildDependencyChainTooltipHTML(projectId) {
-      const requiredIds = reverseDependencyMap.get(projectId) || [];
-      const optionalIds = optionalDependencyMap.get(projectId) || [];
+    function buildDependencyChainTooltipHTML(artifactKey) {
+      const requiredIds = reverseDependencyMap.get(artifactKey) || [];
+      const optionalIds = optionalDependencyMap.get(artifactKey) || [];
       const lines = [];
       if (requiredIds.length > 0) {
         const names = requiredIds.map(id => escapeHtmlForTooltip(modIdToNameMap.get(id) || 'Loading...'));
@@ -10420,37 +10874,41 @@
     }
 
     // --- Update Dependency Chain Tooltip ---
-    function updateDependencyChainTooltip(projectId) {
-      const parentIds = dependencyDependents.get(projectId);
-      if (parentIds && parentIds.size > 0) {
-        for (const parentProjectId of parentIds) {
-          const card = document.querySelector(`.result-card[data-project-id="${parentProjectId}"]`);
+    // Called with the project_id of a dependency that just resolved (its title
+    // landed in modIdToNameMap). We refresh the tooltip on every parent card
+    // that listed it.
+    function updateDependencyChainTooltip(depProjectId) {
+      const parentKeys = dependencyDependents.get(depProjectId);
+      if (parentKeys && parentKeys.size > 0) {
+        for (const parentArtifactKey of parentKeys) {
+          if (!hasDependencyChainEntries(parentArtifactKey)) continue;
+          const card = findCardForArtifactKey(parentArtifactKey);
           if (!card) continue;
-
-          if (!hasDependencyChainEntries(parentProjectId)) continue;
-
           const chainTooltip = card.querySelector('.dependency-chain-tooltip');
           if (!chainTooltip) continue;
-
-          chainTooltip.innerHTML = buildDependencyChainTooltipHTML(parentProjectId);
+          chainTooltip.innerHTML = buildDependencyChainTooltipHTML(parentArtifactKey);
         }
         return;
       }
 
-      // Fallback: if we don't have an index yet, scan cards (older path).
+      // Fallback: walk all rendered cards (older path used before the index
+      // was populated). Each card's own artifact key is derived from its data
+      // attributes so a mod + datapack pair don't refresh each other.
       const resultCards = document.querySelectorAll('.result-card');
       resultCards.forEach(card => {
         const cardProjectId = card.dataset.projectId;
-        if (!cardProjectId || !hasDependencyChainEntries(cardProjectId)) return;
+        if (!cardProjectId) return;
+        const cardArtifactKey = makeArtifactKey(cardProjectId, card.dataset.projectType);
+        if (!hasDependencyChainEntries(cardArtifactKey)) return;
 
-        const requiredIds = reverseDependencyMap.get(cardProjectId) || [];
-        const optionalIds = optionalDependencyMap.get(cardProjectId) || [];
-        if (!requiredIds.includes(projectId) && !optionalIds.includes(projectId)) return;
+        const requiredIds = reverseDependencyMap.get(cardArtifactKey) || [];
+        const optionalIds = optionalDependencyMap.get(cardArtifactKey) || [];
+        if (!requiredIds.includes(depProjectId) && !optionalIds.includes(depProjectId)) return;
 
         const chainTooltip = card.querySelector('.dependency-chain-tooltip');
         if (!chainTooltip) return;
 
-        chainTooltip.innerHTML = buildDependencyChainTooltipHTML(cardProjectId);
+        chainTooltip.innerHTML = buildDependencyChainTooltipHTML(cardArtifactKey);
       });
     }
 
@@ -10715,14 +11173,25 @@
     }
 
     // --- Update Dependency Chain on Existing Card ---
-    function updateDependencyChainOnCard(projectId) {
-      const card = document.querySelector(`.result-card[data-project-id="${projectId}"]`);
-      if (!card || !hasDependencyChainEntries(projectId)) return;
+    // Takes an artifact key ("projectId|project_type"). The matching card is
+    // looked up via both data-project-id AND data-project-type so we don't
+    // grab the wrong artifact when the same Modrinth project has multiple
+    // result cards (e.g. a mod and a datapack).
+    function updateDependencyChainOnCard(artifactKey) {
+      if (!hasDependencyChainEntries(artifactKey)) return;
+      const sep = artifactKey.lastIndexOf('|');
+      const projectId = sep >= 0 ? artifactKey.slice(0, sep) : artifactKey;
+      const projectType = sep >= 0 ? artifactKey.slice(sep + 1) : '';
+      const selector = projectType
+        ? `.result-card[data-project-id="${CSS.escape(projectId)}"][data-project-type="${CSS.escape(projectType)}"]`
+        : `.result-card[data-project-id="${CSS.escape(projectId)}"]`;
+      const card = document.querySelector(selector);
+      if (!card) return;
 
       const modTitleDiv = card.querySelector('.mod-title');
       let chainContainer = card.querySelector('.dependency-chain-tooltip-container');
 
-      const tooltipHTML = buildDependencyChainTooltipHTML(projectId);
+      const tooltipHTML = buildDependencyChainTooltipHTML(artifactKey);
 
       if (chainContainer) {
         // If the icon already exists, just update its tooltip
@@ -10763,6 +11232,26 @@
 
       card.className = cardClasses;
       card.setAttribute('data-project-id', mod.projectId);
+      // Pair with data-project-id so dep-chain lookups can target the right
+      // artifact when the same Modrinth project has both a mod and a datapack.
+      if (mod.project_type) card.setAttribute('data-project-type', mod.project_type);
+
+      // Tag the card with how this mod arrived in the list so the Source filter
+      // can target it. Order matters: dependencies trump search, etc.
+      let cardSource = 'upload';
+      if (mod.isDependency) cardSource = 'dependency';
+      else if (typeof searchedMods !== 'undefined' && searchedMods && searchedMods.has(mod.projectId)) cardSource = 'search';
+      card.setAttribute('data-source', cardSource);
+
+      // Initial file-size for the File Size sort. Updated whenever the user
+      // changes the selected version (see updateDynamicContent below).
+      try {
+        const initialVersion = mod.all_versions && mod.all_versions[0];
+        const initialPrimary = initialVersion ? selectArtifactFile(initialVersion, mod.project_type) : null;
+        if (initialPrimary && typeof initialPrimary.size === 'number') {
+          card.setAttribute('data-file-size', String(initialPrimary.size));
+        }
+      } catch (_) {}
 
       const clientServerInfo = getClientServerSupport(
         mod.client_side,
@@ -10898,6 +11387,12 @@
         if (primaryFile) {
           downloadLink.href = primaryFile.url;
           downloadLink.setAttribute("download", primaryFile.filename);
+
+          // Keep the card's data-file-size in sync so File Size sort reflects
+          // the currently-selected version.
+          if (typeof primaryFile.size === 'number') {
+            card.setAttribute('data-file-size', String(primaryFile.size));
+          }
 
           // --- Add new version to the list for bulk downloads ---
           successfulDownloadKeys.add(dlKey);
@@ -11094,8 +11589,9 @@
       });
 
       // --- Add Dependency Chain Icon if needed ---
-      if (hasDependencyChainEntries(mod.projectId)) {
-        const initialTooltipHTML = buildDependencyChainTooltipHTML(mod.projectId);
+      const cardArtifactKey = makeArtifactKey(mod.projectId, mod.project_type);
+      if (hasDependencyChainEntries(cardArtifactKey)) {
+        const initialTooltipHTML = buildDependencyChainTooltipHTML(cardArtifactKey);
 
         // Create and add the chain icon
         const modTitleDiv = card.querySelector('.mod-title');
@@ -11182,6 +11678,12 @@
       card.dataset.supportedLoaders = Array.isArray(mod.supportedLoaders)
         ? mod.supportedLoaders.map(loader => String(loader).toLowerCase()).join(',')
         : '';
+
+      // Stamp how this mod ended up here so the Source filter can target it.
+      let cardSource = 'upload';
+      if (mod.isDependency) cardSource = 'dependency';
+      else if (typeof searchedMods !== 'undefined' && searchedMods && searchedMods.has(mod.projectId)) cardSource = 'search';
+      card.setAttribute('data-source', cardSource);
       const clientServerInfo = getClientServerSupport(
         mod.client_side,
         mod.server_side
