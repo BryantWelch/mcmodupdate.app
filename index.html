@@ -1934,6 +1934,12 @@
       display: block;
     }
 
+    .sort-dropdown.export-dropdown {
+      left: auto;
+      right: 0;
+      min-width: 180px;
+    }
+
     .sort-option {
       padding: 0.75rem 1rem;
       cursor: pointer;
@@ -3145,7 +3151,7 @@
       </div>
     </div>
     <div id="dropzone" class="dropzone"
-      title="Drag and drop your files here or click to browse. Supports .jar (mods, plugins), .zip (resource packs, shaders, data packs), and .mrpack (modpacks)">
+      title="Drag and drop your files here or click to browse. Supports .jar (mods, plugins), .zip (resource packs, shaders, data packs), .mrpack (modpacks), and .json (mcmodupdate.app modlist export).">
       <div id="file-list-container" class="file-list"></div>
       <div id="dropzone-prompt" class="dropzone-prompt">
         <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -3159,6 +3165,7 @@
           <span class="ext">.jar</span><span class="cat">mods &middot; plugins</span>
           <span class="ext">.zip</span><span class="cat">resource packs &middot; shaders &middot; data packs</span>
           <span class="ext">.mrpack</span><span class="cat">modpacks</span>
+          <span class="ext">.json</span><span class="cat">import an exported modlist</span>
         </div>
         <span class="dropzone-hint">or use the search above</span>
       </div>
@@ -3199,8 +3206,9 @@
         <h3 style="text-align: center; margin-top: 2rem">Ready to Start?</h3>
         <p style="text-align: left; line-height: 1.6">
           To get started, you can upload an entire modpack (<code>.mrpack</code>), individual mods or plugins
-          (<code>.jar</code>), resource packs, shaders, or data packs (<code>.zip</code>), or use the search bar to
-          find new content. Then, click the "Update" button to see the magic happen!
+          (<code>.jar</code>), resource packs, shaders, or data packs (<code>.zip</code>), import a previously
+          exported modlist (<code>.json</code>), or use the search bar to find new content. Then, click the
+          "Update" button to see the magic happen!
         </p>
         <p style="
               text-align: left;
@@ -3224,7 +3232,7 @@
       </div>
     </div>
   </div>
-  <input type="file" id="file-input" multiple style="display: none" accept=".jar,.mrpack,.zip" />
+    <input type="file" id="file-input" multiple style="display: none" accept=".jar,.mrpack,.zip,.json" />
 
 
   <!-- Info Modal -->
@@ -3253,7 +3261,7 @@
           Minecraft version.</li>
         <li><b>Upload Files:</b> Drop a <code>.mrpack</code> file to load a modpack, or drag and drop your local
           <code>.jar</code> (mods, plugins) and <code>.zip</code> (resource packs, shaders, data packs) files into
-          the upload area.
+          the upload area. You can also drop a previously exported <code>.json</code> modlist to restore it.
         </li>
         <li><b>Search for New Mods:</b> Use the search bar to find and add mods directly from Modrinth.</li>
         <li><b>Process Your List:</b> Click "Update" to find the latest compatible versions and dependencies.</li>
@@ -3338,6 +3346,10 @@
         <li><b>Sort Options:</b> Click the sort button to organize by name, downloads, followers, or filter by
           environment/channel</li>
         <li><b>Copy Lists:</b> Use the copy button to quickly copy mod names to your clipboard</li>
+        <li><b>Export Lists:</b> Use the export button to download the current list as CSV, JSON, Markdown, or plain text.
+          The JSON format is the one you can re-import — CSV/Markdown/plain text are share-oriented and not importable.</li>
+        <li><b>Import Modlist:</b> Drag and drop a previously exported <code>.json</code> file onto the upload area to
+          restore that modlist.</li>
         <li><b>Version Selection:</b> Choose between Release, Beta, or Alpha versions for each mod</li>
         <li><b>Download Options:</b> Download individual mods or get everything as a ready-to-use <code>.mrpack</code>
           file</li>
@@ -3605,6 +3617,11 @@
     let renderedArtifactIds = new Set(); // Tracks (slug, artifactType) to allow multiple artifact types per project
     let searchedMods = new Map();
     let mrpackMods = new Map(); // For mods from .mrpack files
+
+    // Single source of truth for the modlist-export schema version. Bump in
+    // lockstep with any schema change (exporter writes it, importer gates
+    // against it).
+    const MODLIST_EXPORT_FORMAT_VERSION = 1;
     let zipContentTypeByUploadKey = new Map(); // Cache zip content type discovered during upload analysis
     // Maps mod identifier (project_id or slug) → { pill, source } for the search modal Remove button.
     // Source can be "search", "upload", or "mrpack". The pill is the upload-area DOM element.
@@ -4083,6 +4100,9 @@
           'sort-warning-dropdown',
           'filter-warning-dropdown',
           'sort-failure-dropdown',
+          'export-found-dropdown',
+          'export-warning-dropdown',
+          'export-failure-dropdown',
         ];
         for (const id of dropdownIds) {
           const el = document.getElementById(id);
@@ -6159,10 +6179,225 @@
       return uploadNotices;
     }
 
+    // --- JSON Modlist Import ---
+    // Accepts a .json export produced by this app and re-populates the upload
+    // area so the existing resolution pipeline handles everything downstream
+    // when the user clicks Update. Two routing paths, mirroring `.mrpack`:
+    //   - sha1 present → mrpackMods + hash lookup. This is what makes
+    //     up-to-date detection work on round-trip (Modrinth tells us the
+    //     installed version from the hash).
+    //   - sha1 absent but project_id present → searchedMods + id lookup
+    //     (always resolves to the latest version for the current loader/MC).
+    //
+    // Design choices (locked in with the user):
+    //   - JSON only.
+    //   - Replace semantics: clear the dropzone + results before importing.
+    //   - Confirm modal only when the dropzone has existing content
+    //     (otherwise there's nothing to lose; just import).
+    //   - Keep the user's current loader/game version. The file's stored
+    //     loader/version is surfaced in the confirm modal / status line for
+    //     context but never applied — makes "what does this pack look like
+    //     on 1.22?" the natural use case.
+    //   - Ignored entries are not restored. The exporter doesn't emit them
+    //     anymore either; legacy exports that still carry an `ignored`
+    //     array are silently dropped.
+    async function handleJsonImport(file) {
+      let text;
+      try {
+        text = await file.text();
+      } catch (err) {
+        showCustomAlert(`Could not read ${file.name}: ${err.message || err}`, "error", "Import Failed");
+        return;
+      }
+
+      let payload;
+      try {
+        payload = JSON.parse(text);
+      } catch (err) {
+        showCustomAlert(`${file.name} is not valid JSON: ${err.message || err}`, "error", "Import Failed");
+        return;
+      }
+
+      // Validate this is one of our exports. We require source_app strictly
+      // — format_version alone is too common a field name to use as a
+      // signature (random tools' JSONs would pass), and source_app has been
+      // on every export this app has ever produced.
+      if (!payload || payload.source_app !== 'mcmodupdate.app') {
+        showCustomAlert(
+          `${file.name} doesn't look like an mcmodupdate.app export. Expected a JSON file with "source_app": "mcmodupdate.app".`,
+          "error",
+          "Import Failed"
+        );
+        return;
+      }
+
+      // format_version forward-compat: warn if newer than what we know about,
+      // but try anyway since the importer only depends on a tiny subset.
+      if (typeof payload.format_version === 'number' && payload.format_version > MODLIST_EXPORT_FORMAT_VERSION) {
+        const proceed = await showCustomConfirm(
+          `This file uses format_version ${payload.format_version}, but this build of the app only supports up to ${MODLIST_EXPORT_FORMAT_VERSION}. Import anyway?`,
+          "Newer Modlist Format"
+        );
+        if (!proceed) return;
+      }
+
+      const mods = Array.isArray(payload.mods) ? payload.mods : [];
+      // An entry is importable when we can route it through Modrinth's
+      // resolution pipeline. Two paths:
+      //   - sha1 → hash lookup (matches the .mrpack flow exactly, so the
+      //     resolver knows the *installed* version and can correctly flag
+      //     each mod as up-to-date vs needs-update).
+      //   - project_id → id lookup (always resolves to the latest version;
+      //     used as a fallback when we don't have a sha1).
+      // Skipped:
+      //   - rows marked `ignored: true` — current exports never emit these,
+      //     but legacy exports might via the selection path; "if the user
+      //     ignored it, they don't want it back" is the policy.
+      //   - failure-section rows (no sha1, no project_id).
+      const SHA1_RE = /^[a-f0-9]{40}$/i;
+      const importable = mods.filter(m => m && m.ignored !== true && (
+        (typeof m.sha1 === 'string' && SHA1_RE.test(m.sha1)) ||
+        (typeof m.project_id === 'string' && m.project_id.length)
+      ));
+      if (importable.length === 0) {
+        showCustomAlert(
+          `${file.name} doesn't contain any mods with a sha1 or project_id. Nothing to import.`,
+          "error",
+          "Import Failed"
+        );
+        return;
+      }
+
+      // Surface only the file's own context (loader + version it was exported
+      // for); the user can compare to their current dropdowns at a glance.
+      const fileLoader = payload.loader_label || payload.loader || 'unknown';
+      const fileVersion = payload.game_version || 'unknown';
+      const exportedFor = (fileLoader === 'unknown' && fileVersion === 'unknown')
+        ? ''
+        : ` (exported for ${fileLoader} ${fileVersion})`;
+
+      // Only prompt for the destructive replace when there's something to
+      // destroy. An empty dropzone means no consent needed — just import.
+      const dropzoneHadContent =
+        uploadedFiles.size > 0 || mrpackMods.size > 0 || searchedMods.size > 0;
+      if (dropzoneHadContent) {
+        const proceed = await showCustomConfirm(
+          `Import ${importable.length} mod${importable.length === 1 ? '' : 's'} from "${file.name}"${exportedFor}? This will clear your current uploads and results.`,
+          "Replace with Imported Modlist"
+        );
+        if (!proceed) return;
+      }
+
+      // Wipe the workspace so the import is a clean replace.
+      clearDropzone();
+      resetResults();
+
+      // Push every importable entry into the correct registry + create a pill.
+      // sha1-bearing entries go into mrpackMods (hash lookup, mirrors the
+      // .mrpack pathway so the resolver can detect up-to-date vs needs-update);
+      // the rest fall back to searchedMods (id lookup → always latest). Post-
+      // clearDropzone() both maps are empty, so duplicates here can only
+      // occur if the same key appears twice in the file — we silently keep
+      // the first. We also dedupe across paths by project_id so a JSON that
+      // lists the same mod once with a sha1 and once without doesn't produce
+      // two pills for the same project.
+      const seenSha1 = new Set();
+      const seenProjectIds = new Set();
+      let hashPathCount = 0;
+      let idPathCount = 0;
+      for (const m of importable) {
+        const title = m.name || m.filename || m.project_id || '(unnamed)';
+        const artifactType = m.project_type || null;
+        const sha1 = (typeof m.sha1 === 'string' && SHA1_RE.test(m.sha1)) ? m.sha1.toLowerCase() : null;
+        const projectId = (typeof m.project_id === 'string' && m.project_id.length) ? m.project_id : null;
+
+        if (sha1) {
+          if (seenSha1.has(sha1)) continue;
+          if (projectId && seenProjectIds.has(projectId)) continue;
+          seenSha1.add(sha1);
+          if (projectId) seenProjectIds.add(projectId);
+          // Match the .mrpack key shape (`${filename}|${sha1}`) so pill/result
+          // wiring (findPillForResult, etc.) behaves identically.
+          const baseName = m.filename || title;
+          const mrpackKey = `${baseName}|${sha1}`;
+          if (mrpackMods.has(mrpackKey)) continue;
+          mrpackMods.set(mrpackKey, {
+            title: baseName,
+            lookupType: "hash",
+            identifier: sha1,
+            projectIdHint: projectId,
+            artifactType,
+          });
+          // "(Imported)" suffix for parity with the searched-path pill — the
+          // user asked for explicit provenance on every imported pill, the
+          // same way searched additions read "(Searched)".
+          const pill = createFilePill({ name: `${baseName} (Imported)` }, null, mrpackKey);
+          // Register against the project id (when known) so the Search modal
+          // shows the mod as "Added" immediately — without waiting for the
+          // resolver pipeline to render its card. createFilePill's mrpack-key
+          // remove handler already prunes addedModRemovers entries that
+          // point at this pill, so removal stays consistent.
+          if (projectId) {
+            registerAddedModRemover(projectId, pill, "mrpack", { projectId, modId: null });
+          }
+          hashPathCount++;
+          continue;
+        }
+
+        if (!projectId || seenProjectIds.has(projectId) || searchedMods.has(projectId)) continue;
+        seenProjectIds.add(projectId);
+        searchedMods.set(projectId, {
+          title,
+          artifactType,
+          loaderFilter: null,
+          platformFilter: null,
+          environmentHints: null,
+        });
+        const pill = createFilePill({ name: `${title} (Imported)` }, () => {
+          searchedMods.delete(projectId);
+          addedModRemovers.delete(String(projectId));
+        });
+        registerAddedModRemover(projectId, pill, "search", { projectId, modId: null });
+        idPathCount++;
+      }
+
+      // Show the dropzone in its expanded state since pills were added.
+      dropzonePrompt.style.display = "none";
+      dropzone.classList.add("dropzone-expanded");
+      clearAllButton.style.display = "inline-flex";
+      refreshUpdateButtonLabel();
+      // Keep the search modal in sync in case it happens to be open — its
+      // Add/Remove buttons read from searchedMods / addedModRemovers.
+      if (typeof refreshSearchModalAddedStates === 'function') {
+        refreshSearchModalAddedStates();
+      }
+
+      // Always surface a one-liner mirroring the .mrpack flow's status
+      // message. Mentions the exported-for context so the user can sanity-
+      // check it against the current loader/version dropdowns before
+      // clicking Update.
+      const totalImported = hashPathCount + idPathCount;
+      const exportedForNote = exportedFor ? ` ${exportedFor.trim()}` : '';
+      statusMessage.textContent =
+        `Imported ${totalImported} mod${totalImported === 1 ? '' : 's'} from ${file.name}${exportedForNote}. ` +
+        `Click Update to check for newer versions.`;
+      statusMessage.classList.add("visible");
+    }
+
     async function handleFiles(files) {
       if (files.length === 0) return;
 
       const allFiles = Array.from(files);
+
+      // Single .json drop → treat as an mcmodupdate.app modlist import and bail
+      // out of the normal upload pipeline. We only branch on a *single* .json
+      // because a mix of .json + other files almost certainly means a user
+      // accidentally swept up an unrelated file alongside their mods.
+      if (allFiles.length === 1 && /\.json$/i.test(allFiles[0].name)) {
+        await handleJsonImport(allFiles[0]);
+        return;
+      }
+
       const mrpackContext = getMrpackUploadContext(allFiles);
 
       // Auto-process .mrpack if it's the only uploaded file and the upload area is empty.
@@ -6214,7 +6449,7 @@
         );
       } else if (invalidFiles.length > 0) {
         showCustomAlert(
-          "Please upload valid files (.jar, .zip, .mrpack).",
+          "Please upload .jar, .zip, or .mrpack files. To import a modlist, drop only a single .json file.",
           "notice",
           "Invalid File Type"
         );
@@ -8453,6 +8688,7 @@
       const sortIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="7,10 12,5 17,10"></polyline><polyline points="7,14 12,19 17,14"></polyline></svg>`;
       const filterIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>`;
       const checkboxIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><polyline points="9 11 12 14 16 10"></polyline></svg>`;
+      const exportIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>`;
 
       resultsArea.innerHTML = `
     <div id="results-found" class="results-section">
@@ -8603,6 +8839,15 @@
             </div>
           </div>
           <button id="copy-found-btn" class="layout-toggle" title="Copy list of successful mod names to clipboard">${copyIcon}</button>
+          <div class="sort-dropdown-container">
+            <button id="export-found-btn" class="layout-toggle" title="Export list of mods to a file (CSV, JSON, Markdown, or plain text). With bulk-actions selections active, exports only the selected mods.">${exportIcon}</button>
+            <div id="export-found-dropdown" class="sort-dropdown export-dropdown">
+              <div class="sort-option" data-export="csv" title="Spreadsheet-friendly comma-separated values">CSV (.csv)</div>
+              <div class="sort-option" data-export="json" title="Structured data with all available fields">JSON (.json)</div>
+              <div class="sort-option" data-export="markdown" title="Human-readable formatted list">Markdown (.md)</div>
+              <div class="sort-option" data-export="txt" title="Simple list of mod names, one per line">Plain Text (.txt)</div>
+            </div>
+          </div>
         </div>
       </div>
       <!-- Bulk actions bar (hidden by default) -->
@@ -8731,6 +8976,15 @@
             </div>
           </div>
           <button id="copy-warning-btn" class="layout-toggle" title="Copy list of incompatible mod names to clipboard">${copyIcon}</button>
+          <div class="sort-dropdown-container">
+            <button id="export-warning-btn" class="layout-toggle" title="Export list of incompatible mods to a file (CSV, JSON, Markdown, or plain text). With bulk-actions selections active, exports only the selected mods.">${exportIcon}</button>
+            <div id="export-warning-dropdown" class="sort-dropdown export-dropdown">
+              <div class="sort-option" data-export="csv" title="Spreadsheet-friendly comma-separated values">CSV (.csv)</div>
+              <div class="sort-option" data-export="json" title="Structured data with all available fields">JSON (.json)</div>
+              <div class="sort-option" data-export="markdown" title="Human-readable formatted list">Markdown (.md)</div>
+              <div class="sort-option" data-export="txt" title="Simple list of mod names, one per line">Plain Text (.txt)</div>
+            </div>
+          </div>
         </div>
       </div>
       <!-- Bulk actions bar for incompatible mods (hidden by default) -->
@@ -8771,6 +9025,15 @@
             </div>
           </div>
           <button id="copy-failure-btn" class="layout-toggle" title="Copy list of not-found mod names to clipboard">${copyIcon}</button>
+          <div class="sort-dropdown-container">
+            <button id="export-failure-btn" class="layout-toggle" title="Export list of not-found mods to a file (CSV, JSON, Markdown, or plain text). With bulk-actions selections active, exports only the selected mods.">${exportIcon}</button>
+            <div id="export-failure-dropdown" class="sort-dropdown export-dropdown">
+              <div class="sort-option" data-export="csv" title="Spreadsheet-friendly comma-separated values">CSV (.csv)</div>
+              <div class="sort-option" data-export="json" title="Structured data with all available fields">JSON (.json)</div>
+              <div class="sort-option" data-export="markdown" title="Human-readable formatted list">Markdown (.md)</div>
+              <div class="sort-option" data-export="txt" title="Simple list of mod names, one per line">Plain Text (.txt)</div>
+            </div>
+          </div>
         </div>
       </div>
       <!-- Bulk actions bar for not-found mods (hidden by default) -->
@@ -9700,6 +9963,387 @@
         });
       }
 
+      // --- Export functionality ---
+      // Wires the per-section export buttons. Data is scraped from the rendered
+      // cards (same source of truth as the copy buttons) so the export always
+      // reflects what the user currently sees, including their sort/filter/search.
+      function escapeCsvValue(value) {
+        if (value === null || value === undefined) return '';
+        const str = String(value);
+        if (/[",\r\n]/.test(str)) {
+          return '"' + str.replace(/"/g, '""') + '"';
+        }
+        return str;
+      }
+
+      function getSelectedCardsForSection(sectionSelector) {
+        // A card counts as "selected" when its action button carries the
+        // `.selected` class. This is what both the success download-link and
+        // the warning/failure bulk-select-action buttons use, so a single
+        // selector covers all three sections.
+        return Array.from(
+          document.querySelectorAll(
+            `${sectionSelector} .result-card:has(.download-link.selected), ${sectionSelector} .result-card:has(.bulk-select-action.selected)`
+          )
+        ).filter(card => card.style.display !== 'none');
+      }
+
+      // Extracted so we can build the same row shape for both visible/selected
+      // cards (the regular export) and ignored cards (round-trip-only payload).
+      function buildExportRowFromCard(card, sectionSelector) {
+        const isFound = sectionSelector === '#results-found';
+        const isFailure = sectionSelector === '#results-failure';
+
+        const titleLink = card.querySelector('.mod-title a');
+        const name = titleLink ? titleLink.textContent.trim() : '';
+        const projectUrl = titleLink ? (titleLink.getAttribute('href') || '') : '';
+        const authorLink = card.querySelector('.mod-author a');
+        const author = authorLink ? authorLink.textContent.trim() : '';
+        const authorUrl = authorLink ? (authorLink.getAttribute('href') || '') : '';
+        const descEl = card.querySelector('.mod-description');
+        const description = descEl ? descEl.textContent.trim() : '';
+        const projectId = card.getAttribute('data-project-id') || '';
+        const projectType = card.getAttribute('data-project-type') || '';
+        const source = card.getAttribute('data-source') || '';
+
+        let selectedVersion = '';
+        let versionId = '';
+        let downloadUrl = '';
+        let filename = '';
+        let fileSha1 = '';
+        let fileSha512 = '';
+        let fileSize = '';
+        if (isFound) {
+          const versionSelect = card.querySelector('.version-select');
+          if (versionSelect && versionSelect.selectedIndex >= 0) {
+            const opt = versionSelect.options[versionSelect.selectedIndex];
+            if (opt) selectedVersion = opt.textContent.trim();
+            // versionSelect.value is the Modrinth version id (used as <option value>)
+            versionId = versionSelect.value || card.getAttribute('data-version-id') || '';
+          } else {
+            versionId = card.getAttribute('data-version-id') || '';
+          }
+          // Prefer the data-attributes stamped from the resolved primaryFile
+          // (they're authoritative); fall back to the download link href.
+          downloadUrl = card.getAttribute('data-download-url') || '';
+          if (!downloadUrl) {
+            const dlLink = card.querySelector('.download-link');
+            if (dlLink) {
+              const href = dlLink.getAttribute('href') || '';
+              if (href && href !== '#') downloadUrl = href;
+            }
+          }
+          filename = card.getAttribute('data-filename') || '';
+          fileSha1 = card.getAttribute('data-file-sha1') || '';
+          fileSha512 = card.getAttribute('data-file-sha512') || '';
+          fileSize = card.getAttribute('data-file-size') || '';
+        }
+
+        let downloads = '', followers = '', lastUpdated = '', environments = '';
+        card.querySelectorAll('.mod-meta-item').forEach(item => {
+          const tooltip = item.querySelector('.meta-tooltip');
+          if (!tooltip) return;
+          const label = tooltip.textContent.trim();
+          if (label === 'Total Downloads') {
+            const span = item.querySelector('span:not(.meta-tooltip)');
+            if (span) downloads = span.textContent.trim();
+          } else if (label === 'Followers') {
+            const span = item.querySelector('span:not(.meta-tooltip)');
+            if (span) followers = span.textContent.trim();
+          } else if (label === 'Last Updated') {
+            const dateSpan = item.querySelector('.mod-meta-date');
+            if (dateSpan) lastUpdated = dateSpan.textContent.trim();
+          } else if (label === 'Supported Environments') {
+            const span = item.querySelector('span:not(.meta-tooltip)');
+            if (span) environments = span.textContent.trim();
+          }
+        });
+
+        const row = {};
+        if (isFailure) {
+          row.filename = card.getAttribute('data-failure-key') || name;
+          row.cleaned_name = name;
+          if (description) row.reason = description;
+          if (projectUrl) row.search_url = projectUrl;
+        } else {
+          row.name = name;
+          if (author) row.author = author;
+          if (selectedVersion) row.selected_version = selectedVersion;
+          if (versionId) row.version_id = versionId;
+          if (environments) row.environments = environments;
+          if (downloads) row.downloads = downloads;
+          if (followers) row.followers = followers;
+          if (lastUpdated) row.last_updated = lastUpdated;
+          if (source) row.source = source;
+          if (projectId) row.project_id = projectId;
+          if (projectType) row.project_type = projectType;
+          if (projectUrl) row.project_url = projectUrl;
+          if (authorUrl) row.author_url = authorUrl;
+          if (filename) row.filename = filename;
+          if (fileSize) row.file_size_bytes = fileSize;
+          if (fileSha1) row.sha1 = fileSha1;
+          if (fileSha512) row.sha512 = fileSha512;
+          if (downloadUrl) row.download_url = downloadUrl;
+          if (description) row.description = description;
+        }
+        if (card.classList.contains('ignored')) row.ignored = true;
+        return row;
+      }
+
+      function gatherSectionExportRows(sectionSelector) {
+        // If the user has anything selected in bulk-actions mode, export ONLY
+        // those mods (regardless of ignored/filtered state) — that's the
+        // explicit intent. Otherwise fall back to the visible, non-ignored set.
+        const selected = getSelectedCardsForSection(sectionSelector);
+        const usingSelection = selected.length > 0;
+        const cards = usingSelection
+          ? selected
+          : Array.from(document.querySelectorAll(`${sectionSelector} .result-card`))
+              .filter(card => !card.classList.contains('ignored') && card.style.display !== 'none');
+        const rows = cards.map(card => buildExportRowFromCard(card, sectionSelector));
+        return { rows, usingSelection };
+      }
+
+      function triggerDownload(filename, content, mime) {
+        const blob = new Blob([content], { type: mime });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+
+      function getExportContext() {
+        const loaderEl = document.getElementById('mod-loader');
+        const versionEl = document.getElementById('mc-version');
+        const loader = loaderEl && loaderEl.value ? loaderEl.value : '';
+        const gameVersion = versionEl && versionEl.value ? versionEl.value : '';
+        const loaderLabel = loaderEl && loaderEl.selectedIndex >= 0
+          ? (loaderEl.options[loaderEl.selectedIndex].textContent || loader).trim()
+          : loader;
+        // `location.origin` returns the literal string "null" when the page is
+        // served via file:// (and is empty for some sandboxed contexts), so
+        // truthy-check alone isn't enough — fall back to the canonical URL.
+        const rawOrigin = (typeof location !== 'undefined') ? location.origin : '';
+        const sourceUrl = (rawOrigin && rawOrigin !== 'null' && /^https?:\/\//i.test(rawOrigin))
+          ? rawOrigin
+          : 'https://mcmodupdate.app';
+        return {
+          loader,
+          loader_label: loaderLabel,
+          game_version: gameVersion,
+          exported_at: new Date().toISOString(),
+          source_app: 'mcmodupdate.app',
+          source_url: sourceUrl,
+        };
+      }
+
+      function exportSection(sectionSelector, format, label) {
+        const { rows, usingSelection } = gatherSectionExportRows(sectionSelector);
+        if (!rows.length) {
+          // Surface the empty case so the user isn't left wondering why
+          // clicking an export option produced no download. This is the
+          // realistic scenario when filters/search have hidden every card.
+          showCustomAlert(
+            `There's nothing to export in "${label}" right now — adjust your filters or search and try again.`,
+            "notice",
+            "Nothing to Export"
+          );
+          return false;
+        }
+        const ctx = getExportContext();
+        const scope = usingSelection ? 'selected' : 'visible';
+        const datestamp = new Date().toISOString().slice(0, 10);
+        const slug = sectionSelector.replace('#results-', '');
+        const base = `mcmodupdate-${slug}${usingSelection ? '-selected' : ''}-${datestamp}`;
+        const loaderLine = `${ctx.loader_label || ctx.loader || 'n/a'}${ctx.game_version ? ` ${ctx.game_version}` : ''}`;
+        const scopeNote = usingSelection ? ` (selected only)` : '';
+        // Strip the trailing release-type marker (e.g. " [R]") from version
+        // labels so headings stay readable in chat/forums.
+        const cleanVersion = (v) => (v || '').replace(/\s*\[[^\]]+\]\s*$/, '').trim();
+        // Backslash-escape characters that would corrupt Markdown link syntax
+        // when interpolated into `[text](url)`. Mod names like "[Forge] Foo"
+        // and authors with brackets exist on Modrinth, so this isn't paranoia.
+        const escapeMdLinkText = (s) => String(s || '').replace(/([\\\[\]])/g, '\\$1');
+
+        if (format === 'csv') {
+          const headers = [];
+          const seen = new Set();
+          for (const r of rows) for (const k of Object.keys(r)) {
+            if (!seen.has(k)) { seen.add(k); headers.push(k); }
+          }
+          // Prefix with commented metadata lines so spreadsheet users still see
+          // context. Excel/Sheets show these as the first column of the first
+          // rows; small price to pay for self-describing files.
+          const metaLines = [
+            `# Exported from ${ctx.source_url} on ${ctx.exported_at}`,
+            `# Loader: ${ctx.loader_label || ctx.loader || 'n/a'} | Game Version: ${ctx.game_version || 'n/a'} | Section: ${label} | Scope: ${scope} | Count: ${rows.length}`,
+          ];
+          const lines = [...metaLines, headers.join(',')];
+          for (const r of rows) {
+            lines.push(headers.map(h => escapeCsvValue(r[h])).join(','));
+          }
+          // BOM helps Excel auto-detect UTF-8. Trailing newline keeps the
+          // file POSIX-conformant for line-counting tools.
+          triggerDownload(`${base}.csv`, '\uFEFF' + lines.join('\r\n') + '\r\n', 'text/csv;charset=utf-8');
+        } else if (format === 'json') {
+          // Ignored mods are intentionally omitted: if the user marked them
+          // ignored they don't want them in the next session either, and
+          // dropping the field entirely keeps the import path from needing to
+          // care about it. `gatherSectionExportRows` already filters
+          // `.ignored` cards out of `rows` for non-selection exports; for the
+          // selection path the user may have explicitly selected an ignored
+          // card, which we treat as intent and let through.
+          //
+          // Per-row slim: drop fields that aren't used by the importer and
+          // aren't useful for "what was in my pack?" inspection in a JSON
+          // file. The dropped fields are still emitted in CSV (for
+          // spreadsheet inspection) and Markdown (for chat/forum shares).
+          //   - `description`: long, multi-line, belongs in Markdown not JSON
+          //   - `download_url`, `sha512`, `file_size_bytes`: regenerable from
+          //     version_id + project_id; download URLs rotate on the CDN
+          //   - `downloads`, `followers`, `last_updated`, `environments`:
+          //     point-in-time display strings that go stale immediately
+          //   - `author_url`: trivially derivable from author name on Modrinth
+          //   - `source`: dead on round-trip (importer doesn't read it)
+          const JSON_DROP_FIELDS = new Set([
+            'description', 'download_url', 'sha512', 'file_size_bytes',
+            'downloads', 'followers', 'last_updated', 'environments',
+            'author_url', 'source',
+          ]);
+          const slimRows = rows.map(row => {
+            const slim = {};
+            for (const key of Object.keys(row)) {
+              if (!JSON_DROP_FIELDS.has(key)) slim[key] = row[key];
+            }
+            return slim;
+          });
+          const payload = {
+            format_version: MODLIST_EXPORT_FORMAT_VERSION,
+            ...ctx,
+            section: label,
+            scope,
+            count: slimRows.length,
+            mods: slimRows,
+          };
+          triggerDownload(`${base}.json`, JSON.stringify(payload, null, 2), 'application/json;charset=utf-8');
+        } else if (format === 'markdown') {
+          // Compact layout: heading + one inline metadata line + optional
+          // blockquoted description + a small file-detail bullet list per mod.
+          // Designed to stay scannable when pasted into Discord, GitHub, or
+          // forums without rendering literal HTML tags.
+          const lines = [
+            `# ${label} (${rows.length})${scopeNote}`,
+            '',
+            `**${loaderLine}** · exported ${new Date().toLocaleString()} · via [${ctx.source_app}](${ctx.source_url})`,
+            '',
+          ];
+          for (const r of rows) {
+            const displayName = r.name || r.cleaned_name || r.filename || '(unnamed)';
+            const urlForHeading = r.project_url || r.search_url || '';
+            const titleLink = urlForHeading
+              ? `[${escapeMdLinkText(displayName)}](${urlForHeading})`
+              : escapeMdLinkText(displayName);
+            const versionTag = r.selected_version ? ` \`${cleanVersion(r.selected_version)}\`` : '';
+            lines.push(`### ${titleLink}${versionTag}`);
+
+            // One compact metadata line. Skip pieces that aren't present so
+            // we don't end up with empty separators.
+            const metaBits = [];
+            if (r.author) {
+              metaBits.push(r.author_url
+                ? `by [${escapeMdLinkText(r.author)}](${r.author_url})`
+                : `by ${escapeMdLinkText(r.author)}`);
+            }
+            if (r.environments) metaBits.push(r.environments);
+            if (r.downloads) metaBits.push(`${r.downloads} downloads`);
+            if (r.followers) metaBits.push(`${r.followers} followers`);
+            if (r.last_updated) metaBits.push(`updated ${r.last_updated}`);
+            if (r.source && r.source !== 'upload') metaBits.push(r.source);
+            if (metaBits.length) lines.push(metaBits.join(' · '));
+
+            const desc = r.reason || r.description;
+            if (desc) {
+              // Collapse multi-line descriptions to a single blockquote line so
+              // the layout stays compact regardless of upstream formatting.
+              lines.push(`> ${String(desc).replace(/\s+/g, ' ').trim()}`);
+            }
+
+            // File-level details as a plain bullet list (no <details>/<summary>
+            // wrapper — those tags render as literal text in Discord and add
+            // visual noise everywhere else).
+            const fileBits = [];
+            if (r.filename) fileBits.push(`- File: \`${r.filename}\``);
+            if (r.sha1) fileBits.push(`- SHA1: \`${r.sha1}\``);
+            if (r.download_url) fileBits.push(`- [Direct download](${r.download_url})`);
+            if (r.project_id) fileBits.push(`- Project ID: \`${r.project_id}\``);
+            if (fileBits.length) lines.push('', ...fileBits);
+
+            lines.push('');
+          }
+          // UTF-8 BOM so previewers (Discord, some editors) reliably detect
+          // the encoding instead of guessing — the · separator's UTF-8 bytes
+          // happen to be valid GBK for an unrelated Chinese character, which
+          // is exactly the kind of misdetection a BOM prevents. The per-mod
+          // loop already pushes a trailing '' so `join('\n')` ends on a
+          // newline; no extra suffix needed.
+          triggerDownload(`${base}.md`, '\uFEFF' + lines.join('\n'), 'text/markdown;charset=utf-8');
+        } else { // txt
+          const header = [
+            `${label} (${rows.length})${scopeNote}`,
+            `Loader: ${ctx.loader_label || ctx.loader || 'n/a'} | Game Version: ${ctx.game_version || 'n/a'}`,
+            `Exported ${ctx.exported_at} from ${ctx.source_url}`,
+            '',
+          ];
+          const body = rows
+            .map(r => r.name || r.cleaned_name || r.filename || '')
+            .filter(Boolean);
+          triggerDownload(`${base}.txt`, '\uFEFF' + [...header, ...body].join('\r\n') + '\r\n', 'text/plain;charset=utf-8');
+        }
+        return true;
+      }
+
+      function wireExportButton(btnId, dropdownId, sectionSelector, label) {
+        const btn = document.getElementById(btnId);
+        const dropdown = document.getElementById(dropdownId);
+        if (!btn || !dropdown) return;
+        const originalHTML = btn.innerHTML;
+        const successIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (typeof openDropdownExclusive === 'function') {
+            openDropdownExclusive(dropdown);
+          } else {
+            dropdown.classList.toggle('show');
+          }
+        });
+
+        dropdown.addEventListener('click', (e) => {
+          const target = e.target.closest('.sort-option[data-export]');
+          if (!target) return;
+          e.stopPropagation();
+          const format = target.dataset.export;
+          const ok = exportSection(sectionSelector, format, label);
+          dropdown.classList.remove('show');
+          if (ok) {
+            btn.innerHTML = successIcon;
+            btn.style.color = 'var(--success-color)';
+            setTimeout(() => {
+              btn.innerHTML = originalHTML;
+              btn.style.color = '';
+            }, 1200);
+          }
+        });
+      }
+
+      wireExportButton('export-found-btn', 'export-found-dropdown', '#results-found', 'Updates');
+      wireExportButton('export-warning-btn', 'export-warning-dropdown', '#results-warning', 'Incompatible Mods');
+      wireExportButton('export-failure-btn', 'export-failure-dropdown', '#results-failure', 'Not-Found Mods');
+
       // --- Search functionality ---
       const searchFoundInput = document.getElementById("search-found");
       const searchWarningInput = document.getElementById("search-warning");
@@ -9792,7 +10436,12 @@
 
       const ALL_SORT_DROPDOWNS = [sortFoundDropdown, sortWarningDropdown, sortFailureDropdown];
       const ALL_FILTER_DROPDOWNS = [filterFoundDropdown, filterWarningDropdown];
-      const ALL_DROPDOWNS = [...ALL_SORT_DROPDOWNS, ...ALL_FILTER_DROPDOWNS].filter(Boolean);
+      const ALL_EXPORT_DROPDOWNS = [
+        document.getElementById('export-found-dropdown'),
+        document.getElementById('export-warning-dropdown'),
+        document.getElementById('export-failure-dropdown'),
+      ];
+      const ALL_DROPDOWNS = [...ALL_SORT_DROPDOWNS, ...ALL_FILTER_DROPDOWNS, ...ALL_EXPORT_DROPDOWNS].filter(Boolean);
 
       // Inject an active-filter chip bar below each section's header so chips can
       // appear when filters are toggled. Stored inside the section so a section
@@ -11243,13 +11892,24 @@
       else if (typeof searchedMods !== 'undefined' && searchedMods && searchedMods.has(mod.projectId)) cardSource = 'search';
       card.setAttribute('data-source', cardSource);
 
-      // Initial file-size for the File Size sort. Updated whenever the user
-      // changes the selected version (see updateDynamicContent below).
+      // Initial file-size + hash/filename stamping. Hashes are exposed as data
+      // attributes so the Export feature can include them without re-deriving
+      // the selected version. Refreshed in updateDynamicContent when the user
+      // changes the dropdown selection.
       try {
         const initialVersion = mod.all_versions && mod.all_versions[0];
         const initialPrimary = initialVersion ? selectArtifactFile(initialVersion, mod.project_type) : null;
-        if (initialPrimary && typeof initialPrimary.size === 'number') {
-          card.setAttribute('data-file-size', String(initialPrimary.size));
+        if (initialVersion && initialVersion.id) card.setAttribute('data-version-id', initialVersion.id);
+        if (initialPrimary) {
+          if (typeof initialPrimary.size === 'number') {
+            card.setAttribute('data-file-size', String(initialPrimary.size));
+          }
+          if (initialPrimary.filename) card.setAttribute('data-filename', initialPrimary.filename);
+          if (initialPrimary.url) card.setAttribute('data-download-url', initialPrimary.url);
+          if (initialPrimary.hashes) {
+            if (initialPrimary.hashes.sha1) card.setAttribute('data-file-sha1', initialPrimary.hashes.sha1);
+            if (initialPrimary.hashes.sha512) card.setAttribute('data-file-sha512', initialPrimary.hashes.sha512);
+          }
         }
       } catch (_) {}
 
@@ -11373,6 +12033,10 @@
         );
         if (!selectedVersion) return;
 
+        // Stamp the selected Modrinth version id so Export (and future Import)
+        // can round-trip the exact version the user chose.
+        if (selectedVersion.id) card.setAttribute('data-version-id', selectedVersion.id);
+
         const primaryFile = selectArtifactFile(selectedVersion, mod.project_type);
 
         const dlKey = getSuccessfulDownloadKey(mod.projectId, mod.project_type);
@@ -11392,6 +12056,16 @@
           // the currently-selected version.
           if (typeof primaryFile.size === 'number') {
             card.setAttribute('data-file-size', String(primaryFile.size));
+          }
+          // Mirror filename/hash/url onto the card so Export can read them
+          // without needing access to the version object.
+          if (primaryFile.filename) card.setAttribute('data-filename', primaryFile.filename);
+          if (primaryFile.url) card.setAttribute('data-download-url', primaryFile.url);
+          if (primaryFile.hashes) {
+            if (primaryFile.hashes.sha1) card.setAttribute('data-file-sha1', primaryFile.hashes.sha1);
+            else card.removeAttribute('data-file-sha1');
+            if (primaryFile.hashes.sha512) card.setAttribute('data-file-sha512', primaryFile.hashes.sha512);
+            else card.removeAttribute('data-file-sha512');
           }
 
           // --- Add new version to the list for bulk downloads ---
@@ -11675,6 +12349,7 @@
       // We keep the 'warning' class for the yellow border
       card.className = "result-card warning";
       card.setAttribute('data-project-id', mod.projectId);
+      if (mod.project_type) card.setAttribute('data-project-type', mod.project_type);
       card.dataset.supportedLoaders = Array.isArray(mod.supportedLoaders)
         ? mod.supportedLoaders.map(loader => String(loader).toLowerCase()).join(',')
         : '';
