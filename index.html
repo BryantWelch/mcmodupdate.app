@@ -880,6 +880,22 @@
       color: var(--primary-text);
     }
 
+    .footer-bottom p #privacy-link {
+      color: var(--secondary-text);
+      text-decoration: underline;
+      transition: color 0.2s ease;
+      background: none;
+      border: none;
+      font: inherit;
+      font-size: inherit;
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .footer-bottom p #privacy-link:hover {
+      color: var(--primary-text);
+    }
+
     .kofi-button {
       position: absolute;
       right: 1rem;
@@ -3820,7 +3836,7 @@
         <a href="https://github.com/BryantWelch/mcmodupdate.app/blob/main/LICENSE" target="_blank"
           rel="noopener noreferrer">MPL-2.0</a>.
         <span aria-hidden="true" style="margin: 0 0.5rem; color: var(--secondary-text);">|</span>
-        <a href="#" id="privacy-link" role="button">Privacy Policy</a>.
+        <button type="button" id="privacy-link" title="Open privacy policy">Privacy Policy</button>.
       </p>
       <a href="https://ko-fi.com/bryantwelch" target="_blank" rel="noopener noreferrer" class="kofi-button"
         title="Support the developer!">
@@ -4826,9 +4842,7 @@
     attachOverlayBackdropClose(infoModal, () => hideModalWithScrollUnlock(infoModal));
 
     document.addEventListener("click", (e) => {
-      const trigger = e.target.closest("#privacy-link");
-      if (!trigger) return;
-      e.preventDefault();
+      if (!e.target.closest("#privacy-link")) return;
       showModalWithScrollLock(privacyModal);
     });
     privacyModalCloseButton.addEventListener("click", () => {
