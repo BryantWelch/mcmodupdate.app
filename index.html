@@ -16,7 +16,6 @@
   <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
   <meta name="googlebot" content="index, follow">
   <meta name="google-site-verification" content="d-Z4KwHExUTAtvp9VwSdNKAgimNP8hglF61av3rrC1E">
-  <meta name="google-adsense-account" content="ca-pub-1728229586138721">
   <link rel="canonical" href="https://mcmodupdate.app/">
   <link rel="alternate" hreflang="en" href="https://mcmodupdate.app/">
   <link rel="alternate" hreflang="x-default" href="https://mcmodupdate.app/">
@@ -45,7 +44,6 @@
   <meta property="og:url" content="https://mcmodupdate.app/">
   <meta property="og:site_name" content="Minecraft Mod Updater">
   <meta property="og:locale" content="en_US">
-  <!-- TODO: replace social-preview.png with a 1200x630 image for best link previews -->
   <meta property="og:image" content="https://mcmodupdate.app/social-preview.png">
   <meta property="og:image:secure_url" content="https://mcmodupdate.app/social-preview.png">
   <meta property="og:image:width" content="1200">
@@ -727,7 +725,8 @@
       fill: none;
     }
 
-    #info-modal .modal-content {
+    #info-modal .modal-content,
+    #privacy-modal .modal-content {
       max-width: 760px;
       width: min(760px, calc(100% - 2rem));
       max-height: 84vh;
@@ -739,21 +738,24 @@
       box-shadow: 0 14px 38px rgba(0, 0, 0, 0.34), 0 2px 10px rgba(0, 0, 0, 0.26);
     }
 
-    #info-modal .info-modal-header {
+    #info-modal .info-modal-header,
+    #privacy-modal .info-modal-header {
       position: relative;
       padding: 1.6rem 4rem 1rem 1.75rem;
       border-bottom: 1px solid rgba(255, 255, 255, 0.1);
       background: #1e1e2f;
     }
 
-    #info-modal .info-modal-header h2 {
+    #info-modal .info-modal-header h2,
+    #privacy-modal .info-modal-header h2 {
       margin: 0;
       color: var(--primary-text);
       font-size: 2rem;
       line-height: 1.2;
     }
 
-    #info-modal .info-modal-body {
+    #info-modal .info-modal-body,
+    #privacy-modal .info-modal-body {
       padding: 1.15rem 1.75rem 1.5rem;
       overflow-y: auto;
       min-height: 0;
@@ -762,33 +764,39 @@
       scrollbar-gutter: stable;
     }
 
-    #info-modal .info-modal-body h3 {
+    #info-modal .info-modal-body h3,
+    #privacy-modal .info-modal-body h3 {
       margin: 1.45rem 0 0.65rem;
       color: var(--primary-text);
       font-size: 1.45rem;
       font-weight: 650;
     }
 
-    #info-modal .info-modal-body h3:not(:first-of-type) {
+    #info-modal .info-modal-body h3:not(:first-of-type),
+    #privacy-modal .info-modal-body h3:not(:first-of-type) {
       padding-top: 1rem;
       border-top: 1px solid rgba(255, 255, 255, 0.08);
     }
 
-    #info-modal .info-modal-body p {
+    #info-modal .info-modal-body p,
+    #privacy-modal .info-modal-body p {
       margin: 0.5rem 0 0.95rem;
     }
 
-    #info-modal .info-modal-body ul {
+    #info-modal .info-modal-body ul,
+    #privacy-modal .info-modal-body ul {
       margin: 0.35rem 0 0.95rem;
       padding-left: 1.35rem;
     }
 
-    #info-modal .info-modal-body li {
+    #info-modal .info-modal-body li,
+    #privacy-modal .info-modal-body li {
       margin-bottom: 0.12rem;
       line-height: 1.25;
     }
 
-    #info-modal #modal-close-button {
+    #info-modal #modal-close-button,
+    #privacy-modal #privacy-modal-close-button {
       top: 1rem;
       right: 1rem;
       z-index: 2;
@@ -3533,6 +3541,91 @@
     </div>
   </div>
 
+  <!-- PRIVACY POLICY MODAL BLOCK -->
+  <div id="privacy-modal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="info-modal-header">
+        <button id="privacy-modal-close-button" class="modal-close-button" title="Close privacy policy"
+          aria-label="Close privacy policy">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M6 6L18 18M18 6L6 18"></path>
+          </svg>
+        </button>
+        <h2>Privacy Policy</h2>
+      </div>
+
+      <div class="info-modal-body">
+        <p>
+          <b>Minecraft Mod Updater is a static, client-side web application.</b> There is no backend server
+          collecting or storing data about you. Everything happens locally inside your browser tab.
+        </p>
+
+        <h3>Your Files</h3>
+        <p>
+          Any <code>.jar</code>, <code>.zip</code>, <code>.mrpack</code>, or <code>.json</code> files you upload
+          are processed <b>entirely in your browser</b>. They are never uploaded to mcmodupdate.app or any third
+          party. When you close or refresh the tab, the files are gone.
+        </p>
+
+        <h3>Browser Storage</h3>
+        <p>
+          To improve performance, the application stores a small amount of non-personal data locally on your device:
+        </p>
+        <ul>
+          <li><b>localStorage</b> — caches the list of Minecraft versions and Modrinth platform statistics so the
+            app loads faster on subsequent visits.</li>
+          <li><b>sessionStorage</b> — caches mod lookups during your current tab session and is cleared automatically
+            when you close the tab.</li>
+        </ul>
+        <p>
+          You can clear this data at any time using your browser's site-data controls. The site does not use
+          tracking cookies.
+        </p>
+
+        <h3>Third-Party Services</h3>
+        <p>
+          The site loads resources from the following third parties. Each may receive standard request data
+          (your IP address, user-agent, and the resource being requested) under their own privacy policies:
+        </p>
+        <ul>
+          <li><b>Modrinth API</b> (<code>api.modrinth.com</code>) — used to search for mods and retrieve version
+            and dependency information.</li>
+          <li><b>Modrinth CDN</b> — serves mod icons and gallery images.</li>
+          <li><b>jsDelivr, unpkg, cdnjs</b> — public JavaScript content delivery networks used to load the
+            libraries the app depends on (JSZip, toml-js, marked, crypto-js).</li>
+          <li><b>Ko-fi</b> — only contacted when you click the "Buy Me a Coffee" button.</li>
+        </ul>
+
+        <h3>What We Do Not Do</h3>
+        <ul>
+          <li>No user accounts, sign-ups, or logins.</li>
+          <li>No first-party analytics or fingerprinting scripts.</li>
+          <li>No tracking cookies.</li>
+          <li>No advertising or ad-network integrations.</li>
+          <li>No selling, sharing, or transferring of any user data — because we don't collect any.</li>
+        </ul>
+
+        <h3>Open Source</h3>
+        <p>
+          The complete source code is available on
+          <a href="https://github.com/BryantWelch/mcmodupdate.app" target="_blank" rel="noopener noreferrer">GitHub</a>,
+          so you can verify the privacy claims above. If you find something that contradicts this policy, please
+          <a href="https://github.com/BryantWelch/mcmodupdate.app/issues" target="_blank" rel="noopener noreferrer">open
+          an issue</a>.
+        </p>
+
+        <h3>Contact</h3>
+        <p>
+          Questions about this policy can be sent via the GitHub repository linked above.
+        </p>
+
+        <p style="margin-top:1.5rem;font-size:0.85rem;color:var(--secondary-text);">
+          Last updated: May 14, 2026.
+        </p>
+      </div>
+    </div>
+  </div>
+
   <!-- ALERT MODAL BLOCK -->
   <div id="alert-modal" class="modal-overlay">
     <div class="modal-content">
@@ -3716,16 +3809,18 @@
             <a href="https://discord.gg/moddedmc" target="_blank" rel="noopener noreferrer">Modded Minecraft Discord</a>
           </li>
           <li>
-            <a href="https://discord.fabricmc.net/" target="_blank" rel="noopener noreferrer">Fabric Project Discord</a>
+            <a href="https://discord.gg/modrinth" target="_blank" rel="noopener noreferrer">Modrinth Discord</a>
           </li>
         </ul>
       </div>
     </div>
     <div class="footer-bottom">
       <p>
-        &copy; <span id="current-year">2025</span> Bryant Welch. Open source under
+        &copy; <span id="current-year">2026</span> Bryant Welch. Open source under
         <a href="https://github.com/BryantWelch/mcmodupdate.app/blob/main/LICENSE" target="_blank"
-          rel="noopener noreferrer">License</a>.
+          rel="noopener noreferrer">MPL-2.0</a>.
+        <span aria-hidden="true" style="margin: 0 0.5rem; color: var(--secondary-text);">|</span>
+        <a href="#" id="privacy-link" role="button">Privacy Policy</a>.
       </p>
       <a href="https://ko-fi.com/bryantwelch" target="_blank" rel="noopener noreferrer" class="kofi-button"
         title="Support the developer!">
@@ -4370,6 +4465,8 @@
     const fileInput = document.getElementById("file-input");
     const infoModal = document.getElementById("info-modal");
     const modalCloseButton = document.getElementById("modal-close-button");
+    const privacyModal = document.getElementById("privacy-modal");
+    const privacyModalCloseButton = document.getElementById("privacy-modal-close-button");
     const mcVersionSelect = document.getElementById("mc-version");
     const updateButton = document.getElementById("update-button");
     const modLoaderSelect = document.getElementById("mod-loader");
@@ -4727,6 +4824,17 @@
       hideModalWithScrollUnlock(infoModal);
     });
     attachOverlayBackdropClose(infoModal, () => hideModalWithScrollUnlock(infoModal));
+
+    document.addEventListener("click", (e) => {
+      const trigger = e.target.closest("#privacy-link");
+      if (!trigger) return;
+      e.preventDefault();
+      showModalWithScrollLock(privacyModal);
+    });
+    privacyModalCloseButton.addEventListener("click", () => {
+      hideModalWithScrollUnlock(privacyModal);
+    });
+    attachOverlayBackdropClose(privacyModal, () => hideModalWithScrollUnlock(privacyModal));
 
     // --- Clear Results Button Logic ---
     clearResultsButton.addEventListener("click", resetResults);
