@@ -9,7 +9,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Minecraft Mod Updater | Update Your Minecraft Mods</title>
   <meta name="description"
-    content="Easily update your Minecraft mods or build a new modpack from scratch. Upload your .jar files or search for mods on Modrinth to find the latest compatible versions and dependencies.">
+    content="Update Minecraft mods or build a new modpack in your browser. Upload .jar files or search Modrinth for the latest compatible versions and dependencies.">
   <meta name="keywords"
     content="Minecraft, Mod, Updater, Modpack, Builder, Modrinth, Fabric, Forge, NeoForge, Quilt, Update, Minecraft Mods">
   <meta name="author" content="Bryant Welch">
@@ -40,23 +40,25 @@
   <!-- Open Graph / Social Media Tags -->
   <meta property="og:title" content="Minecraft Mod Updater | Update & Build Minecraft Modpacks">
   <meta property="og:description"
-    content="Easily update your Minecraft mods or build a new modpack from scratch. Upload your .jar files or search for mods on Modrinth to find the latest compatible versions and dependencies.">
+    content="Update Minecraft mods or build a new modpack in your browser. Upload .jar files or search Modrinth for the latest compatible versions and dependencies.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://mcmodupdate.app/">
   <meta property="og:site_name" content="Minecraft Mod Updater">
   <meta property="og:locale" content="en_US">
+  <!-- TODO: replace social-preview.png with a 1200x630 image for best link previews -->
   <meta property="og:image" content="https://mcmodupdate.app/social-preview.png">
-  <meta property="og:image:width" content="192">
-  <meta property="og:image:height" content="192">
+  <meta property="og:image:secure_url" content="https://mcmodupdate.app/social-preview.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:alt"
     content="Minecraft Mod Updater — update mods and build Modrinth modpacks in your browser">
 
   <!-- Twitter Card Tags -->
-  <meta name="twitter:card" content="summary">
+  <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Minecraft Mod Updater | Update Your Minecraft Mods">
   <meta name="twitter:description"
-    content="Easily update your Minecraft mods or build a new modpack from scratch. Upload your .jar files or search for mods on Modrinth to find the latest compatible versions and dependencies.">
+    content="Update Minecraft mods or build a new modpack in your browser. Upload .jar files or search Modrinth for the latest compatible versions and dependencies.">
   <meta name="twitter:image" content="https://mcmodupdate.app/social-preview.png">
   <meta name="twitter:image:alt"
     content="Minecraft Mod Updater — update mods and build Modrinth modpacks in your browser">
@@ -71,16 +73,24 @@
           "@id": "https://mcmodupdate.app/#website",
           "name": "Minecraft Mod Updater",
           "url": "https://mcmodupdate.app/",
-          "description": "Easily update your Minecraft mods or build a new modpack from scratch. Upload your .jar files or search for mods on Modrinth to find the latest compatible versions and dependencies.",
+          "description": "Update Minecraft mods or build a new modpack in your browser. Upload .jar files or search Modrinth for the latest compatible versions and dependencies.",
           "inLanguage": "en-US",
           "publisher": { "@id": "https://mcmodupdate.app/#person" },
-          "sameAs": ["https://github.com/BryantWelch/mcmodupdate.app"]
+          "sameAs": ["https://github.com/BryantWelch/mcmodupdate.app"],
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": {
+              "@type": "EntryPoint",
+              "urlTemplate": "https://mcmodupdate.app/?q={search_term_string}"
+            },
+            "query-input": "required name=search_term_string"
+          }
         },
         {
           "@type": "WebApplication",
           "@id": "https://mcmodupdate.app/#webapp",
           "name": "Minecraft Mod Updater",
-          "description": "Easily update your Minecraft mods or build a new modpack from scratch. Upload your .jar files or search for mods on Modrinth to find the latest compatible versions and dependencies.",
+          "description": "Update Minecraft mods or build a new modpack in your browser. Upload .jar files or search Modrinth for the latest compatible versions and dependencies.",
           "url": "https://mcmodupdate.app/",
           "isPartOf": { "@id": "https://mcmodupdate.app/#website" },
           "image": "https://mcmodupdate.app/android-chrome-512x512.png",
@@ -112,10 +122,128 @@
       ]
     }
   </script>
-  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-  <script src="https://unpkg.com/toml-js@0.0.8/lib/amd/toml.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+
+  <!-- Breadcrumb structured data -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://mcmodupdate.app/"
+        }
+      ]
+    }
+  </script>
+
+  <!-- FAQ structured data (eligible for rich results in Google) -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Is Minecraft Mod Updater free to use?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. Minecraft Mod Updater is completely free, runs entirely in your browser, and does not require an account."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Which mod loaders are supported?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Fabric, Forge, NeoForge, and Quilt are all supported. You can choose your target loader and Minecraft version when updating or building a modpack."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How does the mod updater work?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Upload your existing .jar mod files. The tool reads each mod's metadata, looks it up on Modrinth, and finds the newest version compatible with your selected Minecraft version and loader. Dependencies are resolved automatically."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I build a new modpack from scratch?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. You can search Modrinth directly for mods, modpacks, shaders, resource packs, and data packs, then export the result as a Modrinth-format .mrpack file."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Are my mod files uploaded to a server?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. All processing happens locally in your browser. Your .jar files are never uploaded; only public Modrinth API calls are made to look up mod information."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What file format does it export?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Minecraft Mod Updater exports modpacks in the official Modrinth .mrpack format, which can be opened in the Modrinth App, Prism Launcher, ATLauncher, and other compatible launchers."
+          }
+        }
+      ]
+    }
+  </script>
+
+  <!-- HowTo structured data -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "HowTo",
+      "name": "How to update your Minecraft mods",
+      "description": "Update your existing Minecraft mod collection to a newer Minecraft version using Modrinth.",
+      "totalTime": "PT3M",
+      "supply": [
+        { "@type": "HowToSupply", "name": "Your existing Minecraft mod .jar files" }
+      ],
+      "tool": [
+        { "@type": "HowToTool", "name": "A modern web browser" }
+      ],
+      "step": [
+        {
+          "@type": "HowToStep",
+          "position": 1,
+          "name": "Choose your loader and target version",
+          "text": "Select your mod loader (Fabric, Forge, NeoForge, or Quilt) and the Minecraft version you want to update to."
+        },
+        {
+          "@type": "HowToStep",
+          "position": 2,
+          "name": "Upload your mod files",
+          "text": "Drag and drop your .jar files into the upload area. The tool reads each mod's metadata locally in your browser."
+        },
+        {
+          "@type": "HowToStep",
+          "position": 3,
+          "name": "Review matches and dependencies",
+          "text": "Minecraft Mod Updater searches Modrinth for the latest compatible version of each mod and resolves required dependencies automatically."
+        },
+        {
+          "@type": "HowToStep",
+          "position": 4,
+          "name": "Export your updated modpack",
+          "text": "Download the result as a Modrinth-format .mrpack file and import it into the Modrinth App, Prism Launcher, or any compatible launcher."
+        }
+      ]
+    }
+  </script>
+
+  <script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script defer src="https://unpkg.com/toml-js@0.0.8/lib/amd/toml.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
   <style>
     /* -- CSS -- */
     :root {
@@ -3104,9 +3232,50 @@
 
 <body>
   <noscript>
-    <p style="max-width:40rem;margin:1rem auto;padding:0 1rem;text-align:center;font-family:system-ui,sans-serif;">
-      Minecraft Mod Updater needs JavaScript. Enable it to update mods, search Modrinth, and export modpacks from this page.
-    </p>
+    <div style="max-width:48rem;margin:2rem auto;padding:0 1rem;font-family:system-ui,sans-serif;line-height:1.6;">
+      <h1>Minecraft Mod Updater</h1>
+      <p>
+        <strong>Minecraft Mod Updater</strong> is a free, browser-based tool that helps you update your
+        existing Minecraft mod collection or build a brand-new modpack from scratch. Upload your
+        <code>.jar</code> files or search <a href="https://modrinth.com/">Modrinth</a> directly to find
+        the latest compatible versions of mods, modpacks, shaders, resource packs, and data packs.
+      </p>
+      <p>
+        This page requires JavaScript to run. Please enable JavaScript in your browser to use the tool.
+      </p>
+
+      <h2>Features</h2>
+      <ul>
+        <li>Update local Minecraft mods to the latest Modrinth-compatible release</li>
+        <li>Search Modrinth for mods, modpacks, shaders, resource packs, and data packs</li>
+        <li>Automatic dependency resolution</li>
+        <li>Export results as a Modrinth-format <code>.mrpack</code> modpack</li>
+        <li>Support for Fabric, Forge, NeoForge, and Quilt loaders</li>
+        <li>Choose any target Minecraft version</li>
+        <li>Everything runs locally in your browser — no uploads, no accounts</li>
+      </ul>
+
+      <h2>How it works</h2>
+      <ol>
+        <li>Select your mod loader (Fabric, Forge, NeoForge, or Quilt) and target Minecraft version.</li>
+        <li>Drag and drop your existing <code>.jar</code> files, or search Modrinth for new mods.</li>
+        <li>Review the matched versions and any required dependencies.</li>
+        <li>Download the result as a Modrinth <code>.mrpack</code> file and import it into your launcher.</li>
+      </ol>
+
+      <h2>Frequently Asked Questions</h2>
+      <h3>Is Minecraft Mod Updater free?</h3>
+      <p>Yes. It is completely free, runs entirely in your browser, and does not require an account.</p>
+      <h3>Are my mod files uploaded anywhere?</h3>
+      <p>No. All processing happens locally in your browser. Only public Modrinth API calls are made.</p>
+      <h3>Which launchers can open the exported file?</h3>
+      <p>The <code>.mrpack</code> format works with the Modrinth App, Prism Launcher, ATLauncher, and other compatible launchers.</p>
+
+      <p>
+        Source code is available on
+        <a href="https://github.com/BryantWelch/mcmodupdate.app">GitHub</a>.
+      </p>
+    </div>
   </noscript>
 
   <div class="main-container">
@@ -3509,8 +3678,8 @@
               rel="noopener noreferrer">Contribute</a>
           </li>
           <li>
-            <a href="https://github.com/BryantWelch/mcmodupdate.app/releases" target="_blank"
-              rel="noopener noreferrer">Releases</a>
+            <a href="https://github.com/BryantWelch/mcmodupdate.app/commits/main/" target="_blank"
+              rel="noopener noreferrer">Changelog</a>
           </li>
         </ul>
       </div>
@@ -3560,7 +3729,8 @@
       </p>
       <a href="https://ko-fi.com/bryantwelch" target="_blank" rel="noopener noreferrer" class="kofi-button"
         title="Support the developer!">
-        <img src="https://storage.ko-fi.com/cdn/kofi5.png?v=6" alt="Buy Me a Coffee at ko-fi.com" />
+        <img src="https://storage.ko-fi.com/cdn/kofi5.png?v=6" alt="Buy Me a Coffee at ko-fi.com"
+          loading="lazy" decoding="async" width="145" height="36" />
       </a>
     </div>
   </footer>
