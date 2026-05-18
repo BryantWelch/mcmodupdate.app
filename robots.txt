@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
+Disallow: /v2/
 
 Sitemap: https://mcmodupdate.app/sitemap.xml
