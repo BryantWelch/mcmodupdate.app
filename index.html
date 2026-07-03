@@ -987,6 +987,8 @@
       display: flex;
       gap: 1rem;
       width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
     }
 
     .result-card.failure,
@@ -1313,11 +1315,17 @@
     .changelog-content {
       display: none;
       width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
       margin-top: 1rem;
       padding-top: 1rem;
       border-top: 1px solid var(--border-color);
       color: var(--secondary-text);
       font-size: 0.9rem;
+      overflow-x: hidden;
+      overflow-wrap: anywhere;
+      word-break: break-word;
     }
 
     .changelog-content.visible {
@@ -1327,6 +1335,21 @@
     .changelog-content ul {
       padding-left: 20px;
       margin: 0;
+    }
+
+    .changelog-content pre,
+    .description-content pre {
+      max-width: 100%;
+      box-sizing: border-box;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .changelog-content code,
+    .description-content code {
+      overflow-wrap: anywhere;
+      word-break: break-word;
     }
 
     .changelog-content video,
@@ -1359,11 +1382,17 @@
     .description-content {
       display: none;
       width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
       margin-top: 1rem;
       padding-top: 1rem;
       border-top: 1px solid var(--border-color);
       color: var(--secondary-text);
       font-size: 0.9rem;
+      overflow-x: hidden;
+      overflow-wrap: anywhere;
+      word-break: break-word;
     }
 
     .gallery-content.visible,
@@ -10804,6 +10833,7 @@
         if (!section) return;
         const cards = section.querySelectorAll('.result-card');
         const term = (state.searchTerm || '').toLowerCase();
+        const hasActiveFilter = state.filters.size > 0 || Boolean(state.searchTerm);
         cards.forEach(card => {
           let visible = true;
           // Dropdown filter pass: must match every active filterType.
@@ -10822,6 +10852,10 @@
         });
 
         if (sectionSelector === "#results-found") {
+          const visibleFoundCount = hasActiveFilter
+            ? Array.from(cards).filter(card => card.style.display !== 'none').length
+            : null;
+          updateSectionHeader("found", sectionCounts.found || cards.length, visibleFoundCount);
           updateFoundSectionActionVisibility();
         } else if (sectionSelector === "#results-warning") {
           updateWarningSectionFilterVisibility();
@@ -11481,7 +11515,7 @@
     }
 
     // --- Helper to update section headers with counts ---
-    function updateSectionHeader(type, count) {
+    function updateSectionHeader(type, count, visibleCount = null) {
       const headerId = `header-${type}`; // e.g., 'header-found'
       const headerElement = document.getElementById(headerId);
       if (!headerElement) return; // Safety check
@@ -11501,7 +11535,10 @@
 
       // Only show the count if it's greater than zero
       if (count > 0) {
-        headerElement.textContent = `${baseText} (${count})`;
+        const countText = type === "found" && Number.isInteger(visibleCount)
+          ? `${visibleCount}/${count}`
+          : count;
+        headerElement.textContent = `${baseText} (${countText})`;
       } else {
         headerElement.textContent = baseText;
       }
