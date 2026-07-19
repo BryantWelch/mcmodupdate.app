@@ -2924,6 +2924,7 @@
       /* Make the main container use the full width */
       .main-container {
         padding: 0 1rem;
+        box-sizing: border-box;
       }
 
       /* Make search boxes smaller on mobile */
@@ -3003,23 +3004,59 @@
 
       /* --- Fix the Footer Layout --- */
       .footer-content {
-        flex-direction: column; /* Stack the columns vertically */
-        text-align: center; /* Center the text inside each column */
-        gap: 2rem; /* Add more space between the stacked sections */
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        align-items: start;
+        gap: 0.875rem;
+        padding: 1rem 1rem 0.875rem;
+        text-align: center;
+        box-sizing: border-box;
+      }
+
+      .footer-column {
+        min-width: 0;
+      }
+
+      .footer-column:last-child {
+        grid-column: auto;
+      }
+
+      .footer-column h4 {
+        margin: 0 0 0.5rem;
+        font-size: 1.1rem;
+      }
+
+      .footer-column ul li {
+        margin-bottom: 0.3rem;
+        font-size: 0.82rem;
+        line-height: 1.35;
+      }
+
+      .footer-column:last-child ul {
+        display: block;
+      }
+
+      .footer-column:last-child ul li {
+        margin-bottom: 0.3rem;
       }
 
       .footer-bottom {
         display: flex;
-        flex-direction: column; /* Stack the copyright and Ko-fi button */
+        flex-direction: column;
         align-items: center;
-        gap: 1rem;
-        padding-top: 1.5rem;
+        gap: 0.625rem;
+        padding: 0.75rem 1rem 0.5rem;
+        line-height: 1.4;
       }
 
       .kofi-button {
-        position: static; /* Remove absolute positioning */
-        transform: none; /* Reset the transform */
-        margin-top: 0.5rem; /* Add some space above it */
+        position: static;
+        transform: none;
+        margin-top: 0;
+      }
+
+      .kofi-button img {
+        height: 32px;
       }
 
       /* --- Mobile-friendly Info Modal --- */
@@ -3056,22 +3093,46 @@
       .results-header-container {
         flex-direction: column;
         align-items: stretch;
-        gap: 1rem;
-      }
-
-      .results-header-container h2 {
-        text-align: center;
-        margin-bottom: 0;
-      }
-
-      .header-buttons {
-        justify-content: center;
-        flex-wrap: wrap;
         gap: 0.75rem;
       }
 
-      .search-box {
-        width: 120px;
+      .results-header-container h2 {
+        text-align: left;
+        margin-bottom: 0;
+        font-size: clamp(1.45rem, 7vw, 1.8rem);
+      }
+
+      .header-buttons {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 0.5rem;
+        width: 100%;
+      }
+
+      .header-buttons .search-box-wrapper {
+        grid-column: 1 / -1;
+        display: block;
+        width: 100%;
+        margin-right: 0 !important;
+      }
+
+      .header-buttons .search-box {
+        width: 100%;
+        min-height: 42px;
+        box-sizing: border-box;
+      }
+
+      .header-buttons > .layout-toggle,
+      .header-buttons > .sort-dropdown-container {
+        width: 100%;
+        min-width: 0;
+      }
+
+      .header-buttons > .layout-toggle,
+      .header-buttons > .sort-dropdown-container > .layout-toggle {
+        width: 100%;
+        min-height: 42px;
+        box-sizing: border-box;
       }
 
       /* --- Mobile-specific search clear button positioning --- */
@@ -3087,12 +3148,16 @@
 
       /* --- Mobile search modal positioning --- */
       #search-modal .modal-content {
-        width: 95% !important;
+        width: calc(100% - 2rem) !important;
         max-width: none !important;
-        margin: 1rem !important;
-        padding: 1.5rem !important;
-        max-height: 80vh !important;
+        height: auto;
+        margin: 0 !important;
+        padding: 0 !important;
+        max-height: calc(100vh - 2rem) !important;
+        max-height: calc(100dvh - 2rem) !important;
+        overflow-x: hidden !important;
         overflow-y: auto !important;
+        overscroll-behavior: contain;
         position: relative !important;
         top: auto !important;
         bottom: auto !important;
@@ -3102,8 +3167,119 @@
       }
 
       /* --- Mobile search header layout --- */
-      .modal-search-header .search-container {
+      #search-modal .modal-search-header {
+        padding: 1.25rem 1rem 1rem !important;
+      }
+
+      #search-modal .modal-search-header h2 {
+        margin: 0 2.5rem 1rem !important;
+        font-size: 1.5rem !important;
+      }
+
+      #search-modal .modal-search-header .search-container {
+        width: 100%;
         max-width: none !important;
+        box-sizing: border-box;
+      }
+
+      #search-modal .modal-search-header .search-container input {
+        width: 100% !important;
+        min-height: 44px;
+        box-sizing: border-box;
+      }
+
+      #search-modal .search-filter-controls {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem !important;
+        margin-top: 0.875rem !important;
+      }
+
+      #search-modal .search-filter-controls > div {
+        width: 100%;
+        min-width: 0;
+        align-items: stretch !important;
+        gap: 0.35rem !important;
+      }
+
+      #search-modal .search-filter-controls label {
+        text-align: left;
+      }
+
+      #search-modal .search-filter-controls select {
+        width: 100% !important;
+        max-width: none !important;
+        min-width: 0;
+        min-height: 42px;
+        box-sizing: border-box;
+      }
+
+      #search-modal #search-results-container {
+        gap: 0.75rem;
+        padding: 0.75rem 1rem 0.5rem;
+        flex: 0 0 auto;
+        min-height: auto;
+        overflow-x: hidden;
+        overflow-y: visible;
+      }
+
+      #search-modal .result-card.search {
+        width: 100%;
+        min-width: 0;
+        margin: 0 !important;
+        padding: 0.75rem;
+        box-sizing: border-box;
+      }
+
+      #search-modal .result-card.search .result-card-main {
+        display: grid;
+        grid-template-columns: 56px minmax(0, 1fr);
+        align-items: start;
+        gap: 0.75rem;
+        min-width: 0;
+      }
+
+      #search-modal .result-card.search .mod-icon {
+        width: 56px;
+        height: 56px;
+      }
+
+      #search-modal .result-card.search .mod-details {
+        width: auto;
+        min-width: 0;
+        align-items: stretch;
+        text-align: left;
+      }
+
+      #search-modal .result-card.search .mod-title {
+        font-size: 1.05rem;
+        line-height: 1.25;
+        overflow-wrap: anywhere;
+      }
+
+      #search-modal .result-card.search .mod-description {
+        display: -webkit-box;
+        overflow: hidden;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        line-height: 1.35;
+      }
+
+      #search-modal .result-card.search .mod-meta {
+        justify-content: flex-start;
+        gap: 0.5rem 0.75rem;
+        margin-top: 0.5rem;
+      }
+
+      #search-modal .modal-actions {
+        padding: 0.5rem 1rem 1rem;
+      }
+
+      #search-modal .modal-actions button {
+        width: 100%;
+        max-width: none;
+        box-sizing: border-box;
       }
 
       /* Position the search modal overlay differently on mobile */
@@ -3137,27 +3313,129 @@
       }
 
       /* --- Mobile result cards adjustments --- */
-      body .result-card {
-        margin: 0 1rem 1rem 1rem !important;
+      #results-area .results-list {
+        gap: 0.75rem;
+      }
+
+      #results-area .result-card {
+        margin: 0 0 0.75rem 0 !important;
+        padding: 0.875rem;
         box-sizing: border-box !important;
       }
 
-      /* --- Mobile mod actions layout - side by side --- */
-      body .mod-actions {
-        flex-direction: row !important;
-        justify-content: space-between !important;
+      #results-area .result-card-main {
+        display: grid;
+        grid-template-columns: 56px minmax(0, 1fr);
+        align-items: start;
+        column-gap: 0.75rem;
+        row-gap: 0.875rem;
+      }
+
+      #results-area .mod-icon-link {
+        align-self: start;
+      }
+
+      #results-area .mod-icon {
+        width: 56px;
+        height: 56px;
+      }
+
+      #results-area .mod-details {
+        width: auto;
+        text-align: left;
+        align-items: stretch;
+      }
+
+      #results-area .mod-title {
+        font-size: 1.05rem;
+        line-height: 1.25;
+      }
+
+      #results-area .mod-description {
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+      }
+
+      #results-area .mod-meta {
+        justify-content: flex-start;
+        gap: 0.55rem 0.85rem;
+        margin-top: 0.55rem;
+      }
+
+      #results-area .mod-meta-toggles {
+        justify-content: flex-start;
+        flex-wrap: wrap;
+        gap: 0.5rem 0.9rem;
+      }
+
+      /* Keep version selection and download together beneath card details. */
+      #results-area .mod-actions {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        width: 100%;
+        flex-direction: initial !important;
         align-items: center !important;
-        gap: 0.75rem !important;
+        gap: 0.625rem !important;
       }
 
-      body .mod-actions select {
-        flex: 1 !important;
+      #results-area .mod-actions .version-select {
+        width: 100%;
         min-width: 0 !important;
+        height: 42px;
       }
 
-      body .mod-actions .download-btn {
-        flex-shrink: 0 !important;
+      #results-area .mod-actions .download-link {
+        width: 100%;
+        min-height: 42px;
+        padding: 0.5rem 0.75rem;
+        box-sizing: border-box;
         white-space: nowrap !important;
+      }
+
+      /* Let bulk controls wrap cleanly instead of overflowing the viewport. */
+      .bulk-actions-bar.show {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.5rem;
+        padding: 0.75rem;
+      }
+
+      .bulk-actions-bar .bulk-selection-count {
+        grid-column: 1 / -1;
+        margin: 0;
+        text-align: center;
+      }
+
+      .bulk-actions-bar .bulk-divider {
+        display: none;
+      }
+
+      .bulk-actions-bar button,
+      #toggle-select-all-bulk-btn,
+      #toggle-select-all-bulk-warning-btn,
+      #toggle-select-all-bulk-failure-btn {
+        width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+      }
+
+      /* Keep navigation useful without covering as much card content. */
+      #scroll-buttons-container {
+        right: max(0.5rem, env(safe-area-inset-right));
+        bottom: calc(4.25rem + env(safe-area-inset-bottom));
+        gap: 0.5rem;
+      }
+
+      .scroll-btn {
+        width: 40px;
+        height: 40px;
+        opacity: 0.55;
+      }
+
+      .scroll-btn svg {
+        width: 20px;
+        height: 20px;
       }
 
       /* --- Mobile download buttons container --- */
@@ -3165,7 +3443,7 @@
         flex-direction: column !important;
         gap: 0.75rem !important;
         align-items: center !important;
-        margin: 0 1rem !important;
+        margin: 0 !important;
       }
 
       body .download-button-group {
@@ -3180,8 +3458,15 @@
 
       /* Center the 'Add' button in the search modal on mobile */
       #search-modal .result-card .mod-actions {
-        justify-content: center !important; /* Override the more generic rule */
-        padding-top: 0.5rem;
+        grid-column: 1 / -1;
+        display: block;
+        width: 100%;
+        padding-top: 0;
+      }
+
+      #search-modal .result-card .add-mod-button {
+        width: 100%;
+        min-height: 42px;
       }
 
       /* Vertically align the clear button in the modal's search input on mobile */
