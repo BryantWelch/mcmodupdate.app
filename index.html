@@ -1369,13 +1369,6 @@
       word-break: break-word;
     }
 
-    .changelog-content video,
-    .changelog-content img {
-      max-width: 100%;
-      height: auto;
-      border-radius: 8px; /* Optional: adds rounded corners to the media */
-    }
-
     .gallery-toggle,
     .description-toggle,
     .links-toggle {
@@ -1739,10 +1732,20 @@
     }
 
     .description-content video,
-    .description-content img {
+    .description-content img,
+    .changelog-content video,
+    .changelog-content img {
       max-width: 100%;
       height: auto;
       border-radius: 8px;
+    }
+
+    .description-content audio,
+    .changelog-content audio {
+      display: block;
+      width: 100%;
+      max-width: 480px;
+      margin: 0.75rem 0;
     }
 
     /* Keep Modrinth YouTube/Discord embeds usable inside card descriptions. */
