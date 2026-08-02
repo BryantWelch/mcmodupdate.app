@@ -1745,6 +1745,20 @@
       border-radius: 8px;
     }
 
+    /* Keep Modrinth YouTube/Discord embeds usable inside card descriptions. */
+    .description-content iframe,
+    .changelog-content iframe {
+      display: block;
+      max-width: 100%;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      height: auto;
+      min-height: 200px;
+      border: 0;
+      border-radius: 8px;
+      margin: 0.75rem 0;
+    }
+
     .mod-actions {
       display: flex;
       flex-direction: column;
@@ -12980,45 +12994,105 @@
       }
 
       versionSelect.addEventListener("change", updateDynamicContent);
+
+      // Accordion: only one of Description / Gallery / Changelog / Links open at a time.
+      const cardPanels = [
+        { toggle: descriptionToggle, content: descriptionContent },
+        { toggle: galleryToggle, content: galleryContent },
+        { toggle: changelogToggle, content: changelogContent },
+        { toggle: linksToggle, content: linksContent },
+      ].filter((p) => p.toggle && p.content);
+
+      function closeOtherPanels(activeContent) {
+        for (const panel of cardPanels) {
+          if (panel.content === activeContent) continue;
+          panel.content.classList.remove("visible");
+          panel.toggle.classList.remove("active");
+        }
+      }
+
+      function ensureGalleryContent() {
+        if (galleryContent.innerHTML !== "") return;
+        if (mod.gallery && mod.gallery.length > 0) {
+          normalizedGalleryImages = mod.gallery.map((img, index) => {
+            const fallbackTitle = `Gallery image ${index + 1}`;
+            return {
+              src: img.raw_url || img.original_url || img.url || img.thumbnail_url || "",
+              thumbnailSrc: img.thumbnail_url || img.url || "",
+              alt: img.title || fallbackTitle,
+              title: img.title || fallbackTitle,
+              description: img.description || ""
+            };
+          });
+
+          const grid = document.createElement("div");
+          grid.className = "gallery-grid";
+
+          normalizedGalleryImages.forEach((img, index) => {
+            const imageEl = document.createElement("img");
+            imageEl.src = img.thumbnailSrc;
+            imageEl.alt = img.alt;
+            imageEl.title = img.title || "";
+            imageEl.loading = "lazy";
+            imageEl.dataset.galleryIndex = String(index);
+            grid.appendChild(imageEl);
+          });
+
+          galleryContent.replaceChildren(grid);
+        } else {
+          galleryContent.innerHTML = `<p style="color: var(--secondary-text); margin: 0;">No gallery images available for this mod.</p>`;
+        }
+      }
+
+      function ensureDescriptionContent() {
+        if (descriptionContent.innerHTML !== "") return;
+        if (mod.body) {
+          descriptionContent.innerHTML = marked.parse(mod.body);
+        } else {
+          descriptionContent.innerHTML = `<p style="color: var(--secondary-text); margin: 0;">No description available.</p>`;
+        }
+      }
+
+      function ensureLinksContent() {
+        const list = document.createElement("ul");
+        list.className = "project-links-list";
+        for (const link of mod.links) {
+          const li = document.createElement("li");
+          const a = document.createElement("a");
+          a.href = link.url;
+          a.target = "_blank";
+          a.rel = "noopener noreferrer";
+          const typeIcon = createProjectLinkIcon(
+            resolveProjectLinkIconKey(link),
+            "link-type-icon"
+          );
+          if (typeIcon) a.appendChild(typeIcon);
+          const label = document.createElement("span");
+          label.textContent = link.label;
+          a.appendChild(label);
+          const externalIcon = createProjectLinkIcon("external", "link-external-icon");
+          if (externalIcon) a.appendChild(externalIcon);
+          li.appendChild(a);
+          list.appendChild(li);
+        }
+        linksContent.replaceChildren(list);
+      }
+
       changelogToggle.addEventListener("click", () => {
-        changelogContent.classList.toggle("visible");
-        changelogToggle.classList.toggle("active");
+        const opening = !changelogContent.classList.contains("visible");
+        if (opening) closeOtherPanels(changelogContent);
+        changelogContent.classList.toggle("visible", opening);
+        changelogToggle.classList.toggle("active", opening);
       });
 
       galleryToggle.addEventListener("click", () => {
-        galleryContent.classList.toggle("visible");
-        galleryToggle.classList.toggle("active");
-        if (galleryContent.classList.contains("visible") && galleryContent.innerHTML === "") {
-          if (mod.gallery && mod.gallery.length > 0) {
-            normalizedGalleryImages = mod.gallery.map((img, index) => {
-              const fallbackTitle = `Gallery image ${index + 1}`;
-              return {
-                src: img.raw_url || img.original_url || img.url || img.thumbnail_url || "",
-                thumbnailSrc: img.thumbnail_url || img.url || "",
-                alt: img.title || fallbackTitle,
-                title: img.title || fallbackTitle,
-                description: img.description || ""
-              };
-            });
-
-            const grid = document.createElement("div");
-            grid.className = "gallery-grid";
-
-            normalizedGalleryImages.forEach((img, index) => {
-              const imageEl = document.createElement("img");
-              imageEl.src = img.thumbnailSrc;
-              imageEl.alt = img.alt;
-              imageEl.title = img.title || "";
-              imageEl.loading = "lazy";
-              imageEl.dataset.galleryIndex = String(index);
-              grid.appendChild(imageEl);
-            });
-
-            galleryContent.replaceChildren(grid);
-          } else {
-            galleryContent.innerHTML = `<p style="color: var(--secondary-text); margin: 0;">No gallery images available for this mod.</p>`;
-          }
+        const opening = !galleryContent.classList.contains("visible");
+        if (opening) {
+          closeOtherPanels(galleryContent);
+          ensureGalleryContent();
         }
+        galleryContent.classList.toggle("visible", opening);
+        galleryToggle.classList.toggle("active", opening);
       });
 
       galleryContent.addEventListener("click", (e) => {
@@ -13030,46 +13104,24 @@
       });
 
       descriptionToggle.addEventListener("click", () => {
-        descriptionContent.classList.toggle("visible");
-        descriptionToggle.classList.toggle("active");
-        if (descriptionContent.classList.contains("visible") && descriptionContent.innerHTML === "") {
-          if (mod.body) {
-            descriptionContent.innerHTML = marked.parse(mod.body);
-          } else {
-            descriptionContent.innerHTML = `<p style="color: var(--secondary-text); margin: 0;">No description available.</p>`;
-          }
+        const opening = !descriptionContent.classList.contains("visible");
+        if (opening) {
+          closeOtherPanels(descriptionContent);
+          ensureDescriptionContent();
         }
+        descriptionContent.classList.toggle("visible", opening);
+        descriptionToggle.classList.toggle("active", opening);
       });
 
       if (linksToggle) {
         linksToggle.addEventListener("click", () => {
           const opening = !linksContent.classList.contains("visible");
-          linksContent.classList.toggle("visible");
-          linksToggle.classList.toggle("active");
           if (opening) {
-            const list = document.createElement("ul");
-            list.className = "project-links-list";
-            for (const link of mod.links) {
-              const li = document.createElement("li");
-              const a = document.createElement("a");
-              a.href = link.url;
-              a.target = "_blank";
-              a.rel = "noopener noreferrer";
-              const typeIcon = createProjectLinkIcon(
-                resolveProjectLinkIconKey(link),
-                "link-type-icon"
-              );
-              if (typeIcon) a.appendChild(typeIcon);
-              const label = document.createElement("span");
-              label.textContent = link.label;
-              a.appendChild(label);
-              const externalIcon = createProjectLinkIcon("external", "link-external-icon");
-              if (externalIcon) a.appendChild(externalIcon);
-              li.appendChild(a);
-              list.appendChild(li);
-            }
-            linksContent.replaceChildren(list);
+            closeOtherPanels(linksContent);
+            ensureLinksContent();
           }
+          linksContent.classList.toggle("visible", opening);
+          linksToggle.classList.toggle("active", opening);
         });
       }
 
