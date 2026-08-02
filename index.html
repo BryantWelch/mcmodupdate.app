@@ -943,6 +943,23 @@
       opacity: 1; /* Animate to be fully visible */
     }
 
+    .status-message a.summary-jump {
+      color: inherit;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      cursor: pointer;
+    }
+
+    .status-message a.summary-jump:hover {
+      color: var(--primary-text);
+    }
+
+    #header-found,
+    #header-warning,
+    #header-failure {
+      scroll-margin-top: 1rem;
+    }
+
     #results-area {
       width: 100%;
       margin-top: 1rem;
@@ -1360,26 +1377,30 @@
     }
 
     .gallery-toggle,
-    .description-toggle {
+    .description-toggle,
+    .links-toggle {
       cursor: pointer;
       text-decoration: underline;
     }
 
     .gallery-toggle:hover,
     .description-toggle:hover,
-    .changelog-toggle:hover {
+    .changelog-toggle:hover,
+    .links-toggle:hover {
       color: var(--gradient-start);
     }
 
     .changelog-toggle.active,
     .gallery-toggle.active,
-    .description-toggle.active {
+    .description-toggle.active,
+    .links-toggle.active {
       color: var(--gradient-start);
       text-decoration: underline;
     }
 
     .gallery-content,
-    .description-content {
+    .description-content,
+    .links-content {
       display: none;
       width: 100%;
       max-width: 100%;
@@ -1396,13 +1417,15 @@
     }
 
     .gallery-content.visible,
-    .description-content.visible {
+    .description-content.visible,
+    .links-content.visible {
       display: block;
     }
 
     .changelog-content.visible::before,
     .gallery-content.visible::before,
     .description-content.visible::before,
+    .links-content.visible::before,
     .reason-content.visible::before {
       display: block;
       font-size: 1.2rem;
@@ -1426,8 +1449,54 @@
       content: 'Description';
     }
 
+    .links-content.visible::before {
+      content: 'Links';
+    }
+
     .reason-content.visible::before {
       content: 'Reason';
+    }
+
+    .project-links-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+    }
+
+    .project-links-list a {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--primary-text);
+      text-decoration: none;
+      width: fit-content;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+
+    .project-links-list a:hover {
+      color: var(--gradient-start);
+      text-decoration: underline;
+    }
+
+    .project-links-list .link-type-icon,
+    .project-links-list .link-external-icon {
+      flex-shrink: 0;
+      width: 16px;
+      height: 16px;
+    }
+
+    .project-links-list .link-external-icon {
+      width: 14px;
+      height: 14px;
+      opacity: 0.7;
+    }
+
+    .project-links-list a:hover .link-external-icon {
+      opacity: 1;
     }
 
     .reason-content {
@@ -2217,7 +2286,7 @@
       pointer-events: none;
     }
 
-    /* Active-filter chip bar shown below a section's header when filters are on. */
+    /* Active sort/filter chip bar shown below a section's header when either is on. */
     .active-filters-bar {
       display: none;
       flex-wrap: wrap;
@@ -5159,6 +5228,16 @@
     // --- Clear Results Button Logic ---
     clearResultsButton.addEventListener("click", resetResults);
 
+    // --- Summary jump links (Updates found / Not compatible / Failed to find) ---
+    statusMessage.addEventListener("click", (event) => {
+      const link = event.target.closest("a.summary-jump");
+      if (!link) return;
+      const target = document.querySelector(link.getAttribute("href"));
+      if (!target) return;
+      event.preventDefault();
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+
     // --- Custom Alert Modal Logic ---
     function showCustomAlert(message, type = "notice", customTitle = null) {
       const titles = {
@@ -8005,9 +8084,13 @@
         // Calculate processing time
         const processingTime = ((Date.now() - processingStartTime) / 1000).toFixed(1);
 
-        let summaryText = `Updates found: ${updatesFound}`;
-        if (notCompatible > 0) summaryText += `, Not compatible: ${notCompatible}`;
-        if (notFound > 0) summaryText += `, Failed to find: ${notFound}`;
+        let summaryText = `<a href="#header-found" class="summary-jump">Updates found: ${updatesFound}</a>`;
+        if (notCompatible > 0) {
+          summaryText += `, <a href="#header-warning" class="summary-jump">Not compatible: ${notCompatible}</a>`;
+        }
+        if (notFound > 0) {
+          summaryText += `, <a href="#header-failure" class="summary-jump">Failed to find: ${notFound}</a>`;
+        }
         if (dependenciesAdded > 0) summaryText += `, Dependencies added: ${dependenciesAdded}`;
         if (conflictResults && conflictResults.totalConflicts > 0) {
           summaryText += `, Conflicts detected: ${conflictResults.totalConflicts}`;
@@ -8878,7 +8961,8 @@
               supportedLoaders,
               selectedLoader: isLoaderAgnostic ? null : (resolutionContext.selectedLoader || null),
               selectedGameVersion: gameVersion,
-              installedVersion: originalModInfo.version || null,
+              installedVersion: originalModInfo.version || versionDetails?.version_number || null,
+              installedVersionId: versionDetails?.id || null,
             });
             continue;
           }
@@ -8914,19 +8998,17 @@
               supportedLoaders,
               selectedLoader: fallbackIsLoaderAgnostic ? null : (resolutionContext.selectedLoader || null),
               selectedGameVersion: mcVersionSelect.value,
-              installedVersion: originalModInfo.version || null,
+              installedVersion: originalModInfo.version || versionDetails?.version_number || null,
+              installedVersionId: versionDetails?.id || null,
             });
             continue;
           }
 
           // Compare versions: prefer hash-based ID match (reliable), fall back to manifest string comparison
-          const isUpToDate = latestVersion && (
-            (versionDetails && versionDetails.id === latestVersion.id) ||
-            (originalModInfo.version && (
-              originalModInfo.version === latestVersion.version_number ||
-              latestVersion.version_number.startsWith(originalModInfo.version + '+') ||
-              latestVersion.version_number.startsWith(originalModInfo.version + '-')
-            ))
+          const isUpToDate = latestVersion && isInstalledModVersion(
+            latestVersion,
+            originalModInfo.version || versionDetails?.version_number || null,
+            versionDetails?.id || null
           );
 
           // Folder path driven by artifact type via single helper
@@ -8975,7 +9057,9 @@
             isMrpackFile: job.isMrpackFile === true,
             gallery: projectDetails.gallery || [],
             body: projectDetails.body || "",
-            installedVersion: originalModInfo.version || null,
+            links: collectProjectLinks(projectDetails),
+            installedVersion: originalModInfo.version || versionDetails?.version_number || null,
+            installedVersionId: versionDetails?.id || null,
           });
 
         } catch (error) {
@@ -9015,6 +9099,120 @@
       }
 
       return { name: "unknown", url: "#" };
+    }
+
+    // SVG icons from Modrinth's assets package (packages/assets/icons +
+    // packages/assets/external), matching ProjectSidebarLinks.vue.
+    const PROJECT_LINK_ICON_SVGS = {
+      issues: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>',
+      code: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>',
+      wiki: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>',
+      discord: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="currentColor" d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>',
+      patreon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="currentColor" d="M22.957 7.21c-.004-3.064-2.391-5.576-5.191-6.482-3.478-1.125-8.064-.962-11.384.604C2.357 3.231 1.093 7.391 1.046 11.54c-.039 3.411.302 12.396 5.369 12.46 3.765.047 4.326-4.804 6.068-7.141 1.24-1.662 2.836-2.132 4.801-2.618 3.376-.836 5.678-3.501 5.673-7.031Z"/></svg>',
+      'ko-fi': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="currentColor" d="M11.351 2.715c-2.7 0-4.986.025-6.83.26C2.078 3.285 0 5.154 0 8.61c0 3.506.182 6.13 1.585 8.493 1.584 2.701 4.233 4.182 7.662 4.182h.83c4.209 0 6.494-2.234 7.637-4a9.5 9.5 0 0 0 1.091-2.338C21.792 14.688 24 12.22 24 9.208v-.415c0-3.247-2.13-5.507-5.792-5.87-1.558-.156-2.65-.208-6.857-.208m0 1.947c4.208 0 5.09.052 6.571.182 2.624.311 4.13 1.584 4.13 4v.39c0 2.156-1.792 3.844-3.87 3.844h-.935l-.156.649c-.208 1.013-.597 1.818-1.039 2.546-.909 1.428-2.545 3.064-5.922 3.064h-.805c-2.571 0-4.831-.883-6.078-3.195-1.09-2-1.298-4.155-1.298-7.506 0-2.181.857-3.402 3.012-3.714 1.533-.233 3.559-.26 6.39-.26m6.547 2.287c-.416 0-.65.234-.65.546v2.935c0 .311.234.545.65.545 1.324 0 2.051-.754 2.051-2s-.727-2.026-2.052-2.026m-10.39.182c-1.818 0-3.013 1.48-3.013 3.142 0 1.533.858 2.857 1.949 3.897.727.701 1.87 1.429 2.649 1.896a1.47 1.47 0 0 0 1.507 0c.78-.467 1.922-1.195 2.623-1.896 1.117-1.039 1.974-2.364 1.974-3.897 0-1.662-1.247-3.142-3.039-3.142-1.065 0-1.792.545-2.338 1.298-.493-.753-1.246-1.298-2.312-1.298"/></svg>',
+      paypal: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="currentColor" d="M15.607 4.653H8.941L6.645 19.251H1.82L4.862 0h7.995c3.754 0 6.375 2.294 6.473 5.513-.648-.478-2.105-.86-3.722-.86m6.57 5.546c0 3.41-3.01 6.853-6.958 6.853h-2.493L11.595 24H6.74l1.845-11.538h3.592c4.208 0 7.346-3.634 7.153-6.949a5.24 5.24 0 0 1 2.848 4.686M9.653 5.546h6.408c.907 0 1.942.222 2.363.541-.195 2.741-2.655 5.483-6.441 5.483H8.714Z"/></svg>',
+      'open-collective': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="currentColor" d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12c2.54 0 4.894-.79 6.834-2.135l-3.107-3.109a7.715 7.715 0 1 1 0-13.512l3.107-3.109A11.943 11.943 0 0 0 12 0zm9.865 5.166l-3.109 3.107A7.67 7.67 0 0 1 19.715 12a7.682 7.682 0 0 1-.959 3.727l3.109 3.107A11.943 11.943 0 0 0 24 12c0-2.54-.79-4.894-2.135-6.834z"/></svg>',
+      bmac: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="currentColor" d="M20.216 6.415l-.132-.666c-.119-.598-.388-1.163-1.001-1.379-.197-.069-.42-.098-.57-.241-.152-.143-.196-.366-.231-.572-.065-.378-.125-.756-.192-1.133-.057-.325-.102-.69-.25-.987-.195-.4-.597-.634-.996-.788a5.723 5.723 0 00-.626-.194c-1-.263-2.05-.36-3.077-.416a25.834 25.834 0 00-3.7.062c-.915.083-1.88.184-2.75.5-.318.116-.646.256-.888.501-.297.302-.393.77-.177 1.146.154.267.415.456.692.58.36.162.737.284 1.123.366 1.075.238 2.189.331 3.287.37 1.218.05 2.437.01 3.65-.118.299-.033.598-.073.896-.119.352-.054.578-.513.474-.834-.124-.383-.457-.531-.834-.473-.466.074-.96.108-1.382.146-1.177.08-2.358.082-3.536.006a22.228 22.228 0 01-1.157-.107c-.086-.01-.18-.025-.258-.036-.243-.036-.484-.08-.724-.13-.111-.027-.111-.185 0-.212h.005c.277-.06.557-.108.838-.147h.002c.131-.009.263-.032.394-.048a25.076 25.076 0 013.426-.12c.674.019 1.347.067 2.017.144l.228.031c.267.04.533.088.798.145.392.085.895.113 1.07.542.055.137.08.288.111.431l.319 1.484a.237.237 0 01-.199.284h-.003c-.037.006-.075.01-.112.015a36.704 36.704 0 01-4.743.295 37.059 37.059 0 01-4.699-.304c-.14-.017-.293-.042-.417-.06-.326-.048-.649-.108-.973-.161-.393-.065-.768-.032-1.123.161-.29.16-.527.404-.675.701-.154.316-.199.66-.267 1-.069.34-.176.707-.135 1.056.087.753.613 1.365 1.37 1.502a39.69 39.69 0 0011.343.376.483.483 0 01.535.53l-.071.697-1.018 9.907c-.041.41-.047.832-.125 1.237-.122.637-.553 1.028-1.182 1.171-.577.131-1.165.2-1.756.205-.656.004-1.31-.025-1.966-.022-.699.004-1.556-.06-2.095-.58-.475-.458-.54-1.174-.605-1.793l-.731-7.013-.322-3.094c-.037-.351-.286-.695-.678-.678-.336.015-.718.3-.678.679l.228 2.185.949 9.112c.147 1.344 1.174 2.068 2.446 2.272.742.12 1.503.144 2.257.156.966.016 1.942.053 2.892-.122 1.408-.258 2.465-1.198 2.616-2.657.34-3.332.683-6.663 1.024-9.995l.215-2.087a.484.484 0 01.39-.426c.402-.078.787-.212 1.074-.518.455-.488.546-1.124.385-1.766zm-1.478.772c-.145.137-.363.201-.578.233-2.416.359-4.866.54-7.308.46-1.748-.06-3.477-.254-5.207-.498-.17-.024-.353-.055-.47-.18-.22-.236-.111-.71-.054-.995.052-.26.152-.609.463-.646.484-.057 1.046.148 1.526.22.577.088 1.156.159 1.737.212 2.48.226 5.002.19 7.472-.14.45-.06.899-.13 1.345-.21.399-.072.84-.206 1.08.206.166.281.188.657.162.974a.544.544 0 01-.169.364zm-6.159 3.9c-.862.37-1.84.788-3.109.788a5.884 5.884 0 01-1.569-.217l.877 9.004c.065.78.717 1.38 1.5 1.38 0 0 1.243.065 1.658.065.447 0 1.786-.065 1.786-.065.783 0 1.434-.6 1.499-1.38l.94-9.95a3.996 3.996 0 00-1.322-.238c-.826 0-1.491.284-2.26.613z"/></svg>',
+      github: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>',
+      currency: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>',
+      external: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>',
+    };
+
+    function createProjectLinkIcon(iconKey, className) {
+      const markup = PROJECT_LINK_ICON_SVGS[iconKey];
+      if (!markup) return null;
+      // Parse via HTML so SVG children reliably attach in the document.
+      const holder = document.createElement("div");
+      holder.innerHTML = markup.trim();
+      const svg = holder.querySelector("svg");
+      if (!svg) return null;
+      svg.setAttribute("aria-hidden", "true");
+      svg.setAttribute("focusable", "false");
+      if (className) svg.setAttribute("class", className);
+      return svg;
+    }
+
+    // Resolve which icon to show for a link. Prefer the stored key, then
+    // infer from label/url so older in-memory results still get the right glyph.
+    function resolveProjectLinkIconKey(link) {
+      if (link?.icon && PROJECT_LINK_ICON_SVGS[link.icon]) return link.icon;
+      const label = String(link?.label || "").toLowerCase();
+      const url = String(link?.url || "").toLowerCase();
+      if (label.includes("issue") || label.includes("bug")) return "issues";
+      if (label.includes("source") || label.includes("code")) return "code";
+      if (label.includes("wiki")) return "wiki";
+      if (label.includes("discord") || url.includes("discord")) return "discord";
+      if (label.includes("patreon") || url.includes("patreon")) return "patreon";
+      if (label.includes("ko-fi") || label.includes("kofi") || url.includes("ko-fi")) return "ko-fi";
+      if (label.includes("paypal") || url.includes("paypal")) return "paypal";
+      if (label.includes("open collective") || label.includes("opencollective") || url.includes("opencollective")) return "open-collective";
+      if (label.includes("buy me a coffee") || label.includes("bmac") || url.includes("buymeacoffee")) return "bmac";
+      if (label.includes("github") || label.includes("sponsor")) return "github";
+      if (label.includes("donate") || label.includes("sponsor")) return "currency";
+      return null;
+    }
+
+    // Collect outbound project links from a Modrinth project payload.
+    // Labels/icons mirror Modrinth's ProjectSidebarLinks wording.
+    function collectProjectLinks(project) {
+      if (!project) return [];
+      const isSafeHttpUrl = (url) => {
+        try {
+          const parsed = new URL(url);
+          return parsed.protocol === "http:" || parsed.protocol === "https:";
+        } catch (_) {
+          return false;
+        }
+      };
+      const pushLink = (links, label, url, icon) => {
+        if (url && isSafeHttpUrl(url)) links.push({ label, url, icon });
+      };
+      const donationLabel = (id, platform) => {
+        switch (id) {
+          case "bmac": return "Buy Me a Coffee";
+          case "patreon": return "Donate on Patreon";
+          case "paypal": return "Donate on PayPal";
+          case "ko-fi": return "Donate on Ko-fi";
+          case "github": return "Sponsor on GitHub";
+          case "open-collective": return "Donate on Open Collective";
+          default: return platform ? `Donate on ${platform}` : "Donate";
+        }
+      };
+      const donationIcon = (id, platform) => {
+        const key = (id || platform || "").trim().toLowerCase().replace(/\s+/g, "-");
+        if (key === "github" || key === "github-sponsors") return "github";
+        if (key === "buy-me-a-coffee" || key === "buymeacoffee") return "bmac";
+        if (PROJECT_LINK_ICON_SVGS[key]) return key;
+        return "currency";
+      };
+      const links = [];
+      pushLink(links, "Report issues", project.issues_url, "issues");
+      pushLink(links, "View source", project.source_url, "code");
+      pushLink(links, "Visit wiki", project.wiki_url, "wiki");
+      pushLink(links, "Join Discord server", project.discord_url, "discord");
+      if (Array.isArray(project.donation_urls)) {
+        for (const donation of project.donation_urls) {
+          if (!donation?.url) continue;
+          const id = (donation.id || "").trim();
+          const platform = (donation.platform || "").trim();
+          pushLink(links, donationLabel(id, platform), donation.url, donationIcon(id, platform));
+        }
+      }
+      return links;
+    }
+
+    // True when a Modrinth version matches the user's uploaded/installed file.
+    // Prefer hash-resolved version id; fall back to JAR/manifest version strings
+    // (including common "+build" / "-suffix" Modrinth numbering).
+    function isInstalledModVersion(version, installedVersion, installedVersionId) {
+      if (!version) return false;
+      if (installedVersionId && version.id === installedVersionId) return true;
+      if (!installedVersion || !version.version_number) return false;
+      return (
+        installedVersion === version.version_number ||
+        version.version_number.startsWith(installedVersion + "+") ||
+        version.version_number.startsWith(installedVersion + "-")
+      );
     }
 
     // Extract mod id, name, and version from JAR mods (only version used later).
@@ -10759,9 +10957,12 @@
         const base = `mcmodupdate-${slug}${usingSelection ? '-selected' : ''}-${datestamp}`;
         const loaderLine = `${ctx.loader_label || ctx.loader || 'n/a'}${ctx.game_version ? ` ${ctx.game_version}` : ''}`;
         const scopeNote = usingSelection ? ` (selected only)` : '';
-        // Strip the trailing release-type marker (e.g. " [R]") from version
+        // Strip trailing markers (e.g. " [R]", " *") from version
         // labels so headings stay readable in chat/forums.
-        const cleanVersion = (v) => (v || '').replace(/\s*\[[^\]]+\]\s*$/, '').trim();
+        const cleanVersion = (v) => (v || '')
+          .replace(/\s\*\s*$/, '')
+          .replace(/(\s*\[[^\]]+\])+\s*$/, '')
+          .trim();
         // Backslash-escape characters that would corrupt Markdown link syntax
         // when interpolated into `[text](url)`. Mod names like "[Forge] Foo"
         // and authors with brackets exist on Modrinth, so this isn't paranoia.
@@ -11041,9 +11242,9 @@
       ];
       const ALL_DROPDOWNS = [...ALL_SORT_DROPDOWNS, ...ALL_FILTER_DROPDOWNS, ...ALL_EXPORT_DROPDOWNS].filter(Boolean);
 
-      // Inject an active-filter chip bar below each section's header so chips can
-      // appear when filters are toggled. Stored inside the section so a section
-      // reset (resetSortStates / clearResults) clears them along with the cards.
+      // Inject an active sort/filter chip bar below each section's header so chips
+      // can appear when sort or filters are toggled. Stored inside the section so a
+      // section reset (resetSortStates / clearResults) clears them along with the cards.
       function ensureActiveFiltersBar(sectionSelector) {
         const section = document.querySelector(sectionSelector);
         if (!section) return null;
@@ -11238,46 +11439,99 @@
         const bar = sectionEl.querySelector(':scope > .active-filters-bar');
         if (!bar) return;
         const state = sectionState[sectionSelector];
+        const sortDropdown = getSectionSortDropdown(sectionSelector);
         const filterDropdown = getSectionFilterDropdown(sectionSelector);
+        const sortActive = state.sort.type !== 'default';
         bar.innerHTML = '';
-        if (state.filters.size === 0) {
+        if (!sortActive && state.filters.size === 0) {
           bar.classList.remove('visible');
           return;
         }
 
-        const label = document.createElement('span');
-        label.className = 'active-filters-label';
-        label.textContent = 'Filters:';
-        bar.appendChild(label);
+        if (sortActive) {
+          const sortLabel = document.createElement('span');
+          sortLabel.className = 'active-filters-label';
+          sortLabel.textContent = 'Sort:';
+          bar.appendChild(sortLabel);
 
-        for (const [type, valueSet] of state.filters) {
-          for (const v of valueSet) {
-            const chip = document.createElement('span');
-            chip.className = 'active-filter-chip';
-            let labelText = v;
-            if (filterDropdown) {
-              const opt = filterDropdown.querySelector(
-                `[data-sort="${type}"][data-filter="${CSS.escape(v)}"]`
-              );
-              if (opt) labelText = opt.textContent.trim();
+          let labelText = state.sort.type;
+          if (sortDropdown) {
+            const reversedAttr = String(state.sort.reversed);
+            const sortOpt = sortDropdown.querySelector(
+              `[data-sort="${state.sort.type}"][data-direction="${reversedAttr}"]`
+            );
+            if (sortOpt) {
+              const direction = sortOpt.textContent.trim();
+              const parent = sortOpt.closest('.sort-option.has-submenu');
+              let category = '';
+              if (parent) {
+                const clone = parent.cloneNode(true);
+                clone.querySelector('.sort-submenu')?.remove();
+                clone.querySelector('.submenu-arrow')?.remove();
+                category = clone.textContent.trim();
+              }
+              labelText = category ? `${category}: ${direction}` : direction;
             }
-            const labelSpan = document.createElement('span');
-            labelSpan.textContent = labelText;
-            const x = document.createElement('span');
-            x.className = 'chip-x';
-            x.textContent = '×';
-            chip.appendChild(labelSpan);
-            chip.appendChild(x);
-            chip.title = 'Click to remove this filter';
-            chip.addEventListener('click', () => toggleFilterForSection(sectionSelector, type, v));
-            bar.appendChild(chip);
+          }
+
+          const sortChip = document.createElement('span');
+          sortChip.className = 'active-filter-chip';
+          const sortLabelSpan = document.createElement('span');
+          sortLabelSpan.textContent = labelText;
+          const sortX = document.createElement('span');
+          sortX.className = 'chip-x';
+          sortX.textContent = '×';
+          sortChip.appendChild(sortLabelSpan);
+          sortChip.appendChild(sortX);
+          sortChip.title = 'Click to clear sort';
+          sortChip.addEventListener('click', () => applySortToSection(sectionSelector, 'default', false));
+          bar.appendChild(sortChip);
+        }
+
+        if (state.filters.size > 0) {
+          const label = document.createElement('span');
+          label.className = 'active-filters-label';
+          label.textContent = 'Filters:';
+          bar.appendChild(label);
+
+          for (const [type, valueSet] of state.filters) {
+            for (const v of valueSet) {
+              const chip = document.createElement('span');
+              chip.className = 'active-filter-chip';
+              let labelText = v;
+              if (filterDropdown) {
+                const opt = filterDropdown.querySelector(
+                  `[data-sort="${type}"][data-filter="${CSS.escape(v)}"]`
+                );
+                if (opt) labelText = opt.textContent.trim();
+              }
+              const labelSpan = document.createElement('span');
+              labelSpan.textContent = labelText;
+              const x = document.createElement('span');
+              x.className = 'chip-x';
+              x.textContent = '×';
+              chip.appendChild(labelSpan);
+              chip.appendChild(x);
+              chip.title = 'Click to remove this filter';
+              chip.addEventListener('click', () => toggleFilterForSection(sectionSelector, type, v));
+              bar.appendChild(chip);
+            }
           }
         }
 
         const clearAll = document.createElement('span');
         clearAll.className = 'active-filters-clear-all';
         clearAll.textContent = 'Clear all';
-        clearAll.addEventListener('click', () => clearAllFiltersForSection(sectionSelector));
+        clearAll.title = sortActive && state.filters.size > 0
+          ? 'Clear sort and all filters'
+          : sortActive
+            ? 'Clear sort'
+            : 'Clear all filters';
+        clearAll.addEventListener('click', () => {
+          sectionState[sectionSelector].filters.clear();
+          applySortToSection(sectionSelector, 'default', false);
+          applyAllFiltersToSection(sectionSelector);
+        });
         bar.appendChild(clearAll);
 
         bar.classList.add('visible');
@@ -12527,7 +12781,14 @@
         .map((v, index) => {
           const type = v.version_type.charAt(0).toUpperCase();
           const selected = index === 0 ? " selected" : "";
-          return `<option value="${v.id}"${selected}>${v.version_number} [${type}]</option>`;
+          const currentLabel = isInstalledModVersion(
+            v,
+            mod.installedVersion,
+            mod.installedVersionId
+          )
+            ? " *"
+            : "";
+          return `<option value="${v.id}"${selected}>${v.version_number} [${type}]${currentLabel}</option>`;
         })
         .join("");
 
@@ -12601,6 +12862,9 @@
           <div class="mod-meta-item description-toggle" title="Click to view full mod description">Description</div>
           <div class="mod-meta-item gallery-toggle" title="Click to view mod gallery">Gallery</div>
           <div class="mod-meta-item changelog-toggle" title="Click to view changelog and version details">Changelog</div>
+          ${(mod.links && mod.links.length > 0)
+          ? `<div class="mod-meta-item links-toggle" title="Click to view project links">Links</div>`
+          : ""}
         </div>
       </div>
       <div class="mod-actions">
@@ -12610,7 +12874,8 @@
     </div>
     <div class="changelog-content"></div>
     <div class="gallery-content"></div>
-    <div class="description-content"></div>`;
+    <div class="description-content"></div>
+    <div class="links-content"></div>`;
 
       // Get references to ALL the elements we need to update
       const versionSelect = card.querySelector(".version-select");
@@ -12619,9 +12884,11 @@
       const changelogToggle = card.querySelector(".changelog-toggle");
       const galleryToggle = card.querySelector(".gallery-toggle");
       const descriptionToggle = card.querySelector(".description-toggle");
+      const linksToggle = card.querySelector(".links-toggle");
       const changelogContent = card.querySelector(".changelog-content");
       const galleryContent = card.querySelector(".gallery-content");
       const descriptionContent = card.querySelector(".description-content");
+      const linksContent = card.querySelector(".links-content");
       let normalizedGalleryImages = [];
 
       // Get references to channel links
@@ -12773,6 +13040,38 @@
           }
         }
       });
+
+      if (linksToggle) {
+        linksToggle.addEventListener("click", () => {
+          const opening = !linksContent.classList.contains("visible");
+          linksContent.classList.toggle("visible");
+          linksToggle.classList.toggle("active");
+          if (opening) {
+            const list = document.createElement("ul");
+            list.className = "project-links-list";
+            for (const link of mod.links) {
+              const li = document.createElement("li");
+              const a = document.createElement("a");
+              a.href = link.url;
+              a.target = "_blank";
+              a.rel = "noopener noreferrer";
+              const typeIcon = createProjectLinkIcon(
+                resolveProjectLinkIconKey(link),
+                "link-type-icon"
+              );
+              if (typeIcon) a.appendChild(typeIcon);
+              const label = document.createElement("span");
+              label.textContent = link.label;
+              a.appendChild(label);
+              const externalIcon = createProjectLinkIcon("external", "link-external-icon");
+              if (externalIcon) a.appendChild(externalIcon);
+              li.appendChild(a);
+              list.appendChild(li);
+            }
+            linksContent.replaceChildren(list);
+          }
+        });
+      }
 
       updateDynamicContent();
 
