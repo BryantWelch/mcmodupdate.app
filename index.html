@@ -921,7 +921,7 @@
           var(--gradient-start),
           var(--gradient-end));
       border-radius: 4px;
-      transition: width 0.3s ease-out;
+      transition: width 0.2s ease-out;
     }
 
     .status-message {
@@ -2245,6 +2245,7 @@
       border-radius: 12px;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
       min-width: 140px;
+      width: max-content;
       display: none;
       overflow: hidden;
       z-index: 1001;
@@ -2257,6 +2258,7 @@
     .sort-submenu .sort-option {
       padding: 0.75rem 1rem;
       font-size: 0.9rem;
+      white-space: nowrap;
     }
 
     .sort-submenu .sort-option:first-child {
@@ -3925,11 +3927,24 @@
             </svg> Double Checkmark:</b> This mod is already up-to-date with the version selected</li>
       </ul>
 
+      <p><b>Supported Environments:</b> Each result shows where that mod runs. On updates, the label follows the version selected in the dropdown.</p>
+      <ul>
+        <li><b>Client-side:</b> Runs on the client only</li>
+        <li><b>Client (server optional):</b> Needs the client; installing on the server can unlock extra features</li>
+        <li><b>Singleplayer:</b> Intended for singleplayer only</li>
+        <li><b>Server-side:</b> Runs on the server only</li>
+        <li><b>Server (client optional):</b> Needs the server; installing on the client can unlock extra features</li>
+        <li><b>Dedicated server:</b> Dedicated server only</li>
+        <li><b>Client &amp; Server:</b> Must be installed on both client and server</li>
+        <li><b>Client or Server:</b> Works fine on either side alone</li>
+        <li><b>Either (prefers both):</b> Works on either side, but works best with both installed</li>
+      </ul>
+
       <h3>Features &amp; Tools:</h3>
       <ul>
-        <li><b>Search &amp; Filter:</b> Use the search boxes to quickly find specific mods in your results</li>
-        <li><b>Sort Options:</b> Click the sort button to organize by name, downloads, followers, or filter by
-          environment/channel</li>
+        <li><b>Search:</b> Use the search boxes to quickly find specific mods in your results</li>
+        <li><b>Sort:</b> Organize results by name, downloads, followers, last updated, or file size</li>
+        <li><b>Filter:</b> Narrow results by category, channel, environment, source, dependencies, and more. The Environments list only shows labels present in your current results.</li>
         <li><b>Copy Lists:</b> Use the copy button to quickly copy mod names to your clipboard</li>
         <li><b>Export Lists:</b> Use the export button to download the current list as CSV, JSON, Markdown, or plain text.
           The JSON format is the one you can re-import — CSV/Markdown/plain text are share-oriented and not importable.</li>
@@ -4737,6 +4752,46 @@
     let optionalDependencyMap = new Map(); // Track what optional dependencies each mod has
     let incompatibleMap = new Map(); // Track incompatible relationships between mods (sourceProjectId -> Set<targetProjectId>)
     let modIdToNameMap = new Map(); // Track mod ID to name mapping
+    // Pinned dependency version_ids → version_number (only when Modrinth calls out a specific version)
+    let versionIdToNumberMap = new Map();
+
+    // reverseDependencyMap / optionalDependencyMap store { projectId, versionId }
+    // entries. versionId is set only when the parent pins a specific dep version.
+    function makeDepEntry(dep) {
+      return {
+        projectId: dep.project_id,
+        versionId: dep.version_id || null,
+      };
+    }
+
+    function getDepProjectId(entry) {
+      return typeof entry === 'string' ? entry : entry.projectId;
+    }
+
+    function depListHasProject(list, projectId) {
+      return list.some((entry) => getDepProjectId(entry) === projectId);
+    }
+
+    function formatDepTooltipLabel(entry) {
+      const projectId = getDepProjectId(entry);
+      const name = modIdToNameMap.get(projectId) || 'Loading...';
+      const versionId = typeof entry === 'object' ? entry.versionId : null;
+      const versionNumber = versionId ? versionIdToNumberMap.get(versionId) : null;
+      // Only append a pin when we know the real project name (avoid "Loading... (1.2.3)").
+      if (versionNumber && modIdToNameMap.has(projectId)) return `${name} (${versionNumber})`;
+      return name;
+    }
+
+    // Index version_id → version_number from version objects we already fetched
+    // (batch lookup / result cards). Used by Depends on tooltips for pinned deps.
+    function rememberVersionNumbers(versions) {
+      if (!Array.isArray(versions)) return;
+      for (const v of versions) {
+        if (v && v.id && v.version_number) {
+          versionIdToNumberMap.set(v.id, v.version_number);
+        }
+      }
+    }
     let installedModVersions = new Map(); // Track installed version of each uploaded mod (projectId -> versionString)
     let conflictResults = null; // Populated by analyzeConflicts(); read by addConflictIndicatorsToCards() (top-level fn)
 
@@ -4832,18 +4887,45 @@
     }
 
     function selectArtifactFile(version, artifactType) {
+      const files = Array.isArray(version?.files) ? version.files : [];
+      if (files.length === 0) return null;
       const cfg = ARTIFACT_CONFIG[artifactType];
-      if (!cfg) return version.files.find(f => f.primary) || version.files[0];
-      const primaryMatch = version.files.find((f) => {
+      if (!cfg) return files.find(f => f.primary) || files[0];
+      const primaryMatch = files.find((f) => {
         const lowerName = String(f.filename || "").toLowerCase();
         return f.primary && cfg.exts.some((ext) => lowerName.endsWith(ext));
       });
       if (primaryMatch) return primaryMatch;
-      const anyMatch = version.files.find((f) => {
+      const anyMatch = files.find((f) => {
         const lowerName = String(f.filename || "").toLowerCase();
         return cfg.exts.some((ext) => lowerName.endsWith(ext));
       });
-      return anyMatch || version.files[0];
+      return anyMatch || files[0];
+    }
+
+    // v3 modpack versions use loaders: ["mrpack"] and put Fabric/Forge/etc. in
+    // mrpack_loaders. v2 still puts the platform in loaders. For compatibility
+    // checks and Supported Loaders chips, treat both as the effective set and
+    // drop bare "mrpack" when the real platform tags are present.
+    function getEffectiveVersionLoaders(version) {
+      const loaders = Array.isArray(version?.loaders) ? version.loaders : [];
+      const mrpackLoaders = Array.isArray(version?.mrpack_loaders)
+        ? version.mrpack_loaders
+        : [];
+      if (mrpackLoaders.length > 0) {
+        return [
+          ...new Set([
+            ...mrpackLoaders,
+            ...loaders.filter((l) => l && l !== "mrpack"),
+          ]),
+        ];
+      }
+      return loaders.filter(Boolean);
+    }
+
+    function versionSupportsLoader(version, loader) {
+      if (!loader) return true;
+      return getEffectiveVersionLoaders(version).includes(loader);
     }
 
     function inferArtifactTypeFromVersionLoaders(currentType, versionLoaders = []) {
@@ -4882,6 +4964,34 @@
     const progressBarContainer = document.getElementById("progress-bar-container");
     const progressBar = document.getElementById("progress-bar");
     const statusMessage = document.getElementById("status-message");
+    let progressBarHideTimeout = null;
+
+    function showUpdateProgress() {
+      if (progressBarHideTimeout) {
+        clearTimeout(progressBarHideTimeout);
+        progressBarHideTimeout = null;
+      }
+      progressBarContainer.style.display = "block";
+      progressBar.style.width = "0%";
+    }
+
+    function hideUpdateProgress(delayMs = 1000) {
+      if (progressBarHideTimeout) {
+        clearTimeout(progressBarHideTimeout);
+        progressBarHideTimeout = null;
+      }
+      if (delayMs <= 0) {
+        progressBarContainer.style.display = "none";
+        progressBar.style.width = "0%";
+        return;
+      }
+      progressBarHideTimeout = setTimeout(() => {
+        progressBarContainer.style.display = "none";
+        progressBar.style.width = "0%";
+        progressBarHideTimeout = null;
+      }, delayMs);
+    }
+
     const clearAllButton = document.getElementById("clear-all-button");
     const alertModal = document.getElementById("alert-modal");
     const alertMessage = document.getElementById("alert-message");
@@ -4908,10 +5018,18 @@
     const modalVersionSelect = document.getElementById("modal-version-select");
 
     function countUploadAreaPills() {
+      // Name span only — the remove control is also a <span>.
       return Array.from(fileListContainer.querySelectorAll(".file-pill")).filter((pill) => {
-        const label = pill.querySelector("span")?.textContent || "";
+        const label =
+          pill.querySelector("span:not(.file-pill-remove)")?.textContent || "";
         return !String(label).startsWith("Processing:");
       }).length;
+    }
+
+    // True when the dropzone shows any pill at all (uploads, pack mods,
+    // search-adds, or in-progress "Processing:" archive pills).
+    function dropzoneHasItems() {
+      return fileListContainer.querySelectorAll(".file-pill").length > 0;
     }
 
     function refreshUpdateButtonLabel() {
@@ -4925,6 +5043,69 @@
           <polyline points="17 8 12 3 7 8"></polyline>
           <line x1="12" y1="3" x2="12" y2="15"></line>
         </svg>`;
+    }
+
+    // When a single .mrpack is auto-processed, remember its loader/MC version so
+    // we can re-apply after populateMcVersions finishes (race on fast drop).
+    let pendingPackConstraints = null;
+
+    function ensureSelectOption(select, value, label = value) {
+      if (!select || !value) return false;
+      const exists = Array.from(select.options).some((o) => o.value === value);
+      if (!exists) {
+        const opt = document.createElement("option");
+        opt.value = value;
+        opt.textContent = label;
+        select.appendChild(opt);
+      }
+      return true;
+    }
+
+    // Apply loader + MC version detected from a .mrpack manifest to the main
+    // (and search-modal) dropdowns. Returns a short note for the status line.
+    function applyDetectedPackConstraints(loaderLabel, gameVersion) {
+      const loaderByLabel = {
+        Fabric: "fabric",
+        Forge: "forge",
+        NeoForge: "neoforge",
+        Quilt: "quilt",
+      };
+      const parts = [];
+      const loaderValue =
+        loaderLabel && loaderLabel !== "unknown"
+          ? loaderByLabel[loaderLabel] || null
+          : null;
+
+      if (
+        loaderValue &&
+        Array.from(modLoaderSelect.options).some((o) => o.value === loaderValue)
+      ) {
+        modLoaderSelect.value = loaderValue;
+        if (typeof updateModalLoaderOptions === "function") {
+          updateModalLoaderOptions(projectTypeSelect.value, loaderValue);
+        } else if (modalLoaderSelect) {
+          modalLoaderSelect.value = loaderValue;
+        }
+        parts.push(loaderLabel);
+      }
+
+      if (gameVersion && gameVersion !== "unknown") {
+        ensureSelectOption(mcVersionSelect, gameVersion);
+        ensureSelectOption(modalVersionSelect, gameVersion);
+        mcVersionSelect.value = gameVersion;
+        if (modalVersionSelect) modalVersionSelect.value = gameVersion;
+        parts.push(`Minecraft ${gameVersion}`);
+      }
+
+      if (parts.length > 0) {
+        pendingPackConstraints = {
+          loader: loaderLabel,
+          version: gameVersion,
+        };
+        refreshUpdateButtonLabel();
+        return ` Set controls to ${parts.join(" / ")}.`;
+      }
+      return "";
     }
 
     const MOD_LOADERS = [
@@ -5093,9 +5274,9 @@
     }
 
     function resolveVersionsForContext(versionInfo, context) {
-      const allVersions = versionInfo.allVersions || [];
-      let versions = versionInfo.versions || [];
-      let compatibilityStatus = versionInfo.compatibilityStatus;
+      const allVersions = Array.isArray(versionInfo?.allVersions) ? versionInfo.allVersions : [];
+      let versions = Array.isArray(versionInfo?.versions) ? versionInfo.versions : [];
+      let compatibilityStatus = versionInfo?.compatibilityStatus;
       const {
         artifactType,
         gameVersion,
@@ -5105,13 +5286,17 @@
         pluginPlatformValues,
       } = context;
 
+      const versionGameVersions = (v) =>
+        Array.isArray(v?.game_versions) ? v.game_versions : [];
+      const versionLoaders = (v) => getEffectiveVersionLoaders(v);
+
       // Loader-agnostic artifacts rely on artifact-specific loader tags.
       if (artifactType && ARTIFACT_CONFIG[artifactType] && !ARTIFACT_CONFIG[artifactType].needsLoader) {
         const loaderTags = ARTIFACT_CONFIG[artifactType].loaderTags;
         versions = allVersions.filter(v => {
-          if (!v.game_versions.includes(gameVersion)) return false;
+          if (!versionGameVersions(v).includes(gameVersion)) return false;
           if (!loaderTags) return true;
-          return v.loaders.some(l => loaderTags.includes(l));
+          return versionLoaders(v).some(l => loaderTags.includes(l));
         });
         compatibilityStatus = versions.length > 0 ? 'compatible' : 'no-versions';
         return { versions, compatibilityStatus };
@@ -5119,26 +5304,32 @@
 
       // Plugins must stay within plugin ecosystem variants only.
       if (artifactType === "plugin") {
-        const isPluginVariant = (v) => v.loaders.some(
+        const isPluginVariant = (v) => versionLoaders(v).some(
           l => pluginLoaderValues.has(l) || pluginPlatformValues.has(l)
         );
 
         versions = allVersions.filter(v => {
-          if (!v.game_versions.includes(gameVersion)) return false;
+          if (!versionGameVersions(v).includes(gameVersion)) return false;
           if (!isPluginVariant(v)) return false;
-          if (selectedLoader && !v.loaders.includes(selectedLoader)) return false;
-          if (selectedPlatform && !v.loaders.includes(selectedPlatform)) return false;
+          if (selectedLoader && !versionLoaders(v).includes(selectedLoader)) return false;
+          if (selectedPlatform && !versionLoaders(v).includes(selectedPlatform)) return false;
           return true;
         });
 
         const pluginCandidateVersions = allVersions.filter(isPluginVariant);
-        const hasGameVersion = pluginCandidateVersions.some(v => v.game_versions.includes(gameVersion));
-        const hasLoader = !selectedLoader || pluginCandidateVersions.some(v => v.loaders.includes(selectedLoader));
-        const hasPlatform = !selectedPlatform || pluginCandidateVersions.some(v => v.loaders.includes(selectedPlatform));
+        const hasGameVersion = pluginCandidateVersions.some(v =>
+          versionGameVersions(v).includes(gameVersion)
+        );
+        const hasLoader = !selectedLoader || pluginCandidateVersions.some(v =>
+          versionLoaders(v).includes(selectedLoader)
+        );
+        const hasPlatform = !selectedPlatform || pluginCandidateVersions.some(v =>
+          versionLoaders(v).includes(selectedPlatform)
+        );
         const hasCombined = pluginCandidateVersions.some(v => {
-          if (!v.game_versions.includes(gameVersion)) return false;
-          if (selectedLoader && !v.loaders.includes(selectedLoader)) return false;
-          if (selectedPlatform && !v.loaders.includes(selectedPlatform)) return false;
+          if (!versionGameVersions(v).includes(gameVersion)) return false;
+          if (selectedLoader && !versionLoaders(v).includes(selectedLoader)) return false;
+          if (selectedPlatform && !versionLoaders(v).includes(selectedPlatform)) return false;
           return true;
         });
 
@@ -5433,6 +5624,7 @@
       pillByUploadKey.clear();
       pillByMrpackKey.clear();
       uploadKeyByHash.clear();
+      pendingPackConstraints = null;
       // Pending undo actions reference removed pills/maps and would no-op or error.
       clearUndoHistory();
 
@@ -5713,6 +5905,9 @@
       try {
         const response = await fetchWithRetry(searchUrl);
         if (requestId !== activeSearchRequestId) return;
+        if (!response.ok) {
+          throw new Error(`Search request failed (${response.status})`);
+        }
         const data = await response.json();
         if (requestId !== activeSearchRequestId) return;
 
@@ -5808,6 +6003,9 @@
 
         const response = await fetchWithRetry(searchUrl);
         if (requestId !== activeSearchRequestId) return;
+        if (!response.ok) {
+          throw new Error(`Featured request failed (${response.status})`);
+        }
         const data = await response.json();
         if (requestId !== activeSearchRequestId) return;
 
@@ -6694,7 +6892,9 @@
       const hasMixedMrpackDrop = mrpackFiles.length > 0 && mrpackFiles.length < allFiles.length;
       const hasMultipleMrpacks = mrpackFiles.length > 1;
       const mrpackFile = mrpackFiles[0] || null;
-      const isUploadAreaEmpty = uploadedFiles.size === 0 && mrpackMods.size === 0;
+      // Pills are the dropzone's source of truth (uploads, pack mods, search-adds,
+      // and transient archive "Processing:" pills). Every add path uses createFilePill.
+      const isUploadAreaEmpty = !dropzoneHasItems();
       const shouldAutoProcessMrpack =
         Boolean(mrpackFile) &&
         mrpackFiles.length === 1 &&
@@ -6762,8 +6962,7 @@
 
         dropzonePrompt.style.display = "none";
         dropzone.classList.add("dropzone-expanded");
-        progressBarContainer.style.display = "block";
-        progressBar.style.width = "0%";
+        showUpdateProgress();
         statusMessage.textContent = `Extracting ${totalContainers} archive${totalContainers !== 1 ? "s" : ""}...`;
         statusMessage.classList.add("visible");
 
@@ -6794,10 +6993,7 @@
         }
 
         progressBar.style.width = "100%";
-        setTimeout(() => {
-          progressBarContainer.style.display = "none";
-          progressBar.style.width = "0%";
-        }, 250);
+        hideUpdateProgress(250);
       }
 
       refreshUpdateButtonLabel();
@@ -6867,7 +7063,7 @@
       if (mrpackContext.hasMultipleMrpacks) {
         uploadNotices.push("Multiple .mrpack files detected: manifest extraction was skipped.");
       } else if (mrpackContext.mrpackFiles.length === 1 && allFilesCount === 1 && !mrpackContext.isUploadAreaEmpty) {
-        uploadNotices.push("Existing uploads detected: .mrpack manifest extraction was skipped.");
+        uploadNotices.push("Dropzone already has items: .mrpack manifest extraction was skipped.");
       }
 
       return uploadNotices;
@@ -7154,10 +7350,7 @@
     async function processMrpack(packFile) {
       const finishMrpackProgressBar = () => {
         progressBar.style.width = "100%";
-        setTimeout(() => {
-          progressBarContainer.style.display = "none";
-          progressBar.style.width = "0%";
-        }, 250);
+        hideUpdateProgress(250);
       };
 
       try {
@@ -7171,7 +7364,7 @@
         statusMessage.textContent = `Processing modpack: ${packFile.name}...`;
         statusMessage.classList.add("visible");
 
-        progressBarContainer.style.display = "block";
+        showUpdateProgress();
         progressBar.style.width = "5%";
 
         const zip = await JSZip.loadAsync(packFile);
@@ -7215,6 +7408,11 @@
             sourceLoader = "Forge";
           }
         }
+
+        const constraintsNote = applyDetectedPackConstraints(
+          sourceLoader,
+          sourceVersion
+        );
 
         // The manifest.files array contains the list of mods
         let parsedModsCount = 0;
@@ -7273,8 +7471,9 @@
               : "";
 
           statusMessage.textContent =
-            `Detected modpack: ${packDisplayName} [${sourceLoader}] for Minecraft ${sourceVersion}. ` +
-            `Parsed ${parsedModsCount} mod${parsedModsCount !== 1 ? "s" : ""}. ` +
+            `Detected modpack: ${packDisplayName} [${sourceLoader}] for Minecraft ${sourceVersion}.` +
+            constraintsNote +
+            ` Parsed ${parsedModsCount} mod${parsedModsCount !== 1 ? "s" : ""}. ` +
             `Checking updates for both the modpack and its included mods.` +
             linkResolvedNote +
             skippedNote;
@@ -7282,15 +7481,16 @@
         } else {
           progressBar.style.width = "92%";
           statusMessage.textContent =
-            `Detected modpack: ${packDisplayName} [${sourceLoader}] for Minecraft ${sourceVersion}. ` +
-            `Parsed 0 mods. Checking updates for the modpack.`;
+            `Detected modpack: ${packDisplayName} [${sourceLoader}] for Minecraft ${sourceVersion}.` +
+            constraintsNote +
+            ` Parsed 0 mods. Checking updates for the modpack.`;
           statusMessage.classList.add("visible");
         }
 
         finishMrpackProgressBar();
       } catch (error) {
         console.error("Error processing .mrpack file:", error);
-        progressBarContainer.style.display = "none";
+        hideUpdateProgress(0);
         progressBar.style.width = "0%";
         showCustomAlert(
           "Could not read the uploaded .mrpack file. It may be corrupt.",
@@ -7507,11 +7707,27 @@
         // Sync modal selects with main page selects after options are populated
         modalLoaderSelect.value = modLoaderSelect.value;
         if (mcVersionSelect.value) modalVersionSelect.value = mcVersionSelect.value;
+
+        // Re-apply a .mrpack's detected loader/version if populate finished after
+        // (or during) processMrpack — otherwise the rebuild above would wipe it.
+        if (pendingPackConstraints) {
+          applyDetectedPackConstraints(
+            pendingPackConstraints.loader,
+            pendingPackConstraints.version
+          );
+        }
       } catch (error) {
         console.error("Failed to fetch MC versions after multiple attempts:", error);
         // Fallback or show an error
         mcVersionSelect.innerHTML =
           '<option value="1.21">Error loading versions</option>';
+        // Still honor a pending .mrpack detection if versions failed to load.
+        if (pendingPackConstraints) {
+          applyDetectedPackConstraints(
+            pendingPackConstraints.loader,
+            pendingPackConstraints.version
+          );
+        }
         showCustomAlert(
           "Could not load Minecraft versions from Modrinth. Please check your connection and refresh.",
           "error"
@@ -7568,12 +7784,14 @@
 
     // Sync modal loader/version selects with main page selects
     modLoaderSelect.addEventListener("change", () => {
+      pendingPackConstraints = null;
       if (projectTypeSelect.value !== "plugin") {
         updateModalLoaderOptions(projectTypeSelect.value, modLoaderSelect.value);
       }
     });
 
     mcVersionSelect.addEventListener("change", () => {
+      pendingPackConstraints = null;
       modalVersionSelect.value = mcVersionSelect.value;
     });
 
@@ -7634,8 +7852,7 @@
       } else {
         resultsArea.innerHTML = ""; // no welcome snapshot
       }
-      progressBarContainer.style.display = "none"; // progress bar + status chrome
-      progressBar.style.width = "0%";
+      hideUpdateProgress(0);
       statusMessage.classList.remove("visible");
       successfulDownloads = [];
       successfulDownloadKeys.clear();
@@ -7730,11 +7947,14 @@
     function resetPipelineMetrics() {
       pipelineMetrics = {
         fallbackLookups: 0,
+        transientRetryJobs: 0,
         endpointCalls: {
           versionFiles: 0,
           projects: 0,
           versionsBatch: 0,
+          versionsBatchV3: 0,
           versionsDirect: 0,
+          versionsDirectV3: 0,
           teams: 0,
           organizations: 0,
           search: 0,
@@ -7748,6 +7968,76 @@
           combine: 0,
         },
       };
+      resetPipelineApiFailures();
+    }
+
+    function formatEndpointBreakdown(metrics) {
+      if (!metrics?.endpointCalls) return "";
+      const labels = {
+        versionFiles: "version_files",
+        projects: "projects",
+        versionsBatchV3: "versions(v3)",
+        versionsBatch: "versions(v2)",
+        versionsDirectV3: "direct(v3)",
+        versionsDirect: "direct(v2)",
+        teams: "teams",
+        organizations: "orgs",
+        search: "search",
+        other: "other",
+      };
+      const parts = [];
+      for (const [key, label] of Object.entries(labels)) {
+        const n = metrics.endpointCalls[key] || 0;
+        if (n > 0) parts.push(`${label}=${n}`);
+      }
+      return parts.join(", ");
+    }
+
+    function countCachedAndFreshResultCards() {
+      const allCards = document.querySelectorAll(
+        "#results-found .result-card, #results-warning .result-card"
+      );
+      let cached = 0;
+      let fresh = 0;
+      allCards.forEach((card) => {
+        if (card.querySelector(".cache-icon")) cached++;
+        else fresh++;
+      });
+      return { cached, fresh };
+    }
+
+    function appendPipelineStatsHtml(html, processingTimeSec) {
+      let out = `${html}<br>Processing time: ${processingTimeSec}s, API calls used: ${apiCallCount}`;
+      const { cached, fresh } = countCachedAndFreshResultCards();
+      if (cached + fresh > 0) {
+        let lookupSummary = `Cached lookups: ${cached}, Fresh lookups: ${fresh}`;
+        if (pipelineMetrics && pipelineMetrics.fallbackLookups > 0) {
+          lookupSummary += `, Fallback lookups: ${pipelineMetrics.fallbackLookups}`;
+        }
+        if (pipelineMetrics && pipelineMetrics.transientRetryJobs > 0) {
+          lookupSummary += `, API retries: ${pipelineMetrics.transientRetryJobs}`;
+        }
+        out += `<br>${lookupSummary}`;
+      } else if (pipelineMetrics && pipelineMetrics.transientRetryJobs > 0) {
+        out += `<br>API retries: ${pipelineMetrics.transientRetryJobs}`;
+      }
+      const endpointBreakdown = formatEndpointBreakdown(pipelineMetrics);
+      if (endpointBreakdown) out += `<br>API breakdown: ${endpointBreakdown}`;
+      return out;
+    }
+
+    function logPipelineSummary(processingTimeSec, cached, fresh) {
+      if (!pipelineMetrics) return;
+      console.info("[Update pipeline]", {
+        apiCalls: apiCallCount,
+        processingTimeSec: Number(processingTimeSec),
+        cached,
+        fresh,
+        endpoints: { ...pipelineMetrics.endpointCalls },
+        phaseMs: { ...pipelineMetrics.phaseMs },
+        fallbackLookups: pipelineMetrics.fallbackLookups,
+        transientRetryJobs: pipelineMetrics.transientRetryJobs,
+      });
     }
 
     // --- Main Update Logic with Live Rendering and Dependency Resolution ---
@@ -7795,11 +8085,10 @@
         return;
       }
 
-      // --- START of new logic ---
       isCurrentlySearching = true;
+      let finalSummaryText = null;
+      let updateFailed = false;
       try {
-        // --- END of new logic ---
-
         // Reset the UI and state for a new run.
         renderedModIds.clear();
         renderedArtifactIds.clear();
@@ -7809,6 +8098,7 @@
         dependencyDependents.clear();
         incompatibleMap.clear(); // Reset incompatible dependency tracking
         modIdToNameMap.clear(); // Reset mod name mapping
+        versionIdToNumberMap.clear(); // Reset pinned dependency version numbers
         installedModVersions.clear(); // Reset installed version tracking
         conflictResults = null; // Reset conflict results from prior run
         apiCallCount = 0; // Reset API call counter
@@ -7820,7 +8110,9 @@
         clearUndoHistory();
         updateButton.disabled = true;
         updateButton.innerHTML = "Searching...";
-        statusMessage.textContent = "Searching for updates and dependencies...";
+        // Replace any prior summary immediately so it doesn't linger under the skeleton.
+        statusMessage.textContent =
+          `Searching updates for ${jobs.length} mod${jobs.length === 1 ? "" : "s"}...`;
         statusMessage.classList.add("visible");
 
         // Show skeleton loading with estimated number of cards
@@ -7828,158 +8120,170 @@
         showSkeletonLoading(estimatedCards);
 
         // Reset other UI state after showing skeleton
-        progressBarContainer.style.display = "block";
+        showUpdateProgress();
+        progressBar.style.width = "2%";
         successfulDownloads = [];
         successfulDownloadKeys.clear();
         sectionCounts = { found: 0, warning: 0, failure: 0 };
 
         const processedIds = new Set();
         const processedProjectIds = new Set(); // Tracks project IDs only, for dependency deduplication
-        let allJobs = [...jobs];
-        let completedJobs = 0;
         const allDependencies = new Set(); // Store all discovered dependencies
         const allInitialResults = []; // Snapshot of every initial-phase result; consumed by analyzeConflicts() in Phase 3
 
-        // Phase 1: Process all initial mods in batches
-        statusMessage.textContent = `Searching updates for ${jobs.length} mods...`;
-        while (allJobs.length > 0) {
-          const batchSize = 25;
-          const currentBatch = allJobs.splice(0, batchSize);
+        // Phase 1: Resolve all initial mods in one staged pipeline (hash →
+        // projects → authors/versions → combine) instead of repeating that
+        // full pipeline every 25 mods.
+        updateProgressPhase = "initial";
+        lastPipelineProgressPct = 2;
 
-          const results = await getModUpdateInfoBatch(currentBatch, batchSize);
+        const results = await getModUpdateInfoBatch(jobs);
+        const phase1Results = Array.isArray(results) ? results : [];
 
-          // Process and render results immediately as each batch completes
-          for (const result of results) {
-            const key = (result.modId || (result.title + result.reason)) + '|' + (result.project_type || 'unknown');
+        reportPipelineStage(
+          `Building ${phase1Results.length} result${phase1Results.length === 1 ? "" : "s"}...`,
+          48
+        );
 
-            if (processedIds.has(key)) {
-              completedJobs++;
-              continue;
+        for (const result of phase1Results) {
+          const key = (result.modId || (result.title + result.reason)) + '|' + (result.project_type || 'unknown');
+
+          if (processedIds.has(key)) {
+            continue;
+          }
+          processedIds.add(key);
+          const phase1ProjectId = result.projectId || result.modId;
+          if (phase1ProjectId) processedProjectIds.add(phase1ProjectId);
+          allInitialResults.push(result);
+
+          // Store target version for conflict context (fallback to installed for warnings)
+          if ((result.status === "success" || result.status === "warning") && result.projectId) {
+            const contextVersion = result.targetVersion || result.installedVersion;
+            if (contextVersion) {
+              installedModVersions.set(result.projectId, contextVersion);
             }
-            processedIds.add(key);
-            processedProjectIds.add(result.projectId || result.modId);
-            allInitialResults.push(result);
+          }
 
-            // Store target version for conflict context (fallback to installed for warnings)
-            if ((result.status === "success" || result.status === "warning") && result.projectId) {
-              const contextVersion = result.targetVersion || result.installedVersion;
-              if (contextVersion) {
-                installedModVersions.set(result.projectId, contextVersion);
-              }
-            }
-
-            // Collect dependencies BEFORE rendering the card
-            if (result.status === "success" && result.dependencies) {
-              const parentArtifactKey = makeArtifactKey(result.projectId, result.project_type);
-              const requiredDeps = [];
-              const optionalDeps = [];
-              const incompatibleDeps = [];
-              for (const dep of result.dependencies) {
-                if (dep.dependency_type === "required") {
-                  allDependencies.add(dep.project_id);
-                  // Track which mod requires this dependency
-                  trackDependencyRequirement(dep.project_id, result.title);
-                  // Track dependencies for this mod (reverse mapping)
-                  requiredDeps.push(dep.project_id);
-                  trackDependencyParent(dep.project_id, parentArtifactKey);
-                } else if (dep.dependency_type === "optional") {
-                  optionalDeps.push(dep.project_id);
-                  trackDependencyParent(dep.project_id, parentArtifactKey);
-                } else if (dep.dependency_type === "incompatible") {
-                  // Track incompatible dependencies
-                  if (!incompatibleMap.has(result.projectId)) {
-                    incompatibleMap.set(result.projectId, new Set());
-                  }
-                  incompatibleMap.get(result.projectId).add(dep.project_id);
-                  incompatibleDeps.push(dep.project_id);
+          // Collect dependencies BEFORE rendering the card
+          if (result.status === "success" && result.projectId && Array.isArray(result.dependencies)) {
+            const parentArtifactKey = makeArtifactKey(result.projectId, result.project_type);
+            const requiredDeps = [];
+            const optionalDeps = [];
+            for (const dep of result.dependencies) {
+              if (dep.dependency_type === "required") {
+                if (!dep.project_id) continue;
+                allDependencies.add(dep.project_id);
+                // Track which mod requires this dependency
+                trackDependencyRequirement(dep.project_id, result.title);
+                // Track dependencies for this mod (reverse mapping)
+                requiredDeps.push(makeDepEntry(dep));
+                trackDependencyParent(dep.project_id, parentArtifactKey);
+              } else if (dep.dependency_type === "optional") {
+                if (!dep.project_id) continue;
+                optionalDeps.push(makeDepEntry(dep));
+                trackDependencyParent(dep.project_id, parentArtifactKey);
+              } else if (dep.dependency_type === "incompatible") {
+                if (!dep.project_id || !result.projectId) continue;
+                // Track incompatible dependencies
+                if (!incompatibleMap.has(result.projectId)) {
+                  incompatibleMap.set(result.projectId, new Set());
                 }
-              }
-              // Store what dependencies this artifact has (keyed by composite
-              // artifact key so a datapack version doesn't inherit the mod
-              // version's deps just because they share a projectId).
-              if (requiredDeps.length > 0) {
-                reverseDependencyMap.set(parentArtifactKey, requiredDeps);
-              }
-              if (optionalDeps.length > 0) {
-                optionalDependencyMap.set(parentArtifactKey, optionalDeps);
+                incompatibleMap.get(result.projectId).add(dep.project_id);
               }
             }
+            // Store what dependencies this artifact has (keyed by composite
+            // artifact key so a datapack version doesn't inherit the mod
+            // version's deps just because they share a projectId).
+            if (requiredDeps.length > 0) {
+              reverseDependencyMap.set(parentArtifactKey, requiredDeps);
+            }
+            if (optionalDeps.length > 0) {
+              optionalDependencyMap.set(parentArtifactKey, optionalDeps);
+            }
+          }
 
-            if (!(result.status === "success" && renderedArtifactIds.has(result.modId + '|' + result.project_type))) {
-              renderSingleResult(result);
-              if (result.status === "success") {
-                renderedModIds.add(result.modId);
-                renderedArtifactIds.add(result.modId + '|' + result.project_type);
-                // Store mod ID to name mapping for dependency tooltips
+          if (!(result.status === "success" && renderedArtifactIds.has(result.modId + '|' + result.project_type))) {
+            renderSingleResult(result);
+            if (result.status === "success") {
+              renderedModIds.add(result.modId);
+              renderedArtifactIds.add(result.modId + '|' + result.project_type);
+              // Store mod ID to name mapping for dependency tooltips
+              // Reuse already-fetched version lists for pinned Depends on labels
+              // (covers cache hits that skipped batchVersionLookup). Must run
+              // before tooltip refresh so pins are available immediately.
+              rememberVersionNumbers(result.all_versions);
+              if (result.projectId) {
                 modIdToNameMap.set(result.projectId, result.title);
-
-                // Always register a remover entry — even if there's no upload-area pill
-                // (e.g. dependencies) — so the search modal can show a Remove button that
-                // at least removes the result card.
-                registerRenderedModRemover(result, findPillForResult(result));
-
                 // Update any parent cards that were waiting for this dependency name
                 updateDependencyChainTooltip(result.projectId);
+              }
 
-                // Add to successfulDownloads if it has the required download info
-                // This handles both cached and fresh results
-                if (result.all_versions && result.all_versions.length > 0) {
-                  // Newest-first compatible list: default to index 0 without channel preference.
-                  const latestVersion = result.all_versions[0];
+              // Always register a remover entry — even if there's no upload-area pill
+              // (e.g. dependencies) — so the search modal can show a Remove button that
+              // at least removes the result card.
+              registerRenderedModRemover(result, findPillForResult(result));
 
-                  if (latestVersion) {
-                    const primaryFile = selectArtifactFile(latestVersion, result.project_type);
-                    if (primaryFile) {
-                      const downloadInfo = {
-                        url: primaryFile.url,
-                        filename: primaryFile.filename,
-                        hashes: primaryFile.hashes,
-                        path: buildArtifactPath(result.project_type, primaryFile.filename),
-                        fileSize: primaryFile.size,
-                        client_side: result.client_side,
-                        server_side: result.server_side,
-                        projectId: result.projectId,
-                        artifactType: result.project_type,
-                        // Mirror combineResults() so version-change reshapes are no-ops.
-                        isMrpackFile: result.isMrpackFile === true,
-                      };
+              // Add to successfulDownloads if it has the required download info
+              // This handles both cached and fresh results
+              if (result.all_versions && result.all_versions.length > 0) {
+                // Newest-first compatible list: default to index 0 without channel preference.
+                const latestVersion = result.all_versions[0];
 
-                      const dlKey = getSuccessfulDownloadKey(result.projectId, result.project_type);
-                      if (!successfulDownloadKeys.has(dlKey)) {
-                        successfulDownloadKeys.add(dlKey);
-                        successfulDownloads.push(downloadInfo);
-                      }
+                if (latestVersion) {
+                  const primaryFile = selectArtifactFile(latestVersion, result.project_type);
+                  if (primaryFile) {
+                    const downloadInfo = {
+                      url: primaryFile.url,
+                      filename: primaryFile.filename,
+                      hashes: primaryFile.hashes,
+                      path: buildArtifactPath(result.project_type, primaryFile.filename),
+                      fileSize: primaryFile.size,
+                      client_side: result.client_side,
+                      server_side: result.server_side,
+                      projectId: result.projectId,
+                      artifactType: result.project_type,
+                      // Mirror combineResults() so version-change reshapes are no-ops.
+                      isMrpackFile: result.isMrpackFile === true,
+                    };
+
+                    const dlKey = getSuccessfulDownloadKey(result.projectId, result.project_type);
+                    if (result.projectId && !successfulDownloadKeys.has(dlKey)) {
+                      successfulDownloadKeys.add(dlKey);
+                      successfulDownloads.push(downloadInfo);
                     }
                   }
                 }
               }
             }
-
-            completedJobs++;
           }
-
-          // Update progress bar after each batch (50% for initial mods)
-          const progressPercentage = Math.min((completedJobs / jobs.length) * 50, 50);
-          progressBar.style.width = `${progressPercentage}%`;
-
         }
 
-        // Complete the progress bar and create summary
-        progressBar.style.width = "100%";
+        // Phase 1 complete — leave headroom for dependency resolution (50–95%).
+        updateProgressPhase = "deps";
+        progressBar.style.width = "50%";
 
         // Phase 2: Recursively process dependencies
         let dependencyQueue = Array.from(allDependencies).filter(depId => !processedProjectIds.has(depId));
         const dependencyQueued = new Set(dependencyQueue);
         let actualDependenciesAdded = 0;
-        const totalInitialDependencies = dependencyQueue.length;
-        let dependenciesProcessed = 0;
+
+        // Use the actual queue, not allDependencies — required deps that were
+        // already in the upload set leave allDependencies non-empty but nothing to resolve.
+        if (dependencyQueue.length > 0) {
+          statusMessage.textContent = "Resolving dependencies...";
+        } else {
+          progressBar.style.width = "90%";
+          statusMessage.textContent = "Finalizing results...";
+        }
 
         let depthLevel = 0;
         while (dependencyQueue.length > 0) {
           // Process entire dependency queue per depth level to minimize API calls
           const currentBatchIds = dependencyQueue.splice(0);
           depthLevel++;
-          statusMessage.textContent = `Resolving dependencies... (depth ${depthLevel}, ${currentBatchIds.length} in this wave, ${dependenciesProcessed}/${totalInitialDependencies} initial processed)`;
+          statusMessage.textContent = currentBatchIds.length === 1
+            ? `Resolving dependencies... (depth ${depthLevel})`
+            : `Resolving ${currentBatchIds.length} dependencies... (depth ${depthLevel})`;
 
           const dependencyJobs = currentBatchIds.map(depId => ({
             source: "dependency",
@@ -7989,9 +8293,10 @@
             isDependencyJob: true,
           })).map(createResolutionJob);
 
-          const results = await getModUpdateInfoBatch(dependencyJobs, dependencyJobs.length);
+          const depResultsRaw = await getModUpdateInfoBatch(dependencyJobs);
+          const depResults = Array.isArray(depResultsRaw) ? depResultsRaw : [];
 
-          for (const result of results) {
+          for (const result of depResults) {
             const key = (result.modId || result.projectId || (result.title + result.reason)) + '|' + (result.project_type || 'unknown');
 
             if (processedIds.has(key)) {
@@ -8001,8 +8306,8 @@
               continue;
             }
             processedIds.add(key);
-            processedProjectIds.add(result.projectId || result.modId);
-            dependenciesProcessed++;
+            const depProjectId = result.projectId || result.modId;
+            if (depProjectId) processedProjectIds.add(depProjectId);
 
             // Render the dependency card
             renderSingleResult(result);
@@ -8011,52 +8316,57 @@
               actualDependenciesAdded++;
               renderedModIds.add(result.modId);
               renderedArtifactIds.add(result.modId + '|' + result.project_type);
-              modIdToNameMap.set(result.projectId, result.title);
+              // Index pinned dep versions before refreshing parent tooltips
+              // (same cache-hit ordering as Phase 1).
+              rememberVersionNumbers(result.all_versions);
+              if (result.projectId) {
+                modIdToNameMap.set(result.projectId, result.title);
+                // Update any parent cards that were waiting for this dependency name
+                updateDependencyChainTooltip(result.projectId);
+              }
 
               // Register the dependency so the search modal Remove button can remove its
               // result card. Dependencies have no upload-area pill, so pill is null here.
               registerRenderedModRemover(result, findPillForResult(result));
 
-              // Update any parent cards that were waiting for this dependency name
-              updateDependencyChainTooltip(result.projectId);
-
               // Check for nested dependencies
-              if (result.dependencies) {
+              if (result.projectId && Array.isArray(result.dependencies)) {
                 const parentArtifactKey = makeArtifactKey(result.projectId, result.project_type);
                 for (const dep of result.dependencies) {
                   if (dep.dependency_type === "required") {
                     const depKey = dep.project_id;
+                    if (!depKey) continue;
                     if (!processedProjectIds.has(depKey) && !dependencyQueued.has(depKey)) {
                       dependencyQueue.push(depKey); // Add new dependency to the queue
                       dependencyQueued.add(depKey);
                       allDependencies.add(depKey); // Keep track of all unique dependencies
                       trackDependencyRequirement(depKey, result.title); // Track who requires this
 
-                      // A new dependency relationship was found, so we might need to update the parent's card
-                      if (result.projectId) {
-                        // Update the reverse map before calling the card update
-                        if (!reverseDependencyMap.has(parentArtifactKey)) {
-                          reverseDependencyMap.set(parentArtifactKey, []);
-                        }
-                        reverseDependencyMap.get(parentArtifactKey).push(depKey);
-                        trackDependencyParent(depKey, parentArtifactKey);
-                        updateDependencyChainOnCard(parentArtifactKey);
+                      // Nested required deps — projectId already verified by outer guard.
+                      if (!reverseDependencyMap.has(parentArtifactKey)) {
+                        reverseDependencyMap.set(parentArtifactKey, []);
                       }
+                      const reqList = reverseDependencyMap.get(parentArtifactKey);
+                      if (!depListHasProject(reqList, depKey)) {
+                        reqList.push(makeDepEntry(dep));
+                      }
+                      trackDependencyParent(depKey, parentArtifactKey);
+                      updateDependencyChainOnCard(parentArtifactKey);
                     }
                   } else if (dep.dependency_type === "optional") {
                     const depKey = dep.project_id;
-                    if (result.projectId) {
-                      if (!optionalDependencyMap.has(parentArtifactKey)) {
-                        optionalDependencyMap.set(parentArtifactKey, []);
-                      }
-                      const optList = optionalDependencyMap.get(parentArtifactKey);
-                      if (!optList.includes(depKey)) {
-                        optList.push(depKey);
-                        trackDependencyParent(depKey, parentArtifactKey);
-                        updateDependencyChainOnCard(parentArtifactKey);
-                      }
+                    if (!depKey || !result.projectId) continue;
+                    if (!optionalDependencyMap.has(parentArtifactKey)) {
+                      optionalDependencyMap.set(parentArtifactKey, []);
+                    }
+                    const optList = optionalDependencyMap.get(parentArtifactKey);
+                    if (!depListHasProject(optList, depKey)) {
+                      optList.push(makeDepEntry(dep));
+                      trackDependencyParent(depKey, parentArtifactKey);
+                      updateDependencyChainOnCard(parentArtifactKey);
                     }
                   } else if (dep.dependency_type === "incompatible") {
+                    if (!dep.project_id || !result.projectId) continue;
                     // Track incompatible dependencies during dependency resolution
                     if (!incompatibleMap.has(result.projectId)) {
                       incompatibleMap.set(result.projectId, new Set());
@@ -8073,17 +8383,21 @@
           const processedDependencyCount = Array.from(allDependencies).filter(id => processedProjectIds.has(id)).length;
           const depProgressPercentage = 50 + (Math.min(processedDependencyCount / (totalDependencies || 1), 1) * 45);
           progressBar.style.width = `${depProgressPercentage}%`;
+          statusMessage.textContent =
+            `Resolved ${processedDependencyCount}/${totalDependencies} dependenc${totalDependencies === 1 ? "y" : "ies"}...`;
         }
 
-        // Optional dependencies aren't auto-resolved, so fetch their titles in one
-        // batch (fire-and-forget) so the chain tooltip can show real names instead
-        // of "Loading...".
-        enrichOptionalDependencyNames();
+        // Optional dependency titles (awaited so a rate-limit countdown cannot
+        // clobber the final summary). Pinned dep version numbers come from
+        // versions already fetched during resolve — no extra versions call.
+        await enrichOptionalDependencyNames();
 
         // Conflict detection uses only Modrinth 'incompatible' metadata for the target version.
         // Uploaded JAR conflicts are ignored; incompatibleMap is filled during dependency resolution.
-   
+
         // Phase 3: Analyze conflicts after all mods are processed
+        updateProgressPhase = "idle";
+        progressBar.style.width = "96%";
         statusMessage.textContent = "Analyzing mod conflicts...";
         conflictResults = analyzeConflicts(allInitialResults);
 
@@ -8113,157 +8427,303 @@
           summaryText += `, Conflicts detected: ${conflictResults.totalConflicts}`;
         }
 
-        // Add timing, API, and cache stats
-        const allCards = document.querySelectorAll('#results-found .result-card, #results-warning .result-card');
-        let cachedModCount = 0;
-        let freshModCount = 0;
-
-        // Count unique mods that were cached vs fresh (include both success and warning results)
-        allCards.forEach(card => {
-          const hasCacheIcon = card.querySelector('.cache-icon');
-          if (hasCacheIcon) {
-            cachedModCount++;
-          } else {
-            freshModCount++;
-          }
-        });
-
-        summaryText += `<br>Processing time: ${processingTime}s, API calls used: ${apiCallCount}`;
-        if (cachedModCount + freshModCount > 0) {
-          let lookupSummary = `Cached lookups: ${cachedModCount}, Fresh lookups: ${freshModCount}`;
-          if (pipelineMetrics && pipelineMetrics.fallbackLookups > 0) {
-            lookupSummary += `, Fallback lookups: ${pipelineMetrics.fallbackLookups}`;
-          }
-          summaryText += `<br>${lookupSummary}`;
-        }
+        const { cached: cachedModCount, fresh: freshModCount } = countCachedAndFreshResultCards();
+        summaryText = appendPipelineStatsHtml(summaryText, processingTime);
+        logPipelineSummary(processingTime, cachedModCount, freshModCount);
 
         // Store the summary for the finally block
-        window.finalSummaryText = summaryText;
+        finalSummaryText = summaryText;
+        progressBar.style.width = "100%";
         statusMessage.innerHTML = summaryText;
         // Keep the status message visible instead of hiding it
-
-        setTimeout(() => {
-          progressBarContainer.style.display = "none";
-        }, 1000);
+        hideUpdateProgress(1000);
 
 
       } catch (error) {
         console.error("Error in handleUpdate:", error);
+        updateFailed = true;
+        updateProgressPhase = "idle";
         statusMessage.textContent = `Error processing mods: ${error.message}`;
         statusMessage.classList.add("visible");
 
         // Reset UI state on error
-        progressBarContainer.style.display = "none";
+        hideUpdateProgress(0);
       } finally {
         isCurrentlySearching = false;
+        updateProgressPhase = "idle";
         // Always reset the button state
         updateButton.disabled = false;
         refreshUpdateButtonLabel();
 
-        // Ensure we show the final summary if it was calculated
-        if (window.finalSummaryText && sectionCounts.found > 0) {
-          statusMessage.innerHTML = window.finalSummaryText;
+        // Ensure we show the final summary if it was calculated.
+        // Never overwrite an error message (including when a summary was
+        // already built and a later step threw).
+        if (finalSummaryText && !updateFailed) {
+          statusMessage.innerHTML = finalSummaryText;
           statusMessage.classList.add("visible");
-          window.finalSummaryText = null; // Clean up
-        } else if (apiCallCount > 0) {
-          // If we have API calls but no final summary, at least show the API count
+        } else if (!updateFailed && apiCallCount > 0) {
           const fallbackTime = ((Date.now() - processingStartTime) / 1000).toFixed(1);
-
-          // Count unique mods that were cached vs fresh (include both success and warning results)
-          const allCards = document.querySelectorAll('#results-found .result-card, #results-warning .result-card');
-          let cachedModCount = 0;
-          let freshModCount = 0;
-
-          allCards.forEach(card => {
-            const hasCacheIcon = card.querySelector('.cache-icon');
-            if (hasCacheIcon) {
-              cachedModCount++;
-            } else {
-              freshModCount++;
-            }
-          });
-
-          let fallbackSummary = `Processing completed<br>Processing time: ${fallbackTime}s, API calls used: ${apiCallCount}`;
-          if (cachedModCount + freshModCount > 0) {
-            let lookupSummary = `Cached lookups: ${cachedModCount}, Fresh lookups: ${freshModCount}`;
-            if (pipelineMetrics && pipelineMetrics.fallbackLookups > 0) {
-              lookupSummary += `, Fallback lookups: ${pipelineMetrics.fallbackLookups}`;
-            }
-            fallbackSummary += `<br>${lookupSummary}`;
-          }
-          statusMessage.innerHTML = fallbackSummary;
+          statusMessage.innerHTML = appendPipelineStatsHtml("Processing completed", fallbackTime);
           statusMessage.classList.add("visible");
         }
       }
     }
 
     // --- API Fetcher with Transparent Rate Limit and Custom User-Agent ---
+    // Shared gate so parallel 429s share one countdown instead of fighting
+    // over statusMessage with overlapping timers.
+    let rateLimitGate = null;
+    const RATE_LIMIT_WAIT_CAP_SEC = 120;
+    const TRANSIENT_HTTP_STATUSES = new Set([500, 502, 503, 504]);
+
+    // Hashes / project IDs that failed a batch request after retries (not
+    // genuine "not on Modrinth"). Used so we can retry those jobs once.
+    let pipelineApiFailures = null;
+
+    function resetPipelineApiFailures() {
+      pipelineApiFailures = {
+        hashes: new Set(),
+        projectIds: new Set(),
+      };
+    }
+
+    function parseRateLimitWaitSeconds(response, fallback = 10) {
+      // Prefer Retry-After (seconds) when present.
+      const retryAfter = Number(response.headers.get("Retry-After"));
+      if (Number.isFinite(retryAfter) && retryAfter > 0) {
+        return Math.min(Math.ceil(retryAfter), RATE_LIMIT_WAIT_CAP_SEC);
+      }
+
+      const resetRaw = Number(response.headers.get("X-Ratelimit-Reset"));
+      if (!Number.isFinite(resetRaw) || resetRaw < 0) return fallback;
+
+      // Modrinth documents Reset as seconds until the window refreshes
+      // (small relative values). Some APIs use absolute Unix timestamps —
+      // treat large values as absolute so we never wait years by accident.
+      let wait;
+      if (resetRaw > 1e9) {
+        const now = Math.floor(Date.now() / 1000);
+        wait = Math.max(0, resetRaw - now) + 1;
+      } else {
+        wait = Math.max(1, Math.ceil(resetRaw));
+      }
+      if (!Number.isFinite(wait) || wait <= 0) return fallback;
+      return Math.min(wait, RATE_LIMIT_WAIT_CAP_SEC);
+    }
+
+    async function awaitSharedRateLimitGate(waitTime) {
+      const seconds = Math.max(
+        1,
+        Math.min(
+          Math.ceil(Number(waitTime) || 10),
+          RATE_LIMIT_WAIT_CAP_SEC
+        )
+      );
+      // Capture locally so a gate that finishes (and clears the slot) between
+      // this check and await can't become `await null`.
+      let gate = rateLimitGate;
+      if (!gate) {
+        const updateStatus = isCurrentlySearching === true;
+        const label = "Rate limited";
+        console.warn(`${label}. Waiting ${seconds}s.`);
+        gate = rateLimitGate = (async () => {
+          for (let remaining = seconds; remaining > 0; remaining--) {
+            if (updateStatus) {
+              statusMessage.textContent = `${label}. Pausing for ${remaining} seconds...`;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          }
+          // Only clear our own rate-limit line. Do not restore a stashed
+          // pre-pause message — the pipeline may have advanced status meanwhile.
+          if (
+            updateStatus &&
+            String(statusMessage.textContent || "").startsWith(label)
+          ) {
+            statusMessage.textContent = "Resuming...";
+          }
+        })().finally(() => {
+          rateLimitGate = null;
+        });
+      }
+      await gate;
+    }
+
+    function recordApiCall(url) {
+      apiCallCount++;
+      if (!pipelineMetrics) return;
+      const lowerUrl = String(url).toLowerCase();
+      if (lowerUrl.includes("/v2/version_files")) pipelineMetrics.endpointCalls.versionFiles++;
+      else if (lowerUrl.includes("/v2/projects?")) pipelineMetrics.endpointCalls.projects++;
+      else if (lowerUrl.includes("/v3/versions")) pipelineMetrics.endpointCalls.versionsBatchV3++;
+      else if (lowerUrl.includes("/v2/versions?ids=")) pipelineMetrics.endpointCalls.versionsBatch++;
+      else if (lowerUrl.includes("/v3/project/") && lowerUrl.includes("/version")) pipelineMetrics.endpointCalls.versionsDirectV3++;
+      else if (lowerUrl.includes("/v2/project/") && lowerUrl.includes("/version?")) pipelineMetrics.endpointCalls.versionsDirect++;
+      else if (lowerUrl.includes("/v3/teams?")) pipelineMetrics.endpointCalls.teams++;
+      else if (lowerUrl.includes("/v3/organizations?")) pipelineMetrics.endpointCalls.organizations++;
+      else if (lowerUrl.includes("/v2/search?")) pipelineMetrics.endpointCalls.search++;
+      else pipelineMetrics.endpointCalls.other++;
+    }
+
     async function fetchWithRetry(url, options, retries = 3) {
       const requestOptions = {
-        ...options, // Spread any existing options
+        ...options,
         headers: {
           // Note: browsers forbid setting User-Agent from JS, so we rely on the default.
           ...(options?.headers || {})
         },
       };
 
+      let lastNetworkError = null;
       for (let i = 0; i < retries; i++) {
-        // Use the new requestOptions object
-        const response = await fetch(url, requestOptions);
-
-        // Count successful API calls (including retries)
-        if (response.ok) {
-          apiCallCount++;
-          if (pipelineMetrics) {
-            const lowerUrl = String(url).toLowerCase();
-            if (lowerUrl.includes("/v2/version_files")) pipelineMetrics.endpointCalls.versionFiles++;
-            else if (lowerUrl.includes("/v2/projects?")) pipelineMetrics.endpointCalls.projects++;
-            else if (lowerUrl.includes("/v2/versions?ids=")) pipelineMetrics.endpointCalls.versionsBatch++;
-            else if (lowerUrl.includes("/v2/project/") && lowerUrl.includes("/version?")) pipelineMetrics.endpointCalls.versionsDirect++;
-            else if (lowerUrl.includes("/v3/teams?")) pipelineMetrics.endpointCalls.teams++;
-            else if (lowerUrl.includes("/v3/organizations?")) pipelineMetrics.endpointCalls.organizations++;
-            else if (lowerUrl.includes("/v2/search?")) pipelineMetrics.endpointCalls.search++;
-            else pipelineMetrics.endpointCalls.other++;
+        let response;
+        try {
+          response = await fetch(url, requestOptions);
+        } catch (err) {
+          // Transient network failures (offline blip, CORS-aborted, etc.).
+          lastNetworkError = err;
+          if (i < retries - 1) {
+            await new Promise((r) => setTimeout(r, 400 * (i + 1)));
+            continue;
           }
+          throw err;
+        }
+
+        // Count every completed HTTP response (ok, 429, 404, 5xx, …) so the
+        // summary matches requests that actually hit Modrinth.
+        recordApiCall(url);
+
+        if (response.ok) {
+          return response;
         }
 
         if (response.status === 429) {
-          const resetTimestamp = Number(
-            response.headers.get("X-Ratelimit-Reset")
-          );
-          const currentTime = Math.floor(Date.now() / 1000);
-          const waitTime = resetTimestamp
-            ? Math.max(0, resetTimestamp - currentTime) + 1
-            : 10; // Default to 10 seconds if reset time is not available
-
-          const originalMessage = statusMessage.textContent;
-          console.warn(
-            `Rate limited. Waiting for ${waitTime} seconds until the limit resets.`
-          );
-
-          // Show countdown for rate limiting
-          for (let i = waitTime; i > 0; i--) {
-            statusMessage.textContent = `Rate limited. Pausing for ${i} seconds...`;
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-          }
-
-          statusMessage.textContent = originalMessage;
+          const waitTime = parseRateLimitWaitSeconds(response, 10);
+          await awaitSharedRateLimitGate(waitTime);
           continue;
         }
+
+        // Retry transient server errors; return on last attempt so callers
+        // can soft-fail (same as before for non-ok responses).
+        if (TRANSIENT_HTTP_STATUSES.has(response.status) && i < retries - 1) {
+          await new Promise((r) => setTimeout(r, 500 * (i + 1)));
+          continue;
+        }
+
+        // 404 / 400 / other: return immediately — no retry (preserves soft-fail).
         return response;
       }
+
+      if (lastNetworkError) throw lastNetworkError;
       throw new Error(
         "Failed to fetch after multiple retries due to rate limiting."
       );
     }
 
+    // CDN / zip file downloads only — retries network + transient 5xx without
+    // Modrinth API rate-limit UI or apiCallCount.
+    async function fetchBlobWithRetry(url, retries = 3) {
+      let lastError = null;
+      for (let i = 0; i < retries; i++) {
+        try {
+          const response = await fetch(url);
+          if (response.ok) {
+            return await response.blob();
+          }
+          if (TRANSIENT_HTTP_STATUSES.has(response.status) && i < retries - 1) {
+            await new Promise((r) => setTimeout(r, 500 * (i + 1)));
+            continue;
+          }
+          const err = new Error(
+            `Download failed (${response.status} ${response.statusText || ""})`.trim()
+          );
+          err.status = response.status;
+          throw err;
+        } catch (err) {
+          lastError = err;
+          if (err?.status && !TRANSIENT_HTTP_STATUSES.has(err.status)) {
+            throw err;
+          }
+          if (i < retries - 1) {
+            await new Promise((r) => setTimeout(r, 400 * (i + 1)));
+            continue;
+          }
+        }
+      }
+      throw lastError || new Error("Download failed");
+    }
+
     // --- Main Batch Processing Function ---
-    async function getModUpdateInfoBatch(jobs, batchSize = 25) {
-      // Process the entire job list as a single batch since we're already batching at the higher level
-      return await processBatch(jobs);
+    // Phase 1 stage UI only. Dependency waves also call processBatch; without
+    // this gate those stages would overwrite dep status and yank the bar
+    // backward from 50%+ down to ~5%.
+    let updateProgressPhase = "idle"; // 'idle' | 'initial' | 'deps'
+    let lastPipelineProgressPct = 0;
+
+    function reportPipelineStage(label, pct) {
+      if (updateProgressPhase !== "initial") return;
+      if (statusMessage && label) statusMessage.textContent = label;
+      if (progressBar && typeof pct === "number") {
+        // Never move the Phase 1 bar backwards (mixed-cache / overlapping stage labels).
+        const next = Math.max(lastPipelineProgressPct, Math.max(0, Math.min(pct, 100)));
+        lastPipelineProgressPct = next;
+        progressBar.style.width = `${next}%`;
+      }
+    }
+
+    async function getModUpdateInfoBatch(jobs) {
+      // Process the entire job list as a single staged pipeline.
+      const results = await processBatch(jobs);
+
+      // One end-of-pass retry for jobs that failed because a batch API chunk
+      // failed (not because the mod is genuinely missing on Modrinth).
+      const retryJobs = [];
+      const seenRetryJobs = new Set();
+      for (const result of results) {
+        if (!result?.apiTransientFailure || !result._retryJob) continue;
+        if (seenRetryJobs.has(result._retryJob)) continue;
+        seenRetryJobs.add(result._retryJob);
+        retryJobs.push(result._retryJob);
+      }
+      if (retryJobs.length === 0) {
+        return results.map((r) => stripApiRetryMeta(r));
+      }
+
+      if (pipelineMetrics) {
+        pipelineMetrics.transientRetryJobs += retryJobs.length;
+      }
+      if (isCurrentlySearching) {
+        statusMessage.textContent =
+          `Retrying ${retryJobs.length} mod${retryJobs.length === 1 ? "" : "s"} after API errors...`;
+      }
+      console.warn(
+        `[Update pipeline] Retrying ${retryJobs.length} job(s) after transient API failures`
+      );
+
+      // Clear failure marks for this retry so a second genuine miss isn't
+      // re-flagged from the first pass's sets.
+      resetPipelineApiFailures();
+      const retryResults = await processBatch(retryJobs);
+      const kept = results.filter((r) => !r.apiTransientFailure);
+      return [
+        ...kept.map((r) => stripApiRetryMeta(r)),
+        ...retryResults.map((r) => stripApiRetryMeta(r, { final: true })),
+      ];
+    }
+
+    function stripApiRetryMeta(result, { final = false } = {}) {
+      if (!result) return result;
+      const out = { ...result };
+      if (final && out.apiTransientFailure) {
+        out.reason = "Temporary API error — please try Update again";
+      }
+      delete out.apiTransientFailure;
+      delete out._retryJob;
+      return out;
     }
 
     async function processBatch(jobs) {
+      if (!Array.isArray(jobs) || jobs.length === 0) return [];
+
       const loader = modLoaderSelect.value;
       const gameVersion = mcVersionSelect.value;
       const getJobCacheScope = (job) => {
@@ -8292,13 +8752,21 @@
       const cachedResults = [];
       const uncachedJobs = [];
 
+      const fileJobs = jobs.filter(job => getJobLookupType(job) === "file");
+      if (fileJobs.length > 0) {
+        reportPipelineStage(
+          `Hashing ${fileJobs.length} mod${fileJobs.length === 1 ? "" : "s"}...`,
+          5
+        );
+      } else {
+        reportPipelineStage("Checking cache...", 5);
+      }
+
       // Pre-calculate all hashes in parallel for uploaded files and mrpack files
-      const fileHashPromises = jobs
-        .filter(job => getJobLookupType(job) === "file")
-        .map(async job => {
-          const hash = await calculateFileHash(job.data);
-          return { job, hash };
-        });
+      const fileHashPromises = fileJobs.map(async job => {
+        const hash = await calculateFileHash(job.data);
+        return { job, hash };
+      });
 
       const fileHashes = await Promise.all(fileHashPromises);
       const hashMap = new Map(fileHashes.map(fh => [fh.job, fh.hash]));
@@ -8319,18 +8787,17 @@
           if (hash) {
             cacheKey = getCacheKey(hash, getJobCacheScope(job), gameVersion, 'hash');
           }
-        } else if (lookupType === "hash") {
+        } else if (lookupType === "hash" && identifier) {
           cacheKey = getCacheKey(identifier, getJobCacheScope(job), gameVersion, 'hash');
-        } else if (lookupType === "id") {
+        } else if (lookupType === "id" && identifier) {
           cacheKey = getCacheKey(identifier, getJobCacheScope(job), gameVersion, 'id');
         }
 
         if (cacheKey) {
           const cachedResult = getCachedResult(cacheKey);
           if (cachedResult) {
-            // Add cache indicator to result
-            cachedResult.fromCache = true;
-            cachedResults.push(cachedResult);
+            // Shallow-copy so fromCache doesn't mutate the object living in the cache store.
+            cachedResults.push({ ...cachedResult, fromCache: true });
             continue;
           }
         }
@@ -8340,7 +8807,18 @@
 
       // If all results were cached, return them immediately
       if (uncachedJobs.length === 0) {
+        reportPipelineStage(
+          `Using ${cachedResults.length} cached result${cachedResults.length === 1 ? "" : "s"}...`,
+          40
+        );
         return cachedResults;
+      }
+
+      if (cachedResults.length > 0) {
+        reportPipelineStage(
+          `Resolving ${uncachedJobs.length} fresh (${cachedResults.length} cached)...`,
+          8
+        );
       }
 
       // Process uncached jobs, passing hashMap to avoid redundant SHA1 computation.
@@ -8348,6 +8826,9 @@
 
       // Cache the fresh results
       for (const result of freshResults) {
+        // Never cache transient API failures — a retry (or next Update) should
+        // hit the network again instead of remembering a false "not found".
+        if (result?.apiTransientFailure) continue;
         const matchingJobs = getMatchingJobsForResult(result, uncachedJobs, hashMap);
         const cacheKeys = new Set();
         for (const matchingJob of matchingJobs) {
@@ -8359,9 +8840,11 @@
         }
 
         if (cacheKeys.size > 0) {
-          // Don't cache the fromCache flag
+          // Don't cache the fromCache flag or retry bookkeeping
           const resultToCache = { ...result };
           delete resultToCache.fromCache;
+          delete resultToCache.apiTransientFailure;
+          delete resultToCache._retryJob;
           for (const cacheKey of cacheKeys) {
             setCachedResult(cacheKey, resultToCache);
           }
@@ -8381,6 +8864,14 @@
       const jobsNeedingHash = uncachedJobs.filter(
         (job) => getJobLookupType(job) === "file" && !(hashMap && hashMap.has(job))
       );
+      if (jobsNeedingHash.length > 0) {
+        reportPipelineStage(
+          `Hashing ${jobsNeedingHash.length} remaining mod${jobsNeedingHash.length === 1 ? "" : "s"}...`,
+          8
+        );
+      }
+      // If hashes are already ready, keep any mixed-cache status from processBatch
+      // instead of overwriting it with a generic "Preparing lookups...".
       const fallbackHashes = await Promise.all(
         jobsNeedingHash.map(async job => ({ job, hash: await calculateFileHash(job.data) }))
       );
@@ -8398,13 +8889,19 @@
             hashJobs.push({ job, hash });
           }
         } else if (lookupType === "hash") {
-          hashJobs.push({ job, hash: identifier });
+          if (identifier) hashJobs.push({ job, hash: identifier });
         } else if (lookupType === "id") {
-          projectIdJobs.push(job);
+          if (identifier) projectIdJobs.push(job);
         }
       }
 
       // Step 2: Batch hash lookups
+      reportPipelineStage(
+        hashJobs.length > 0
+          ? `Looking up ${hashJobs.length} file hash${hashJobs.length === 1 ? "" : "es"}...`
+          : "Looking up projects...",
+        14
+      );
       const tHash = performance.now();
       const hashResults = await batchHashLookup(hashJobs);
       if (pipelineMetrics) pipelineMetrics.phaseMs.hashLookup += Math.round(performance.now() - tHash);
@@ -8415,11 +8912,41 @@
         ...projectIdJobs.map(j => getJobIdentifier(j))
       ];
 
+      const uniqueProjectIds = [...new Set(allProjectIds.filter(Boolean))];
+      if (uniqueProjectIds.length === 0) {
+        reportPipelineStage("No matching projects found...", 22);
+      } else {
+        reportPipelineStage(
+          `Fetching ${uniqueProjectIds.length} project${uniqueProjectIds.length === 1 ? "" : "s"}...`,
+          22
+        );
+      }
       const tProjects = performance.now();
       const projectsData = await batchProjectLookup(allProjectIds);
       if (pipelineMetrics) pipelineMetrics.phaseMs.projectLookup += Math.round(performance.now() - tProjects);
 
+      // Hash lookup can see freshly published version IDs before /projects lists
+      // them. Inject those IDs so batchVersionLookup (v3) hydrates them with
+      // files + environment instead of leaving a bare /version_files object.
+      for (const hr of hashResults) {
+        const vd = hr.versionData;
+        if (!vd?.id || !vd.project_id) continue;
+        const project = projectsData[vd.project_id];
+        if (!project) continue;
+        if (!Array.isArray(project.versions)) project.versions = [];
+        if (!project.versions.includes(vd.id)) {
+          project.versions.push(vd.id);
+        }
+      }
+
       // Steps 4 + 5: Parallel batch lookups for authors and versions.
+      // Versions dominate wall time on large packs — progress advances inside
+      // batchVersionLookup as chunks complete.
+      if (Object.keys(projectsData).length === 0) {
+        reportPipelineStage("Matching results...", 44);
+      } else {
+        reportPipelineStage("Resolving authors and versions...", 24);
+      }
       const tAuthorVersion = performance.now();
       const [authorData, versionData] = await Promise.all([
         batchAuthorLookup(projectsData),
@@ -8433,63 +8960,106 @@
       }
 
       // Step 6: Combine results
+      reportPipelineStage("Matching compatible versions...", 44);
       const tCombine = performance.now();
       const combined = await combineResults(uncachedJobs, hashResults, projectsData, authorData, versionData, gameVersion);
       if (pipelineMetrics) pipelineMetrics.phaseMs.combine += Math.round(performance.now() - tCombine);
       return combined;
     }
 
+    // Chunk sizes for URL/body-safe Modrinth batch endpoints when resolving
+    // the full Update list in one staged pipeline.
+    const HASH_LOOKUP_CHUNK_SIZE = 200;
+    const PROJECT_LOOKUP_CHUNK_SIZE = 150;
+    const AUTHOR_LOOKUP_CHUNK_SIZE = 150;
+
+    function chunkArray(items, chunkSize) {
+      const chunks = [];
+      for (let i = 0; i < items.length; i += chunkSize) {
+        chunks.push(items.slice(i, i + chunkSize));
+      }
+      return chunks;
+    }
+
     // --- Batch Hash Lookup Function ---
     async function batchHashLookup(hashJobs) {
       if (hashJobs.length === 0) return [];
 
-      // Use the batch version_files endpoint
-      const hashes = hashJobs.map(hj => hj.hash);
+      const chunks = chunkArray(hashJobs, HASH_LOOKUP_CHUNK_SIZE);
+      const versionMap = {};
 
-      const response = await fetchWithRetry('https://api.modrinth.com/v2/version_files', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          algorithm: "sha1",
-          hashes: hashes
-        })
-      });
+      for (const chunk of chunks) {
+        const hashes = chunk.map(hj => hj.hash);
+        try {
+          const response = await fetchWithRetry('https://api.modrinth.com/v2/version_files', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              algorithm: "sha1",
+              hashes: hashes
+            })
+          });
 
-      if (response.ok) {
-        const versionMap = await response.json();
-        return hashJobs.map(hj => ({
-          job: hj.job,
-          hash: hj.hash,
-          versionData: versionMap[hj.hash] || null
-        }));
+          if (response.ok) {
+            const partial = await response.json();
+            Object.assign(versionMap, partial);
+          } else if (pipelineApiFailures) {
+            for (const hash of hashes) pipelineApiFailures.hashes.add(hash);
+          }
+        } catch (error) {
+          console.warn("version_files chunk failed:", error);
+          if (pipelineApiFailures) {
+            for (const hash of hashes) pipelineApiFailures.hashes.add(hash);
+          }
+        }
       }
 
-      return hashJobs.map(hj => ({ job: hj.job, hash: hj.hash, versionData: null }));
+      return hashJobs.map(hj => ({
+        job: hj.job,
+        hash: hj.hash,
+        versionData: versionMap[hj.hash] || null
+      }));
     }
 
     // --- Batch Project Lookup Function ---
     async function batchProjectLookup(projectIds) {
       if (projectIds.length === 0) return {};
 
-      // Remove duplicates
       const uniqueIds = [...new Set(projectIds.filter(Boolean))];
+      const out = {};
+      const idChunks = chunkArray(uniqueIds, PROJECT_LOOKUP_CHUNK_SIZE);
 
-      // Use batch projects endpoint
-      const idsParam = JSON.stringify(uniqueIds);
-      const response = await fetchWithRetry(
-        `https://api.modrinth.com/v2/projects?ids=${encodeURIComponent(idsParam)}`
-      );
+      await Promise.all(idChunks.map(async (chunk) => {
+        const idsParam = JSON.stringify(chunk);
+        try {
+          const response = await fetchWithRetry(
+            `https://api.modrinth.com/v2/projects?ids=${encodeURIComponent(idsParam)}`
+          );
+          if (!response.ok) {
+            if (pipelineApiFailures) {
+              for (const id of chunk) pipelineApiFailures.projectIds.add(id);
+            }
+            return;
+          }
+          const projects = await response.json();
+          if (!Array.isArray(projects)) {
+            if (pipelineApiFailures) {
+              for (const id of chunk) pipelineApiFailures.projectIds.add(id);
+            }
+            return;
+          }
+          for (const project of projects) {
+            if (project?.id) out[project.id] = project;
+          }
+        } catch (error) {
+          console.warn("projects chunk failed:", error);
+          if (pipelineApiFailures) {
+            for (const id of chunk) pipelineApiFailures.projectIds.add(id);
+          }
+        }
+      }));
 
-      if (response.ok) {
-        const projects = await response.json();
-        // Convert array to map for easy lookup
-        return projects.reduce((acc, project) => {
-          acc[project.id] = project;
-          return acc;
-        }, {});
-      }
-
-      return {};
+      return out;
     }
 
     // --- Batch Author Lookup Function ---
@@ -8513,48 +9083,55 @@
       if (teamIds.length === 0) return {};
 
       const uniqueIds = [...new Set(teamIds)];
-      const idsParam = JSON.stringify(uniqueIds);
+      const out = {};
+      const idChunks = chunkArray(uniqueIds, AUTHOR_LOOKUP_CHUNK_SIZE);
 
-      const response = await fetchWithRetry(
-        `https://api.modrinth.com/v3/teams?ids=${encodeURIComponent(idsParam)}`
-      );
-
-      if (response.ok) {
+      await Promise.all(idChunks.map(async (chunk) => {
+        const idsParam = JSON.stringify(chunk);
+        const response = await fetchWithRetry(
+          `https://api.modrinth.com/v3/teams?ids=${encodeURIComponent(idsParam)}`
+        );
+        if (!response.ok) return;
         const teams = await response.json();
-        return teams.reduce((acc, team) => {
-          acc[team[0]?.team_id] = team;
-          return acc;
-        }, {});
-      }
+        if (!Array.isArray(teams)) return;
+        for (const team of teams) {
+          const teamId = team[0]?.team_id;
+          if (teamId) out[teamId] = team;
+        }
+      }));
 
-      return {};
+      return out;
     }
 
     async function batchOrganizationLookup(orgIds) {
       if (orgIds.length === 0) return {};
 
       const uniqueIds = [...new Set(orgIds)];
-      const idsParam = JSON.stringify(uniqueIds);
+      const out = {};
+      const idChunks = chunkArray(uniqueIds, AUTHOR_LOOKUP_CHUNK_SIZE);
 
-      const response = await fetchWithRetry(
-        `https://api.modrinth.com/v3/organizations?ids=${encodeURIComponent(idsParam)}`
-      );
-
-      if (response.ok) {
+      await Promise.all(idChunks.map(async (chunk) => {
+        const idsParam = JSON.stringify(chunk);
+        const response = await fetchWithRetry(
+          `https://api.modrinth.com/v3/organizations?ids=${encodeURIComponent(idsParam)}`
+        );
+        if (!response.ok) return;
         const orgs = await response.json();
-        return orgs.reduce((acc, org) => {
-          acc[org.id] = org;
-          return acc;
-        }, {});
-      }
+        if (!Array.isArray(orgs)) return;
+        for (const org of orgs) {
+          if (org?.id) out[org.id] = org;
+        }
+      }));
 
-      return {};
+      return out;
     }
 
     // --- Batch Version Lookup Function ---
-    // Batches all version IDs from projectsData for one-shot lookup via /v2/versions.
-    // Reduces N requests to ~N/500. Results are sorted newest-first by date_published.
-    const VERSION_LOOKUP_CHUNK_SIZE = 500; // URL-safe batch size for /v2/versions
+    // Batches all version IDs from projectsData for one-shot lookup.
+    // Prefer /v3/versions (includes per-version environment) and only fall back
+    // to /v2/versions when v3 fails — so the happy path is still one call per
+    // chunk, not a parallel double-fetch. Results are sorted newest-first.
+    const VERSION_LOOKUP_CHUNK_SIZE = 500; // URL-safe batch size for /v2|/v3 versions
     const VERSION_LOOKUP_CONCURRENCY = 16;  // chunks in flight at a time
     async function batchVersionLookup(projectsData, loader, gameVersion) {
       const projectIds = Object.keys(projectsData);
@@ -8572,30 +9149,67 @@
       }
 
       // Chunk the version IDs into URL-safe groups and fetch them in waves.
+      // Deduplicate — hash injection / project lists can overlap.
       const chunks = [];
-      for (let i = 0; i < allVersionIds.length; i += VERSION_LOOKUP_CHUNK_SIZE) {
-        chunks.push(allVersionIds.slice(i, i + VERSION_LOOKUP_CHUNK_SIZE));
+      const uniqueVersionIds = [...new Set(allVersionIds)];
+      for (let i = 0; i < uniqueVersionIds.length; i += VERSION_LOOKUP_CHUNK_SIZE) {
+        chunks.push(uniqueVersionIds.slice(i, i + VERSION_LOOKUP_CHUNK_SIZE));
       }
 
-      const fetchChunk = async (chunk) => {
+      // v3-first: same fields we need from v2 (files/hashes/deps/loaders) plus
+      // environment. Fall back to v2 only when v3 errors or returns a non-array
+      // payload so we don't double API volume on the common path.
+      const fetchVersionChunk = async (chunk) => {
         if (chunk.length === 0) return [];
         const idsParam = JSON.stringify(chunk);
-        const response = await fetchWithRetry(
-          `https://api.modrinth.com/v2/versions?ids=${encodeURIComponent(idsParam)}`
-        );
-        if (!response.ok) return [];
-        return await response.json();
+        try {
+          const response = await fetchWithRetry(
+            `https://api.modrinth.com/v3/versions?ids=${encodeURIComponent(idsParam)}`
+          );
+          if (response.ok) {
+            const data = await response.json();
+            if (Array.isArray(data)) return data;
+            console.warn('v3 versions returned non-array, falling back to v2');
+          }
+        } catch (e) {
+          console.warn('v3 versions failed, falling back to v2:', e);
+        }
+        try {
+          const response = await fetchWithRetry(
+            `https://api.modrinth.com/v2/versions?ids=${encodeURIComponent(idsParam)}`
+          );
+          if (!response.ok) return [];
+          const data = await response.json();
+          return Array.isArray(data) ? data : [];
+        } catch (e) {
+          console.warn('v2 versions fallback failed:', e);
+          return [];
+        }
       };
 
       for (let i = 0; i < chunks.length; i += VERSION_LOOKUP_CONCURRENCY) {
         const wave = chunks.slice(i, i + VERSION_LOOKUP_CONCURRENCY);
-        const waveResults = await Promise.all(wave.map(fetchChunk));
+        const waveResults = await Promise.all(wave.map(fetchVersionChunk));
         for (const versions of waveResults) {
           for (const v of versions) {
             if (!v || !v.project_id) continue;
             const bucket = versionsByProject.get(v.project_id);
             if (bucket) bucket.push(v);
           }
+          // Index every fetched version so pinned dependency tooltips can reuse
+          // these numbers without a second versions round-trip.
+          rememberVersionNumbers(versions);
+        }
+        // Phase 1 only: versions are the long pole (often ~90% of API calls).
+        if (chunks.length > 0) {
+          const done = Math.min(i + VERSION_LOOKUP_CONCURRENCY, chunks.length);
+          const pct = 24 + Math.round((done / chunks.length) * 18); // 24% → 42%
+          reportPipelineStage(
+            chunks.length === 1
+              ? "Resolving versions..."
+              : `Resolving versions (${done}/${chunks.length})...`,
+            pct
+          );
         }
       }
 
@@ -8618,12 +9232,19 @@
         const allVersions = versionsByProject.get(projectId) || [];
 
         const compatibleVersions = allVersions.filter(v => {
-          const gameVersionMatch = v.game_versions.includes(gameVersion);
-          return requiresGlobalLoader ? (v.loaders.includes(loader) && gameVersionMatch) : gameVersionMatch;
+          const gameVersions = Array.isArray(v.game_versions) ? v.game_versions : [];
+          const gameVersionMatch = gameVersions.includes(gameVersion);
+          return requiresGlobalLoader
+            ? (versionSupportsLoader(v, loader) && gameVersionMatch)
+            : gameVersionMatch;
         });
 
-        const hasGameVersion = allVersions.some(v => v.game_versions.includes(gameVersion));
-        const hasLoader = !requiresGlobalLoader || allVersions.some(v => v.loaders.includes(loader));
+        const hasGameVersion = allVersions.some(v =>
+          Array.isArray(v.game_versions) && v.game_versions.includes(gameVersion)
+        );
+        const hasLoader = !requiresGlobalLoader || allVersions.some(v =>
+          versionSupportsLoader(v, loader)
+        );
 
         let compatibilityStatus = 'compatible';
         if (compatibleVersions.length === 0) {
@@ -8707,20 +9328,71 @@
       }
 
       async function fetchDirectCompatibleVersions(projectId, context) {
-        const params = new URLSearchParams();
-        params.set("game_versions", JSON.stringify([context.gameVersion]));
-        if (context.selectedLoader) {
-          params.set("loaders", JSON.stringify([context.selectedLoader]));
+        const gameVersion = context.gameVersion;
+        const selectedLoader = context.selectedLoader;
+
+        // Always re-filter client-side. v3 project version listing does not honor
+        // top-level game_versions= the way v2 does (needs loader_fields), and a
+        // non-empty wrong set would otherwise short-circuit the v2 fallback.
+        const filterCompatible = (versions) => {
+          if (!Array.isArray(versions)) return [];
+          return versions
+            .filter((v) => {
+              const gameVersions = Array.isArray(v?.game_versions) ? v.game_versions : [];
+              if (gameVersion && !gameVersions.includes(gameVersion)) return false;
+              if (selectedLoader && !versionSupportsLoader(v, selectedLoader)) return false;
+              return true;
+            })
+            .sort((a, b) =>
+              (Date.parse(b.date_published) || 0) - (Date.parse(a.date_published) || 0)
+            );
+        };
+
+        // Prefer v3 so direct-fallback cards also get per-version environment.
+        try {
+          const v3Params = new URLSearchParams();
+          if (selectedLoader) {
+            // v3 modpack versions use loaders:["mrpack"]; Fabric/Forge live in
+            // mrpack_loaders. Asking v3 for loaders=["fabric"] returns [].
+            const v3LoaderFilter =
+              context.artifactType === "modpack" ? "mrpack" : selectedLoader;
+            v3Params.set("loaders", JSON.stringify([v3LoaderFilter]));
+          }
+          if (gameVersion) {
+            v3Params.set(
+              "loader_fields",
+              JSON.stringify({ game_versions: [gameVersion] })
+            );
+          }
+          const response = await fetchWithRetry(
+            `https://api.modrinth.com/v3/project/${projectId}/version?${v3Params.toString()}`
+          );
+          if (response.ok) {
+            const directVersions = filterCompatible(await response.json());
+            if (directVersions.length > 0) return directVersions;
+          }
+        } catch (e) {
+          console.warn('v3 project versions failed, falling back to v2:', e);
         }
-        const response = await fetchWithRetry(
-          `https://api.modrinth.com/v2/project/${projectId}/version?${params.toString()}`
-        );
-        if (!response.ok) return [];
-        const directVersions = await response.json();
-        // Keep newest-first behavior consistent with batch lookup path.
-        return directVersions.sort((a, b) =>
-          (Date.parse(b.date_published) || 0) - (Date.parse(a.date_published) || 0)
-        );
+
+        try {
+          const v2Params = new URLSearchParams();
+          if (gameVersion) {
+            v2Params.set("game_versions", JSON.stringify([gameVersion]));
+          }
+          if (selectedLoader) {
+            v2Params.set("loaders", JSON.stringify([selectedLoader]));
+          }
+          const response = await fetchWithRetry(
+            `https://api.modrinth.com/v2/project/${projectId}/version?${v2Params.toString()}`
+          );
+          if (!response.ok) return [];
+          // Keep newest-first behavior consistent with batch lookup path.
+          return filterCompatible(await response.json());
+        } catch (e) {
+          console.warn('v2 project versions fallback failed:', e);
+          return [];
+        }
       }
 
       async function resolveProjectDetailsByIdentifier(identifier) {
@@ -8731,9 +9403,19 @@
               const response = await fetchWithRetry(
                 `https://api.modrinth.com/v2/project/${encodeURIComponent(identifier)}`
               );
-              if (!response.ok) return null;
+              if (response.status === 404) {
+                // Genuine miss — don't keep a batch-chunk failure mark.
+                pipelineApiFailures?.projectIds.delete(identifier);
+                return null;
+              }
+              if (!response.ok) {
+                pipelineApiFailures?.projectIds.add(identifier);
+                return null;
+              }
+              pipelineApiFailures?.projectIds.delete(identifier);
               return await response.json();
             } catch (_) {
+              pipelineApiFailures?.projectIds.add(identifier);
               return null;
             }
           })());
@@ -8801,7 +9483,10 @@
               fileHash = hashResult.hash; // Preserve hash for caching
 
               // Classify uploaded JARs by loaders, since some projects host both mods and plugins.
-              artifactType = inferArtifactTypeFromVersionLoaders(artifactType, versionDetails.loaders);
+              artifactType = inferArtifactTypeFromVersionLoaders(
+                artifactType,
+                getEffectiveVersionLoaders(versionDetails)
+              );
             }
 
             // Get original version from uploaded file if available
@@ -8836,10 +9521,25 @@
           }
 
           if (!projectDetails) {
+            const hashResult = hashResultByJob.get(job);
+            const failedHash = hashResult?.hash || (lookupType === "hash" ? identifier : null);
+            const failedProjectId =
+              hashResult?.versionData?.project_id ||
+              (lookupType === "id" ? identifier : null);
+            const apiTransientFailure = !!(
+              pipelineApiFailures &&
+              ((failedHash && pipelineApiFailures.hashes.has(failedHash)) ||
+                (failedProjectId && pipelineApiFailures.projectIds.has(failedProjectId)))
+            );
             results.push({
               status: "failure",
               title: lookupType === "file" ? job.data.name : job.title,
-              reason: "Mod not found on Modrinth"
+              reason: apiTransientFailure
+                ? "Temporary API error"
+                : "Mod not found on Modrinth",
+              ...(apiTransientFailure
+                ? { apiTransientFailure: true, _retryJob: job }
+                : {}),
             });
             continue;
           }
@@ -8885,16 +9585,23 @@
           // response can briefly omit a freshly-published version's ID even after
           // /version_files already knows its SHA1, which would otherwise make us
           // pick an older release as "latest" — leading to a downgrade suggestion.
+          // Prefer the batch-hydrated copy (includes v3 environment) when present.
           if (versionDetails && Array.isArray(versions)) {
+            const hydratedInstalled =
+              (Array.isArray(versionInfo.allVersions) ? versionInfo.allVersions : [])
+                .find((v) => v && v.id === versionDetails.id) ||
+              versionDetails;
             const isCompatible =
-              Array.isArray(versionDetails.game_versions) &&
-              versionDetails.game_versions.includes(resolutionContext.gameVersion) &&
+              Array.isArray(hydratedInstalled.game_versions) &&
+              hydratedInstalled.game_versions.includes(resolutionContext.gameVersion) &&
               (!resolutionContext.selectedLoader ||
-                (Array.isArray(versionDetails.loaders) &&
-                  versionDetails.loaders.includes(resolutionContext.selectedLoader)));
-            const alreadyPresent = versions.some(v => v && v.id === versionDetails.id);
+                versionSupportsLoader(
+                  hydratedInstalled,
+                  resolutionContext.selectedLoader
+                ));
+            const alreadyPresent = versions.some(v => v && v.id === hydratedInstalled.id);
             if (isCompatible && !alreadyPresent) {
-              versions = [versionDetails, ...versions].sort((a, b) =>
+              versions = [hydratedInstalled, ...versions].sort((a, b) =>
                 (Date.parse(b.date_published) || 0) - (Date.parse(a.date_published) || 0)
               );
             }
@@ -8948,8 +9655,14 @@
               }
             }
 
-            const supportedVersions = [...new Set(versionInfo.allVersions?.flatMap(v => v.game_versions) || [])];
-            const supportedLoaders = [...new Set(versionInfo.allVersions?.flatMap(v => v.loaders) || [])];
+            const supportedVersions = [...new Set(
+              (Array.isArray(versionInfo.allVersions) ? versionInfo.allVersions : [])
+                .flatMap(v => Array.isArray(v?.game_versions) ? v.game_versions : [])
+            )];
+            const supportedLoaders = [...new Set(
+              (Array.isArray(versionInfo.allVersions) ? versionInfo.allVersions : [])
+                .flatMap(v => getEffectiveVersionLoaders(v))
+            )];
 
             // Pass selection context through so the REASON panel can color-code
             // the loader/version chips (green for "your selection IS supported",
@@ -8987,8 +9700,14 @@
           // Select the correct file from the version based on artifact type
           const primaryFile = selectArtifactFile(latestVersion, artifactType);
           if (!primaryFile) {
-            const supportedVersions = [...new Set(versionInfo.allVersions?.flatMap(v => v.game_versions) || [])];
-            const supportedLoaders = [...new Set(versionInfo.allVersions?.flatMap(v => v.loaders) || [])];
+            const supportedVersions = [...new Set(
+              (Array.isArray(versionInfo.allVersions) ? versionInfo.allVersions : [])
+                .flatMap(v => Array.isArray(v?.game_versions) ? v.game_versions : [])
+            )];
+            const supportedLoaders = [...new Set(
+              (Array.isArray(versionInfo.allVersions) ? versionInfo.allVersions : [])
+                .flatMap(v => getEffectiveVersionLoaders(v))
+            )];
             const fallbackIsLoaderAgnostic =
               artifactType &&
               ARTIFACT_CONFIG[artifactType] &&
@@ -9068,7 +9787,7 @@
             downloads: projectDetails.downloads,
             project_type: artifactType,
             all_versions: versions, // Already filtered to artifact-compatible versions
-            dependencies: latestVersion.dependencies,
+            dependencies: Array.isArray(latestVersion.dependencies) ? latestVersion.dependencies : [],
             targetVersion: latestVersion.version_number, // Version user is updating TO (primary context for conflicts)
             isDependency: job.isDependencyJob === true,
             isMrpackFile: job.isMrpackFile === true,
@@ -9608,11 +10327,16 @@
               </div>
               <div class="sort-option has-submenu" title="Filter by which side(s) of Minecraft the mod runs on">
                 Environments <span class="submenu-arrow">▶</span>
-                <div class="sort-submenu">
-                  <div class="sort-option" data-sort="clientserver" data-filter="client" title="Runs only on the player's client (singleplayer or client-side multiplayer)">Client Only</div>
-                  <div class="sort-option" data-sort="clientserver" data-filter="server" title="Runs only on the server">Server Only</div>
-                  <div class="sort-option" data-sort="clientserver" data-filter="both_required" title="Required on both client and server to function">Client &amp; Server</div>
-                  <div class="sort-option" data-sort="clientserver" data-filter="both_optional" title="Works on either side; not required on both">Client or Server</div>
+                <div class="sort-submenu" data-dynamic-environments="true">
+                  <div class="sort-option" data-sort="clientserver" data-filter="client_side" title="Runs on the client">Client-side</div>
+                  <div class="sort-option" data-sort="clientserver" data-filter="client_server_optional" title="Client required; server is optional">Client (server optional)</div>
+                  <div class="sort-option" data-sort="clientserver" data-filter="singleplayer" title="Intended for singleplayer only">Singleplayer</div>
+                  <div class="sort-option" data-sort="clientserver" data-filter="server_side" title="Runs on the server">Server-side</div>
+                  <div class="sort-option" data-sort="clientserver" data-filter="server_client_optional" title="Server required; client is optional">Server (client optional)</div>
+                  <div class="sort-option" data-sort="clientserver" data-filter="dedicated_server" title="Dedicated server only">Dedicated server</div>
+                  <div class="sort-option" data-sort="clientserver" data-filter="both_required" title="Required on both client and server">Client &amp; Server</div>
+                  <div class="sort-option" data-sort="clientserver" data-filter="both_optional" title="Works on either side">Client or Server</div>
+                  <div class="sort-option" data-sort="clientserver" data-filter="prefers_both" title="Works on either side, but prefers both installed">Either (prefers both)</div>
                 </div>
               </div>
               <div class="sort-option has-submenu" title="Filter by whether you've toggled the mod's ignore state">
@@ -9750,11 +10474,11 @@
               </div>
               <div class="sort-option has-submenu" title="Filter by which side(s) of Minecraft the mod runs on">
                 Environments <span class="submenu-arrow">▶</span>
-                <div class="sort-submenu">
-                  <div class="sort-option" data-sort="clientserver" data-filter="client" title="Runs only on the player's client (singleplayer or client-side multiplayer)">Client Only</div>
-                  <div class="sort-option" data-sort="clientserver" data-filter="server" title="Runs only on the server">Server Only</div>
-                  <div class="sort-option" data-sort="clientserver" data-filter="both_required" title="Required on both client and server to function">Client &amp; Server</div>
-                  <div class="sort-option" data-sort="clientserver" data-filter="both_optional" title="Works on either side; not required on both">Client or Server</div>
+                <div class="sort-submenu" data-dynamic-environments="true">
+                  <div class="sort-option" data-sort="clientserver" data-filter="client_side" title="Runs on the client">Client-side</div>
+                  <div class="sort-option" data-sort="clientserver" data-filter="server_side" title="Runs on the server">Server-side</div>
+                  <div class="sort-option" data-sort="clientserver" data-filter="both_required" title="Required on both client and server">Client &amp; Server</div>
+                  <div class="sort-option" data-sort="clientserver" data-filter="both_optional" title="Works on either side">Client or Server</div>
                 </div>
               </div>
               <div class="sort-option has-submenu" title="Filter by which mod loader(s) the mod supports">
@@ -10867,7 +11591,8 @@
             const dateSpan = item.querySelector('.mod-meta-date');
             if (dateSpan) lastUpdated = dateSpan.textContent.trim();
           } else if (label === 'Supported Environments') {
-            const span = item.querySelector('span:not(.meta-tooltip)');
+            const envLabel = item.querySelector('.mod-meta-environment-label');
+            const span = envLabel || item.querySelector('span:not(.meta-tooltip):not(.mod-meta-environment-icon)');
             if (span) environments = span.textContent.trim();
           }
         });
@@ -11574,6 +12299,34 @@
         return list;
       })();
 
+      // Per-section Environments originals (Found has v3 labels; Warning is v2-only).
+      const originalEnvironmentOptionsBySection = {
+        '#results-found': [],
+        '#results-warning': [],
+      };
+      for (const sectionSelector of Object.keys(originalEnvironmentOptionsBySection)) {
+        const dropdown = getSectionFilterDropdown(sectionSelector);
+        const submenu = dropdown?.querySelector(
+          '.sort-submenu[data-dynamic-environments="true"]'
+        );
+        if (!submenu) continue;
+        const list = [];
+        const seen = new Set();
+        submenu.querySelectorAll('[data-sort="clientserver"]').forEach((opt) => {
+          const value = opt.dataset.filter;
+          const label = opt.textContent.trim();
+          if (value && !seen.has(value)) {
+            seen.add(value);
+            list.push({
+              value,
+              label,
+              title: opt.getAttribute("title") || "",
+            });
+          }
+        });
+        originalEnvironmentOptionsBySection[sectionSelector] = list;
+      }
+
       // Rebuild the Categories submenu for a section to only show categories
       // that at least one card actually has. Hide the Categories parent row
       // entirely when nothing in the section has any categories.
@@ -11591,12 +12344,19 @@
         });
 
         const state = sectionState[sectionSelector];
+        let staleCleared = false;
         const stillActive = state.filters.get('category');
         if (stillActive) {
           for (const v of Array.from(stillActive)) {
-            if (!present.has(v)) stillActive.delete(v);
+            if (!present.has(v)) {
+              stillActive.delete(v);
+              staleCleared = true;
+            }
           }
-          if (stillActive.size === 0) state.filters.delete('category');
+          if (stillActive.size === 0) {
+            state.filters.delete('category');
+            staleCleared = true;
+          }
         }
 
         submenu.innerHTML = '';
@@ -11613,6 +12373,64 @@
         if (parentRow) {
           parentRow.style.display = submenu.children.length === 0 ? 'none' : '';
         }
+
+        // Dropping stale filters from state must also restore card visibility.
+        if (staleCleared) applyAllFiltersToSection(sectionSelector);
+      }
+
+      // Same idea as Categories: only list Environments that appear on at least
+      // one card in this section (and drop stale active env filters).
+      function refreshDynamicEnvironmentsForSection(sectionSelector) {
+        const sectionEl = document.querySelector(sectionSelector);
+        const filterDropdown = getSectionFilterDropdown(sectionSelector);
+        if (!sectionEl || !filterDropdown) return;
+        const submenu = filterDropdown.querySelector(
+          '.sort-submenu[data-dynamic-environments="true"]'
+        );
+        if (!submenu) return;
+        const parentRow = submenu.closest(".sort-option.has-submenu");
+        const originals =
+          originalEnvironmentOptionsBySection[sectionSelector] || [];
+
+        const present = new Set();
+        sectionEl.querySelectorAll(".result-card").forEach((card) => {
+          const key = extractClientServer(card);
+          if (key && key !== "none") present.add(key);
+        });
+
+        const state = sectionState[sectionSelector];
+        let staleCleared = false;
+        const stillActive = state.filters.get("clientserver");
+        if (stillActive) {
+          for (const v of Array.from(stillActive)) {
+            if (!present.has(v)) {
+              stillActive.delete(v);
+              staleCleared = true;
+            }
+          }
+          if (stillActive.size === 0) {
+            state.filters.delete("clientserver");
+            staleCleared = true;
+          }
+        }
+
+        submenu.innerHTML = "";
+        for (const { value, label, title } of originals) {
+          if (!present.has(value)) continue;
+          const opt = document.createElement("div");
+          opt.className = "sort-option";
+          opt.dataset.sort = "clientserver";
+          opt.dataset.filter = value;
+          if (title) opt.title = title;
+          opt.textContent = label;
+          submenu.appendChild(opt);
+        }
+
+        if (parentRow) {
+          parentRow.style.display = submenu.children.length === 0 ? "none" : "";
+        }
+
+        if (staleCleared) applyAllFiltersToSection(sectionSelector);
       }
 
       // Show one dropdown, hiding any others. Also refreshes dynamic content.
@@ -11622,9 +12440,11 @@
         if (willShow) {
           if (targetDropdown === filterFoundDropdown) {
             refreshDynamicCategoriesForSection('#results-found');
+            refreshDynamicEnvironmentsForSection('#results-found');
             refreshSectionFilterUI('#results-found');
           } else if (targetDropdown === filterWarningDropdown) {
             refreshDynamicCategoriesForSection('#results-warning');
+            refreshDynamicEnvironmentsForSection('#results-warning');
             refreshSectionFilterUI('#results-warning');
           }
         }
@@ -11753,6 +12573,9 @@
               case 'clientserver':
                 const clientServerA = extractClientServer(a);
                 const clientServerB = extractClientServer(b);
+                const orderA = CLIENT_SERVER_SORT_ORDER[clientServerA] ?? 99;
+                const orderB = CLIENT_SERVER_SORT_ORDER[clientServerB] ?? 99;
+                if (orderA !== orderB) return orderA - orderB;
                 return clientServerA.localeCompare(clientServerB);
 
               case 'channel':
@@ -11866,19 +12689,45 @@
       }
 
       function extractClientServer(card) {
-        // Look for client/server support in mod-meta-item spans
-        const metaItems = card.querySelectorAll('.mod-meta-item span');
+        // Prefer the stamped filter key (set whenever the env chip is rendered
+        // or refreshed). Falls back to reading the visible label for older cards.
+        const stamped = card.getAttribute("data-environment");
+        if (stamped) return stamped;
 
-        for (let span of metaItems) {
-          const text = span.textContent.trim().toLowerCase();
-          if (text === 'client & server') return 'both_required';
-          if (text === 'client or server') return 'both_optional';
-          if (text === 'client-side') return 'client';
-          if (text === 'server-side') return 'server';
+        const envLabel = card.querySelector(".mod-meta-environment-label");
+        if (envLabel) {
+          return environmentFilterKeyFromLabel(envLabel.textContent);
         }
 
-        return 'none';
+        // Warning / search-style cards: find the Supported Environments meta item.
+        const envItem = Array.from(
+          card.querySelectorAll(".mod-meta-item.meta-tooltip-container")
+        ).find((item) => {
+          const tip = item.querySelector(".meta-tooltip");
+          return tip && tip.textContent.trim() === "Supported Environments";
+        });
+        if (envItem) {
+          const span = envItem.querySelector("span:not(.meta-tooltip)");
+          if (span) return environmentFilterKeyFromLabel(span.textContent);
+        }
+
+        return "none";
       }
+
+      // Stable environment sort order (client → server → both → either → unknown).
+      const CLIENT_SERVER_SORT_ORDER = {
+        client_side: 0,
+        client_server_optional: 1,
+        singleplayer: 2,
+        server_side: 3,
+        server_client_optional: 4,
+        dedicated_server: 5,
+        both_required: 6,
+        both_optional: 7,
+        prefers_both: 8,
+        unknown: 9,
+        none: 10,
+      };
 
       function extractChannel(card) {
         // Look for visible channel links - these are shown based on the selected version type
@@ -12340,29 +13189,26 @@
     // one batch and refreshes any chain tooltips that referenced unresolved ids.
     async function enrichOptionalDependencyNames() {
       const unresolved = new Set();
-      for (const ids of optionalDependencyMap.values()) {
-        for (const id of ids) {
-          if (!modIdToNameMap.has(id)) unresolved.add(id);
+      for (const entries of optionalDependencyMap.values()) {
+        for (const entry of entries) {
+          const id = getDepProjectId(entry);
+          if (id && !modIdToNameMap.has(id)) unresolved.add(id);
         }
       }
       if (unresolved.size === 0) return;
+      statusMessage.textContent =
+        `Looking up ${unresolved.size} optional dependency name${unresolved.size === 1 ? "" : "s"}...`;
       try {
-        const idsParam = JSON.stringify(Array.from(unresolved));
-        const response = await fetchWithRetry(
-          `https://api.modrinth.com/v2/projects?ids=${encodeURIComponent(idsParam)}`
-        );
-        if (!response.ok) return;
-        const projects = await response.json();
-        for (const p of projects) {
-          if (p && p.id && p.title) {
-            if (!modIdToNameMap.has(p.id)) {
-              modIdToNameMap.set(p.id, p.title);
-            }
+        // Reuse chunked project lookup so large optional sets stay URL-safe.
+        const projectsData = await batchProjectLookup(Array.from(unresolved));
+        for (const p of Object.values(projectsData)) {
+          if (p && p.id && p.title && !modIdToNameMap.has(p.id)) {
+            modIdToNameMap.set(p.id, p.title);
           }
         }
         // Refresh any cards whose tooltip referenced one of these optional deps.
-        for (const [parentArtifactKey, ids] of optionalDependencyMap.entries()) {
-          if (!ids.some(id => unresolved.has(id))) continue;
+        for (const [parentArtifactKey, entries] of optionalDependencyMap.entries()) {
+          if (!entries.some((entry) => unresolved.has(getDepProjectId(entry)))) continue;
           const card = findCardForArtifactKey(parentArtifactKey);
           if (!card) continue;
           const chainTooltip = card.querySelector('.dependency-chain-tooltip');
@@ -12385,15 +13231,19 @@
     }
 
     function buildDependencyChainTooltipHTML(artifactKey) {
-      const requiredIds = reverseDependencyMap.get(artifactKey) || [];
-      const optionalIds = optionalDependencyMap.get(artifactKey) || [];
+      const requiredEntries = reverseDependencyMap.get(artifactKey) || [];
+      const optionalEntries = optionalDependencyMap.get(artifactKey) || [];
       const lines = [];
-      if (requiredIds.length > 0) {
-        const names = requiredIds.map(id => escapeHtmlForTooltip(modIdToNameMap.get(id) || 'Loading...'));
+      if (requiredEntries.length > 0) {
+        const names = requiredEntries.map((entry) =>
+          escapeHtmlForTooltip(formatDepTooltipLabel(entry))
+        );
         lines.push(`<span class="dep-chain-line">Depends on: ${names.join(", ")}</span>`);
       }
-      if (optionalIds.length > 0) {
-        const names = optionalIds.map(id => escapeHtmlForTooltip(modIdToNameMap.get(id) || 'Loading...'));
+      if (optionalEntries.length > 0) {
+        const names = optionalEntries.map((entry) =>
+          escapeHtmlForTooltip(formatDepTooltipLabel(entry))
+        );
         lines.push(`<span class="dep-chain-line dep-chain-optional">Optional: ${names.join(", ")}</span>`);
       }
       return lines.join('');
@@ -12427,9 +13277,9 @@
         const cardArtifactKey = makeArtifactKey(cardProjectId, card.dataset.projectType);
         if (!hasDependencyChainEntries(cardArtifactKey)) return;
 
-        const requiredIds = reverseDependencyMap.get(cardArtifactKey) || [];
-        const optionalIds = optionalDependencyMap.get(cardArtifactKey) || [];
-        if (!requiredIds.includes(depProjectId) && !optionalIds.includes(depProjectId)) return;
+        const requiredEntries = reverseDependencyMap.get(cardArtifactKey) || [];
+        const optionalEntries = optionalDependencyMap.get(cardArtifactKey) || [];
+        if (!depListHasProject(requiredEntries, depProjectId) && !depListHasProject(optionalEntries, depProjectId)) return;
 
         const chainTooltip = card.querySelector('.dependency-chain-tooltip');
         if (!chainTooltip) return;
@@ -12762,8 +13612,7 @@
       // artifact when the same Modrinth project has both a mod and a datapack.
       if (mod.project_type) card.setAttribute('data-project-type', mod.project_type);
 
-      // Tag the card with how this mod arrived in the list so the Source filter
-      // can target it. Order matters: dependencies trump search, etc.
+      // Stamp how this mod ended up here so the Source filter can target it.
       let cardSource = 'upload';
       if (mod.isDependency) cardSource = 'dependency';
       else if (typeof searchedMods !== 'undefined' && searchedMods && searchedMods.has(mod.projectId)) cardSource = 'search';
@@ -12790,13 +13639,16 @@
         }
       } catch (_) {}
 
-      const clientServerInfo = getClientServerSupport(
+      const clientServerInfo = resolveEnvForVersion(
+        mod.all_versions && mod.all_versions[0],
         mod.client_side,
         mod.server_side
       );
-      const versionOptions = mod.all_versions
+      stampCardEnvironment(card, clientServerInfo.text);
+      const versionList = Array.isArray(mod.all_versions) ? mod.all_versions : [];
+      const versionOptions = versionList
         .map((v, index) => {
-          const type = v.version_type.charAt(0).toUpperCase();
+          const type = (v.version_type || 'release').charAt(0).toUpperCase();
           const selected = index === 0 ? " selected" : "";
           const currentLabel = isInstalledModVersion(
             v,
@@ -12805,7 +13657,9 @@
           )
             ? " *"
             : "";
-          return `<option value="${v.id}"${selected}>${v.version_number} [${type}]${currentLabel}</option>`;
+          const versionNumber = escapeHtmlForTooltip(v.version_number || v.id || 'unknown');
+          const versionId = escapeHtmlForTooltip(v.id || '');
+          return `<option value="${versionId}"${selected}>${versionNumber} [${type}]${currentLabel}</option>`;
         })
         .join("");
 
@@ -12840,9 +13694,9 @@
         </div>
         <div class="mod-description">${mod.description}</div>
         <div class="mod-meta">
-          <div class="mod-meta-item meta-tooltip-container">
-            ${clientServerInfo.svg}
-            <span>${clientServerInfo.text}</span>
+          <div class="mod-meta-item meta-tooltip-container mod-meta-environment">
+            <span class="mod-meta-environment-icon">${clientServerInfo.svg}</span>
+            <span class="mod-meta-environment-label">${clientServerInfo.text}</span>
             <span class="meta-tooltip">Supported Environments</span>
           </div>
           <div class="mod-meta-item meta-tooltip-container">
@@ -12898,6 +13752,8 @@
       const versionSelect = card.querySelector(".version-select");
       const downloadLink = card.querySelector(".download-link");
       const dateSpan = card.querySelector(".mod-meta-date");
+      const envIconSpan = card.querySelector(".mod-meta-environment-icon");
+      const envLabelSpan = card.querySelector(".mod-meta-environment-label");
       const changelogToggle = card.querySelector(".changelog-toggle");
       const galleryToggle = card.querySelector(".gallery-toggle");
       const descriptionToggle = card.querySelector(".description-toggle");
@@ -12916,9 +13772,10 @@
       };
 
       // --- Update Dynamic Content ---
-      function updateDynamicContent() {
+      function updateDynamicContent(fromUserChange) {
         const selectedVersionId = versionSelect.value;
-        const selectedVersion = mod.all_versions.find(
+        const versions = Array.isArray(mod.all_versions) ? mod.all_versions : [];
+        const selectedVersion = versions.find(
           (v) => v.id === selectedVersionId
         );
         if (!selectedVersion) return;
@@ -12926,6 +13783,28 @@
         // Stamp the selected Modrinth version id so Export (and future Import)
         // can round-trip the exact version the user chose.
         if (selectedVersion.id) card.setAttribute('data-version-id', selectedVersion.id);
+
+        // Prefer per-version v3 environment overlay when present.
+        const envInfo = resolveEnvForVersion(
+          selectedVersion,
+          mod.client_side,
+          mod.server_side
+        );
+        if (envIconSpan) envIconSpan.innerHTML = envInfo.svg;
+        if (envLabelSpan) envLabelSpan.textContent = envInfo.text;
+        stampCardEnvironment(card, envInfo.text);
+
+        // Only re-filter on user version changes — not on the initial paint
+        // (batch card creation would otherwise re-scan the section per card).
+        if (
+          fromUserChange &&
+          typeof window.applyAllFiltersToSection === "function"
+        ) {
+          const section = card.closest(".results-section");
+          if (section?.id) {
+            window.applyAllFiltersToSection("#" + section.id);
+          }
+        }
 
         const primaryFile = selectArtifactFile(selectedVersion, mod.project_type);
 
@@ -12973,6 +13852,15 @@
             client_side: mod.client_side,
             server_side: mod.server_side,
           });
+        } else {
+          // Selected version has no usable file — clear stale download UI/state.
+          downloadLink.removeAttribute('href');
+          downloadLink.removeAttribute('download');
+          card.removeAttribute('data-file-size');
+          card.removeAttribute('data-filename');
+          card.removeAttribute('data-download-url');
+          card.removeAttribute('data-file-sha1');
+          card.removeAttribute('data-file-sha512');
         }
         if (typeof window.updateDownloadAllCount === "function") {
           window.updateDownloadAllCount();
@@ -12996,7 +13884,7 @@
         }
       }
 
-      versionSelect.addEventListener("change", updateDynamicContent);
+      versionSelect.addEventListener("change", () => updateDynamicContent(true));
 
       // Accordion: only one of Description / Gallery / Changelog / Links open at a time.
       const cardPanels = [
@@ -13323,6 +14211,7 @@
         mod.client_side,
         mod.server_side
       );
+      stampCardEnvironment(card, clientServerInfo.text);
 
       card.innerHTML = `
     <div class="result-card-main">
@@ -13636,13 +14525,19 @@
     }
 
     // --- Get Client/Server Support ---
+    function getEnvironmentIcons() {
+      return {
+        both:
+          '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h8"/><path d="M10 19v-3.96 3.15"/><path d="M7 19h5"/><rect width="6" height="10" x="16" y="12" rx="2"/></svg>',
+        client:
+          '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" xmlns="http://www.w3.org/2000/svg" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 002 2z" /></svg>',
+        server:
+          '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" x2="2" y1="12" y2="12" /><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" /><line x1="6" x2="6.01" y1="16" y2="16" /><line x1="10" x2="10.01" y1="16" y2="16" /></svg>',
+      };
+    }
+
     function getClientServerSupport(client, server) {
-      const both =
-        '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h8"/><path d="M10 19v-3.96 3.15"/><path d="M7 19h5"/><rect width="6" height="10" x="16" y="12" rx="2"/></svg>';
-      const clientIcon =
-        '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" xmlns="http://www.w3.org/2000/svg" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 002 2z" /></svg>';
-      const serverIcon =
-        '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" x2="2" y1="12" y2="12" /><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" /><line x1="6" x2="6.01" y1="16" y2="16" /><line x1="10" x2="10.01" y1="16" y2="16" /></svg>';
+      const { both, client: clientIcon, server: serverIcon } = getEnvironmentIcons();
 
       // Both sides are required
       if (client === "required" && server === "required") {
@@ -13670,6 +14565,82 @@
       }
 
       return { text: "Unknown", svg: "" };
+    }
+
+    // Map Modrinth v3 version.environment to clearer chip labels (icons stay
+    // client / server / both). Returns null for unknown/missing so callers
+    // fall back to project-level v2 client_side / server_side.
+    function normalizeV3Environment(env) {
+      // Project-level v3 uses an array; version-level is usually a string.
+      if (Array.isArray(env)) return env[0] || null;
+      if (typeof env === 'string' && env && env !== 'unknown') return env;
+      return null;
+    }
+
+    function environmentFromV3(env) {
+      const normalized = normalizeV3Environment(env);
+      if (!normalized) return null;
+      const { both, client, server } = getEnvironmentIcons();
+      switch (normalized) {
+        case 'client_and_server':
+          return { text: 'Client & Server', svg: both };
+        case 'client_only':
+          return { text: 'Client-side', svg: client };
+        case 'client_only_server_optional':
+          return { text: 'Client (server optional)', svg: client };
+        case 'singleplayer_only':
+          return { text: 'Singleplayer', svg: client };
+        case 'server_only':
+          return { text: 'Server-side', svg: server };
+        case 'server_only_client_optional':
+          return { text: 'Server (client optional)', svg: server };
+        case 'dedicated_server_only':
+          return { text: 'Dedicated server', svg: server };
+        case 'client_or_server':
+          return { text: 'Client or Server', svg: both };
+        case 'client_or_server_prefers_both':
+          return { text: 'Either (prefers both)', svg: both };
+        default:
+          return null;
+      }
+    }
+
+    // Prefer per-version v3 environment when stamped on the version object;
+    // otherwise use project-level v2 client_side / server_side.
+    function resolveEnvForVersion(version, projectClient, projectServer) {
+      const fromV3 = version ? environmentFromV3(version.environment) : null;
+      if (fromV3) return fromV3;
+      return getClientServerSupport(projectClient, projectServer);
+    }
+
+    // Map visible env chip labels → Environments filter values.
+    // Keep in sync with environmentFromV3 / getClientServerSupport text.
+    const ENVIRONMENT_LABEL_TO_FILTER = {
+      "client & server": "both_required",
+      "client or server": "both_optional",
+      "either (prefers both)": "prefers_both",
+      "client-side": "client_side",
+      "client (server optional)": "client_server_optional",
+      singleplayer: "singleplayer",
+      "server-side": "server_side",
+      "server (client optional)": "server_client_optional",
+      "dedicated server": "dedicated_server",
+      unknown: "unknown",
+    };
+
+    function environmentFilterKeyFromLabel(text) {
+      return (
+        ENVIRONMENT_LABEL_TO_FILTER[String(text || "").trim().toLowerCase()] ||
+        "none"
+      );
+    }
+
+    function stampCardEnvironment(card, envText) {
+      if (!card) return;
+      card.setAttribute(
+        "data-environment",
+        environmentFilterKeyFromLabel(envText)
+      );
     }
 
     // --- Format Downloads ---
@@ -13777,13 +14748,7 @@
           DOWNLOAD_ZIP_FETCH_CONCURRENCY,
           async (dl, i) => {
             try {
-              const response = await fetch(dl.url);
-              if (!response.ok) {
-                failedCount++;
-                console.warn(`Failed to download ${dl.filename}`, response.status, response.statusText);
-                return null;
-              }
-              const blob = await response.blob();
+              const blob = await fetchBlobWithRetry(dl.url);
               const entryPath = buildArtifactPath(dl.artifactType || dl.projectType, dl.filename);
               return { entryPath, blob, index: i };
             } catch (error) {
@@ -13965,9 +14930,8 @@
 
     // --- Session-Based Mod Caching System ---
     const MOD_CACHE_KEY = 'mcModUpdaterCache';
-    // Bumped to invalidate caches that captured stale dropdown contents from
-    // Modrinth /projects responses missing freshly-published version IDs.
-    const CACHE_VERSION = '1.1';
+    // Bumped for v3-first version payloads (per-version environment on cards).
+    const CACHE_VERSION = '1.2';
     const CACHE_EXPIRY_HOURS = 2; // Short session-based expiry
     const MAX_CACHE_ENTRIES = 500; // Reasonable limit
 
