@@ -3949,7 +3949,8 @@
         <li><b>Export Lists:</b> Use the export button to download the current list as CSV, JSON, Markdown, or plain text.
           The JSON format is the one you can re-import — CSV/Markdown/plain text are share-oriented and not importable.</li>
         <li><b>Import Modlist:</b> Drag and drop a previously exported <code>.json</code> file onto the upload area to
-          restore that modlist.</li>
+          restore that modlist. Loader and Minecraft version are set to match the export (same as dropping a
+          <code>.mrpack</code>).</li>
         <li><b>Version Selection:</b> Choose between Release, Beta, or Alpha versions for each mod</li>
         <li><b>Download Options:</b> Download individual mods or get everything as a ready-to-use <code>.mrpack</code>
           file</li>
@@ -5045,8 +5046,9 @@
         </svg>`;
     }
 
-    // When a single .mrpack is auto-processed, remember its loader/MC version so
-    // we can re-apply after populateMcVersions finishes (race on fast drop).
+    // When a single .mrpack is auto-processed (or a JSON modlist is imported),
+    // remember its loader/MC version so we can re-apply after populateMcVersions
+    // finishes (race on fast drop / early import).
     let pendingPackConstraints = null;
 
     function ensureSelectOption(select, value, label = value) {
@@ -5061,32 +5063,55 @@
       return true;
     }
 
-    // Apply loader + MC version detected from a .mrpack manifest to the main
-    // (and search-modal) dropdowns. Returns a short note for the status line.
-    function applyDetectedPackConstraints(loaderLabel, gameVersion) {
-      const loaderByLabel = {
+    // Normalize export/manifest loader hints to { value, label } for the main
+    // dropdown. Accepts display labels ("Fabric") or API values ("fabric").
+    function normalizeLoaderConstraint(loaderHint) {
+      if (!loaderHint || loaderHint === "unknown") return null;
+      const labelToValue = {
         Fabric: "fabric",
         Forge: "forge",
         NeoForge: "neoforge",
         Quilt: "quilt",
       };
+      const valueToLabel = {
+        fabric: "Fabric",
+        forge: "Forge",
+        neoforge: "NeoForge",
+        quilt: "Quilt",
+      };
+      const raw = String(loaderHint).trim();
+      if (labelToValue[raw]) {
+        return { value: labelToValue[raw], label: raw };
+      }
+      const lower = raw.toLowerCase();
+      if (valueToLabel[lower]) {
+        return { value: lower, label: valueToLabel[lower] };
+      }
+      // Case-insensitive label match (e.g. "FABRIC", "neoforge" already handled).
+      for (const [label, value] of Object.entries(labelToValue)) {
+        if (label.toLowerCase() === lower) return { value, label };
+      }
+      return null;
+    }
+
+    // Apply loader + MC version detected from a .mrpack manifest or exported
+    // JSON modlist to the main (and search-modal) dropdowns. Returns a short
+    // note for the status line.
+    function applyDetectedPackConstraints(loaderHint, gameVersion) {
       const parts = [];
-      const loaderValue =
-        loaderLabel && loaderLabel !== "unknown"
-          ? loaderByLabel[loaderLabel] || null
-          : null;
+      const normalized = normalizeLoaderConstraint(loaderHint);
 
       if (
-        loaderValue &&
-        Array.from(modLoaderSelect.options).some((o) => o.value === loaderValue)
+        normalized &&
+        Array.from(modLoaderSelect.options).some((o) => o.value === normalized.value)
       ) {
-        modLoaderSelect.value = loaderValue;
+        modLoaderSelect.value = normalized.value;
         if (typeof updateModalLoaderOptions === "function") {
-          updateModalLoaderOptions(projectTypeSelect.value, loaderValue);
+          updateModalLoaderOptions(projectTypeSelect.value, normalized.value);
         } else if (modalLoaderSelect) {
-          modalLoaderSelect.value = loaderValue;
+          modalLoaderSelect.value = normalized.value;
         }
-        parts.push(loaderLabel);
+        parts.push(normalized.label);
       }
 
       if (gameVersion && gameVersion !== "unknown") {
@@ -5099,7 +5124,7 @@
 
       if (parts.length > 0) {
         pendingPackConstraints = {
-          loader: loaderLabel,
+          loader: normalized ? normalized.label : loaderHint,
           version: gameVersion,
         };
         refreshUpdateButtonLabel();
@@ -7084,10 +7109,9 @@
     //   - Replace semantics: clear the dropzone + results before importing.
     //   - Confirm modal only when the dropzone has existing content
     //     (otherwise there's nothing to lose; just import).
-    //   - Keep the user's current loader/game version. The file's stored
-    //     loader/version is surfaced in the confirm modal / status line for
-    //     context but never applied — makes "what does this pack look like
-    //     on 1.22?" the natural use case.
+    //   - Auto-apply the export's loader + game version to the main controls
+    //     (same helper as .mrpack), so Update matches the list's context.
+    //     User can still change the dropdowns afterward before clicking Update.
     //   - Ignored entries are not restored. The exporter doesn't emit them
     //     anymore either; legacy exports that still carry an `ignored`
     //     array are silently dropped.
@@ -7158,8 +7182,8 @@
         return;
       }
 
-      // Surface only the file's own context (loader + version it was exported
-      // for); the user can compare to their current dropdowns at a glance.
+      // Surface the file's own context (loader + version it was exported for)
+      // in the confirm prompt, and apply those controls after a successful import.
       const fileLoader = payload.loader_label || payload.loader || 'unknown';
       const fileVersion = payload.game_version || 'unknown';
       const exportedFor = (fileLoader === 'unknown' && fileVersion === 'unknown')
@@ -7172,7 +7196,7 @@
         uploadedFiles.size > 0 || mrpackMods.size > 0 || searchedMods.size > 0;
       if (dropzoneHadContent) {
         const proceed = await showCustomConfirm(
-          `Import ${importable.length} mod${importable.length === 1 ? '' : 's'} from "${file.name}"${exportedFor}? This will clear your current uploads and results.`,
+          `Import ${importable.length} mod${importable.length === 1 ? '' : 's'} from "${file.name}"${exportedFor}? This will clear your current uploads and results, and set Loader/Version to match the export.`,
           "Replace with Imported Modlist"
         );
         if (!proceed) return;
@@ -7263,14 +7287,13 @@
       }
 
       // Always surface a one-liner mirroring the .mrpack flow's status
-      // message. Mentions the exported-for context so the user can sanity-
-      // check it against the current loader/version dropdowns before
-      // clicking Update.
+      // message. Apply the export's loader/MC version so Update uses the
+      // same context the list was built for.
+      const constraintsNote = applyDetectedPackConstraints(fileLoader, fileVersion);
       const totalImported = hashPathCount + idPathCount;
-      const exportedForNote = exportedFor ? ` ${exportedFor.trim()}` : '';
       statusMessage.textContent =
-        `Imported ${totalImported} mod${totalImported === 1 ? '' : 's'} from ${file.name}${exportedForNote}. ` +
-        `Click Update to check for newer versions.`;
+        `Imported ${totalImported} mod${totalImported === 1 ? '' : 's'} from ${file.name}.` +
+        `${constraintsNote || (exportedFor ? ` ${exportedFor.trim()}.` : '')}`;
       statusMessage.classList.add("visible");
     }
 
@@ -7948,18 +7971,6 @@
       pipelineMetrics = {
         fallbackLookups: 0,
         transientRetryJobs: 0,
-        endpointCalls: {
-          versionFiles: 0,
-          projects: 0,
-          versionsBatch: 0,
-          versionsBatchV3: 0,
-          versionsDirect: 0,
-          versionsDirectV3: 0,
-          teams: 0,
-          organizations: 0,
-          search: 0,
-          other: 0,
-        },
         phaseMs: {
           hashLookup: 0,
           projectLookup: 0,
@@ -7969,28 +7980,6 @@
         },
       };
       resetPipelineApiFailures();
-    }
-
-    function formatEndpointBreakdown(metrics) {
-      if (!metrics?.endpointCalls) return "";
-      const labels = {
-        versionFiles: "version_files",
-        projects: "projects",
-        versionsBatchV3: "versions(v3)",
-        versionsBatch: "versions(v2)",
-        versionsDirectV3: "direct(v3)",
-        versionsDirect: "direct(v2)",
-        teams: "teams",
-        organizations: "orgs",
-        search: "search",
-        other: "other",
-      };
-      const parts = [];
-      for (const [key, label] of Object.entries(labels)) {
-        const n = metrics.endpointCalls[key] || 0;
-        if (n > 0) parts.push(`${label}=${n}`);
-      }
-      return parts.join(", ");
     }
 
     function countCachedAndFreshResultCards() {
@@ -8021,8 +8010,6 @@
       } else if (pipelineMetrics && pipelineMetrics.transientRetryJobs > 0) {
         out += `<br>API retries: ${pipelineMetrics.transientRetryJobs}`;
       }
-      const endpointBreakdown = formatEndpointBreakdown(pipelineMetrics);
-      if (endpointBreakdown) out += `<br>API breakdown: ${endpointBreakdown}`;
       return out;
     }
 
@@ -8033,7 +8020,6 @@
         processingTimeSec: Number(processingTimeSec),
         cached,
         fresh,
-        endpoints: { ...pipelineMetrics.endpointCalls },
         phaseMs: { ...pipelineMetrics.phaseMs },
         fallbackLookups: pipelineMetrics.fallbackLookups,
         transientRetryJobs: pipelineMetrics.transientRetryJobs,
@@ -8391,6 +8377,7 @@
         // clobber the final summary). Pinned dep version numbers come from
         // versions already fetched during resolve — no extra versions call.
         await enrichOptionalDependencyNames();
+        persistKnownProjectTitles();
 
         // Conflict detection uses only Modrinth 'incompatible' metadata for the target version.
         // Uploaded JAR conflicts are ignored; incompatibleMap is filled during dependency resolution.
@@ -8548,22 +8535,6 @@
       await gate;
     }
 
-    function recordApiCall(url) {
-      apiCallCount++;
-      if (!pipelineMetrics) return;
-      const lowerUrl = String(url).toLowerCase();
-      if (lowerUrl.includes("/v2/version_files")) pipelineMetrics.endpointCalls.versionFiles++;
-      else if (lowerUrl.includes("/v2/projects?")) pipelineMetrics.endpointCalls.projects++;
-      else if (lowerUrl.includes("/v3/versions")) pipelineMetrics.endpointCalls.versionsBatchV3++;
-      else if (lowerUrl.includes("/v2/versions?ids=")) pipelineMetrics.endpointCalls.versionsBatch++;
-      else if (lowerUrl.includes("/v3/project/") && lowerUrl.includes("/version")) pipelineMetrics.endpointCalls.versionsDirectV3++;
-      else if (lowerUrl.includes("/v2/project/") && lowerUrl.includes("/version?")) pipelineMetrics.endpointCalls.versionsDirect++;
-      else if (lowerUrl.includes("/v3/teams?")) pipelineMetrics.endpointCalls.teams++;
-      else if (lowerUrl.includes("/v3/organizations?")) pipelineMetrics.endpointCalls.organizations++;
-      else if (lowerUrl.includes("/v2/search?")) pipelineMetrics.endpointCalls.search++;
-      else pipelineMetrics.endpointCalls.other++;
-    }
-
     async function fetchWithRetry(url, options, retries = 3) {
       const requestOptions = {
         ...options,
@@ -8590,7 +8561,7 @@
 
         // Count every completed HTTP response (ok, 429, 404, 5xx, …) so the
         // summary matches requests that actually hit Modrinth.
-        recordApiCall(url);
+        apiCallCount++;
 
         if (response.ok) {
           return response;
@@ -13196,6 +13167,27 @@
         }
       }
       if (unresolved.size === 0) return;
+
+      const neededIds = [...unresolved];
+      // Reuse titles learned in earlier runs this session (same TTL as mod cache)
+      // so a fully cached Update doesn't need a /projects call just for tooltips.
+      hydrateProjectTitlesFromCache(neededIds);
+      for (const id of neededIds) {
+        if (modIdToNameMap.has(id)) unresolved.delete(id);
+      }
+      if (unresolved.size === 0) {
+        // Still refresh tooltips — names may have just been hydrated.
+        for (const [parentArtifactKey, entries] of optionalDependencyMap.entries()) {
+          if (!entries.some((entry) => neededIds.includes(getDepProjectId(entry)))) continue;
+          const card = findCardForArtifactKey(parentArtifactKey);
+          if (!card) continue;
+          const chainTooltip = card.querySelector('.dependency-chain-tooltip');
+          if (!chainTooltip) continue;
+          chainTooltip.innerHTML = buildDependencyChainTooltipHTML(parentArtifactKey);
+        }
+        return;
+      }
+
       statusMessage.textContent =
         `Looking up ${unresolved.size} optional dependency name${unresolved.size === 1 ? "" : "s"}...`;
       try {
@@ -14930,10 +14922,11 @@
 
     // --- Session-Based Mod Caching System ---
     const MOD_CACHE_KEY = 'mcModUpdaterCache';
-    // Bumped for v3-first version payloads (per-version environment on cards).
-    const CACHE_VERSION = '1.2';
+    // 1.3: also cache projectId → title for optional-dep name enrichment.
+    const CACHE_VERSION = '1.3';
     const CACHE_EXPIRY_HOURS = 2; // Short session-based expiry
     const MAX_CACHE_ENTRIES = 500; // Reasonable limit
+    const MAX_TITLE_CACHE_ENTRIES = 1000;
 
     let cacheStats = {
       hits: 0,
@@ -15062,12 +15055,77 @@
       return {
         version: CACHE_VERSION,
         entries: {},
+        // projectId → { title, timestamp } for optional-dep tooltips without
+        // re-fetching /projects when the parent mod result was already cached.
+        titles: {},
         metadata: {
           created: Date.now(),
           lastUpdated: Date.now(),
           totalEntries: 0
         }
       };
+    }
+
+    function ensureCacheTitles(cache) {
+      if (!cache.titles || typeof cache.titles !== "object") {
+        cache.titles = {};
+      }
+      return cache.titles;
+    }
+
+    // Pull cached project titles into modIdToNameMap (skips expired entries).
+    function hydrateProjectTitlesFromCache(projectIds = null) {
+      try {
+        const cache = getCache();
+        const titles = ensureCacheTitles(cache);
+        const now = Date.now();
+        const expiry = CACHE_EXPIRY_HOURS * 60 * 60 * 1000;
+        const ids = projectIds
+          ? projectIds
+          : Object.keys(titles);
+        let pruned = false;
+        for (const id of ids) {
+          if (!id || modIdToNameMap.has(id)) continue;
+          const entry = titles[id];
+          if (!entry?.title) continue;
+          if (now - (entry.timestamp || 0) > expiry) {
+            delete titles[id];
+            pruned = true;
+            continue;
+          }
+          modIdToNameMap.set(id, entry.title);
+        }
+        if (pruned) saveCache(cache);
+      } catch (error) {
+        console.warn("Title cache hydrate error:", error);
+      }
+    }
+
+    // Persist known project titles (from this run) for later optional-dep lookups.
+    function persistKnownProjectTitles() {
+      if (modIdToNameMap.size === 0) return;
+      try {
+        const cache = getCache();
+        const titles = ensureCacheTitles(cache);
+        const now = Date.now();
+        for (const [id, title] of modIdToNameMap) {
+          if (!id || !title) continue;
+          titles[id] = { title, timestamp: now };
+        }
+        const titleKeys = Object.keys(titles);
+        if (titleKeys.length > MAX_TITLE_CACHE_ENTRIES) {
+          const sorted = titleKeys
+            .map((key) => ({ key, timestamp: titles[key]?.timestamp || 0 }))
+            .sort((a, b) => a.timestamp - b.timestamp);
+          const toRemove = titleKeys.length - MAX_TITLE_CACHE_ENTRIES;
+          for (let i = 0; i < toRemove; i++) {
+            delete titles[sorted[i].key];
+          }
+        }
+        saveCache(cache);
+      } catch (error) {
+        console.warn("Title cache persist error:", error);
+      }
     }
 
     // Clean up expired cache entries
@@ -15080,6 +15138,14 @@
       for (const [key, entry] of Object.entries(cache.entries)) {
         if (now - entry.timestamp > expiry) {
           delete cache.entries[key];
+          removedCount++;
+        }
+      }
+
+      const titles = ensureCacheTitles(cache);
+      for (const [id, entry] of Object.entries(titles)) {
+        if (now - (entry?.timestamp || 0) > expiry) {
+          delete titles[id];
           removedCount++;
         }
       }
