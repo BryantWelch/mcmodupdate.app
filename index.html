@@ -24,7 +24,6 @@
   <link rel="preconnect" href="https://api.modrinth.com" crossorigin>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="dns-prefetch" href="https://unpkg.com">
-  <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
 
   <!-- Favicon and Theme Configuration -->
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
@@ -233,7 +232,6 @@
   <script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script defer src="https://unpkg.com/toml-js@0.0.8/lib/amd/toml.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
   <style>
     /* -- CSS -- */
     :root {
@@ -4015,8 +4013,8 @@
           <li><b>Modrinth API</b> (<code>api.modrinth.com</code>) — used to search for mods and retrieve version
             and dependency information.</li>
           <li><b>Modrinth CDN</b> — serves mod icons and gallery images.</li>
-          <li><b>jsDelivr, unpkg, cdnjs</b> — public JavaScript content delivery networks used to load the
-            libraries the app depends on (JSZip, toml-js, marked, crypto-js).</li>
+          <li><b>jsDelivr, unpkg</b> — public JavaScript content delivery networks used to load the
+            libraries the app depends on (JSZip, toml-js, marked).</li>
           <li><b>Ko-fi</b> — only contacted when you click the "Buy Me a Coffee" button.</li>
         </ul>
 
@@ -4853,6 +4851,9 @@
     const ZIP_ANALYSIS_CONCURRENCY = 3;
     const ZIP_ENTRY_EXTRACTION_CONCURRENCY = 6;
     const DOWNLOAD_ZIP_FETCH_CONCURRENCY = 4;
+    // Cap simultaneous whole-file reads + SHA-1 work so large packs don't
+    // spike RAM / main-thread load. Same ballpark as zip entry extraction.
+    const FILE_HASH_CONCURRENCY = 6;
 
     // Backward-compatible: types that skip loader filtering
     const LOADER_AGNOSTIC_TYPES = Object.entries(ARTIFACT_CONFIG)
@@ -8752,13 +8753,12 @@
         reportPipelineStage("Checking cache...", 5);
       }
 
-      // Pre-calculate all hashes in parallel for uploaded files and mrpack files
-      const fileHashPromises = fileJobs.map(async job => {
-        const hash = await calculateFileHash(job.data);
-        return { job, hash };
-      });
-
-      const fileHashes = await Promise.all(fileHashPromises);
+      // Pre-calculate hashes for uploaded / mrpack files (bounded concurrency).
+      const fileHashes = await mapWithConcurrency(
+        fileJobs,
+        FILE_HASH_CONCURRENCY,
+        async (job) => ({ job, hash: await calculateFileHash(job.data) })
+      );
       const hashMap = new Map(fileHashes.map(fh => [fh.job, fh.hash]));
 
       // Track hash → upload key so the search modal Remove button can locate the source pill.
@@ -8850,7 +8850,7 @@
       const hashJobs = [];
       const projectIdJobs = [];
 
-      // Compute any missing hashes in parallel for performance
+      // Compute any missing hashes with the same bounded concurrency as Step 0.
       const jobsNeedingHash = uncachedJobs.filter(
         (job) => getJobLookupType(job) === "file" && !(hashMap && hashMap.has(job))
       );
@@ -8862,8 +8862,10 @@
       }
       // If hashes are already ready, keep any mixed-cache status from processBatch
       // instead of overwriting it with a generic "Preparing lookups...".
-      const fallbackHashes = await Promise.all(
-        jobsNeedingHash.map(async job => ({ job, hash: await calculateFileHash(job.data) }))
+      const fallbackHashes = await mapWithConcurrency(
+        jobsNeedingHash,
+        FILE_HASH_CONCURRENCY,
+        async (job) => ({ job, hash: await calculateFileHash(job.data) })
       );
       const fallbackHashMap = new Map(fallbackHashes.map(fh => [fh.job, fh.hash]));
 
@@ -14504,35 +14506,46 @@
     }
 
     // --- File Hash Calculation with Caching ---
+    // Stores either a finished hex digest or an in-flight Promise so concurrent
+    // callers for the same file share one read/hash.
     const fileHashCache = new Map();
 
-    async function calculateFileHash(file) {
-      // Create a cache key based on file name, size, and last modified
-      const cacheKey = `${file.name}-${file.size}-${file.lastModified}`;
-
-      // Check if we already calculated this hash
-      if (fileHashCache.has(cacheKey)) {
-        return fileHashCache.get(cacheKey);
+    function bufferToSha1Hex(digestBuffer) {
+      const bytes = new Uint8Array(digestBuffer);
+      let hex = "";
+      for (let i = 0; i < bytes.length; i++) {
+        hex += bytes[i].toString(16).padStart(2, "0");
       }
+      return hex;
+    }
 
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          try {
-            const binary = event.target.result;
-            const wordArray = CryptoJS.lib.WordArray.create(binary);
-            const hash = CryptoJS.SHA1(wordArray).toString(CryptoJS.enc.Hex);
+    async function sha1HexFromArrayBuffer(arrayBuffer) {
+      if (!globalThis.crypto?.subtle?.digest) {
+        throw new Error("Web Crypto SHA-1 is unavailable in this browser");
+      }
+      const digest = await crypto.subtle.digest("SHA-1", arrayBuffer);
+      return bufferToSha1Hex(digest);
+    }
 
-            // Cache the result
-            fileHashCache.set(cacheKey, hash);
-            resolve(hash);
-          } catch (error) {
-            reject(error);
-          }
-        };
-        reader.onerror = (error) => reject(error);
-        reader.readAsArrayBuffer(file);
-      });
+    async function calculateFileHash(file) {
+      const cacheKey = `${file.name}-${file.size}-${file.lastModified}`;
+      const cached = fileHashCache.get(cacheKey);
+      if (cached) return cached;
+
+      const hashPromise = (async () => {
+        const buffer = await file.arrayBuffer();
+        return sha1HexFromArrayBuffer(buffer);
+      })();
+
+      fileHashCache.set(cacheKey, hashPromise);
+      try {
+        const hash = await hashPromise;
+        fileHashCache.set(cacheKey, hash);
+        return hash;
+      } catch (error) {
+        fileHashCache.delete(cacheKey);
+        throw error;
+      }
     }
 
     // --- Get Client/Server Support ---

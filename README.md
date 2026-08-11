@@ -85,8 +85,8 @@ Built with performance and accessibility in mind, using modern web standards wit
 *   **[JSZip](https://stuk.github.io/jszip/)** - Client-side `.jar` file reading and `.mrpack` creation
 *   **[TOML.js](https://github.com/BinaryMuse/toml-node)** - Parse `mods.toml` files for mod identification
 *   **[Marked.js](https://marked.js.org/)** - Render mod changelogs from Markdown
-*   **[CryptoJS](https://github.com/brix/crypto-js)** - Calculate SHA-1 file hashes for accurate identification
 *   **[Modrinth API](https://docs.modrinth.com/)** - All mod data, versions, and metadata
+*   **Web Crypto API** - Native SHA-1 file hashes for accurate Modrinth identification
 
 ### Infrastructure
 *   **[Netlify](https://netlify.com)** - Hosting with automatic deployments
