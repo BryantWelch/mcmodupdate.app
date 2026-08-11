@@ -7593,158 +7593,184 @@
     document.getElementById("current-year").textContent =
       new Date().getFullYear();
 
+    // Shared timed localStorage helpers for decorative/bootstrap Modrinth data
+    // (MC versions dropdown + homepage stats). Same stale-while-revalidate
+    // policy: paint any cached payload, skip the network when fresh.
+    const LOCAL_JSON_CACHE_TTL_24H = 1000 * 60 * 60 * 24; // 24 hours
     const MODRINTH_STATS_CACHE_KEY = "modrinth_stats_cache";
-    const MODRINTH_STATS_CACHE_TTL = 1000 * 60 * 60 * 24; // 24 hours
+    const MC_VERSIONS_CACHE_KEY = "modrinth_game_versions_cache";
 
-    async function populateMcVersions() {
-      // Cache Minecraft versions for 24h to avoid unnecessary API calls
-      const MC_VERSIONS_CACHE_KEY = "modrinth_game_versions_cache";
-      const MC_VERSIONS_TTL = 1000 * 60 * 60 * 24; // 24 hours
-
+    // Returns { data, fresh } or null. `data` is the full stored object (incl. ts).
+    function readTimedLocalCache(key, ttl = LOCAL_JSON_CACHE_TTL_24H) {
       try {
-        let versions = null;
+        const raw = localStorage.getItem(key);
+        if (!raw) return null;
+        const data = JSON.parse(raw);
+        if (!data || typeof data !== "object") return null;
+        const fresh = data.ts != null && Date.now() - data.ts < ttl;
+        return { data, fresh };
+      } catch (_) {
+        return null; // corrupt / unavailable
+      }
+    }
 
-        // 1. Try the cache first. A fresh hit lets us skip the network call
-        try {
-          const cached = JSON.parse(localStorage.getItem(MC_VERSIONS_CACHE_KEY));
-          if (cached && Array.isArray(cached.versions) && Date.now() - cached.ts < MC_VERSIONS_TTL) {
-            versions = cached.versions;
-          }
-        } catch (_) { /* ignore corrupt cache */ }
+    // Persists `data` with a fresh timestamp. Quota failures are non-fatal.
+    function writeTimedLocalCache(key, data) {
+      try {
+        localStorage.setItem(key, JSON.stringify({ ...data, ts: Date.now() }));
+      } catch (_) { /* quota exceeded or private mode — callers already painted */ }
+    }
 
-        // 2. Fall back to the network if the cache was missing or stale.
-        if (!versions) {
-          const response = await fetchWithRetry(
-            "https://api.modrinth.com/v2/tag/game_version"
-          );
-          if (!response.ok) throw new Error("Failed to fetch MC versions after retries");
-          versions = await response.json();
-          try {
-            localStorage.setItem(
-              MC_VERSIONS_CACHE_KEY,
-              JSON.stringify({ versions, ts: Date.now() })
-            );
-          } catch (_) { /* quota exceeded — non-fatal, dropdown still renders */ }
-        }
+    function renderMcVersionDropdowns(versions) {
+      // Preserve selection across stale-paint → refresh rebuilds so a pending
+      // .mrpack constraint (or a prior default) isn't wiped by the second pass.
+      const previousMain = mcVersionSelect.value;
 
-        // Filter for release versions and sort them numerically descending
-        const releaseVersions = versions
-          .filter(
-            (v) =>
-              v.version_type === "release" &&
-              /^\d+\.\d+(\.\d+)?$/.test(v.version)
-          )
-          .sort((a, b) => {
-            const aParts = a.version.split(".").map(Number);
-            const bParts = b.version.split(".").map(Number);
-            for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
-              const aVal = aParts[i] || 0;
-              const bVal = bParts[i] || 0;
-              if (aVal !== bVal) return bVal - aVal; // Sort descending
-            }
-            return 0;
-          });
-
-        const groupedVersions = {};
-
-        // Group versions by their major release (e.g., "1.21.6" -> "1.21")
-        releaseVersions.forEach((versionObj) => {
-          // Access the .version property of the object
-          const versionStr = versionObj.version;
-          const parts = versionStr.split(".");
-
-          if (parts.length >= 2) {
-            const majorVersion = `${parts[0]}.${parts[1]}`;
-            if (!groupedVersions[majorVersion]) {
-              groupedVersions[majorVersion] = [];
-            }
-            // Only add patch versions (like 1.21.6) to the sub-list
-            if (parts.length > 2) {
-              // Push the version string, not the whole object
-              groupedVersions[majorVersion].push(versionStr);
-            }
-          }
-        });
-
-        // Get the major versions and sort them again to ensure order
-        const sortedMajorVersions = Object.keys(groupedVersions).sort((a, b) => {
-          const aParts = a.split(".").map(Number);
-          const bParts = b.split(".").map(Number);
+      // Filter for release versions and sort them numerically descending
+      const releaseVersions = versions
+        .filter(
+          (v) =>
+            v.version_type === "release" &&
+            /^\d+\.\d+(\.\d+)?$/.test(v.version)
+        )
+        .sort((a, b) => {
+          const aParts = a.version.split(".").map(Number);
+          const bParts = b.version.split(".").map(Number);
           for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
             const aVal = aParts[i] || 0;
             const bVal = bParts[i] || 0;
-            if (aVal !== bVal) return bVal - aVal;
+            if (aVal !== bVal) return bVal - aVal; // Sort descending
           }
           return 0;
         });
 
-        mcVersionSelect.innerHTML = ""; // Clear existing options
-        modalVersionSelect.innerHTML = ""; // Clear modal version select too
+      const groupedVersions = {};
 
-        // Add "All Versions" option only to modal dropdown
-        const allVersionsModal = document.createElement("option");
-        allVersionsModal.value = "";
-        allVersionsModal.textContent = "All Versions";
-        modalVersionSelect.appendChild(allVersionsModal);
+      // Group versions by their major release (e.g., "1.21.6" -> "1.21")
+      releaseVersions.forEach((versionObj) => {
+        // Access the .version property of the object
+        const versionStr = versionObj.version;
+        const parts = versionStr.split(".");
 
-        // Populate both dropdowns with the hierarchical structure
-        sortedMajorVersions.forEach((majorVersion) => {
-          // Add the main version entry (e.g., 1.21) to main select
-          const mainOption = document.createElement("option");
-          mainOption.value = majorVersion;
-          mainOption.textContent = majorVersion;
-          mcVersionSelect.appendChild(mainOption);
+        if (parts.length >= 2) {
+          const majorVersion = `${parts[0]}.${parts[1]}`;
+          if (!groupedVersions[majorVersion]) {
+            groupedVersions[majorVersion] = [];
+          }
+          // Only add patch versions (like 1.21.6) to the sub-list
+          if (parts.length > 2) {
+            // Push the version string, not the whole object
+            groupedVersions[majorVersion].push(versionStr);
+          }
+        }
+      });
 
-          // Add the main version entry to modal select
-          const modalMainOption = document.createElement("option");
-          modalMainOption.value = majorVersion;
-          modalMainOption.textContent = majorVersion;
-          modalVersionSelect.appendChild(modalMainOption);
+      // Get the major versions and sort them again to ensure order
+      const sortedMajorVersions = Object.keys(groupedVersions).sort((a, b) => {
+        const aParts = a.split(".").map(Number);
+        const bParts = b.split(".").map(Number);
+        for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
+          const aVal = aParts[i] || 0;
+          const bVal = bParts[i] || 0;
+          if (aVal !== bVal) return bVal - aVal;
+        }
+        return 0;
+      });
 
-          // Add the indented sub-version entries (e.g., 1.21.6, 1.21.5)
-          const subVersions = groupedVersions[majorVersion];
-          subVersions.forEach((subVersion) => {
-            // Add to main select
-            const subOption = document.createElement("option");
-            subOption.value = subVersion;
-            // Use non-breaking spaces for indentation
-            subOption.innerHTML = `&nbsp;&nbsp;${subVersion}`;
-            mcVersionSelect.appendChild(subOption);
+      mcVersionSelect.innerHTML = ""; // Clear existing options
+      modalVersionSelect.innerHTML = ""; // Clear modal version select too
 
-            // Add to modal select
-            const modalSubOption = document.createElement("option");
-            modalSubOption.value = subVersion;
-            modalSubOption.innerHTML = `&nbsp;&nbsp;${subVersion}`;
-            modalVersionSelect.appendChild(modalSubOption);
-          });
+      // Add "All Versions" option only to modal dropdown
+      const allVersionsModal = document.createElement("option");
+      allVersionsModal.value = "";
+      allVersionsModal.textContent = "All Versions";
+      modalVersionSelect.appendChild(allVersionsModal);
+
+      // Populate both dropdowns with the hierarchical structure
+      sortedMajorVersions.forEach((majorVersion) => {
+        // Add the main version entry (e.g., 1.21) to main select
+        const mainOption = document.createElement("option");
+        mainOption.value = majorVersion;
+        mainOption.textContent = majorVersion;
+        mcVersionSelect.appendChild(mainOption);
+
+        // Add the main version entry to modal select
+        const modalMainOption = document.createElement("option");
+        modalMainOption.value = majorVersion;
+        modalMainOption.textContent = majorVersion;
+        modalVersionSelect.appendChild(modalMainOption);
+
+        // Add the indented sub-version entries (e.g., 1.21.6, 1.21.5)
+        const subVersions = groupedVersions[majorVersion];
+        subVersions.forEach((subVersion) => {
+          // Add to main select
+          const subOption = document.createElement("option");
+          subOption.value = subVersion;
+          // Use non-breaking spaces for indentation
+          subOption.innerHTML = `&nbsp;&nbsp;${subVersion}`;
+          mcVersionSelect.appendChild(subOption);
+
+          // Add to modal select
+          const modalSubOption = document.createElement("option");
+          modalSubOption.value = subVersion;
+          modalSubOption.innerHTML = `&nbsp;&nbsp;${subVersion}`;
+          modalVersionSelect.appendChild(modalSubOption);
         });
+      });
 
-        // Select the latest version by default in both selects
-        if (mcVersionSelect.options.length > 0) {
-          mcVersionSelect.options[0].selected = true;
-        }
-        // Modal select defaults to latest version (skip "All Versions" at index 0)
-        if (modalVersionSelect.options.length > 1) {
-          modalVersionSelect.options[1].selected = true;
-        }
-        // Sync modal selects with main page selects after options are populated
-        modalLoaderSelect.value = modLoaderSelect.value;
-        if (mcVersionSelect.value) modalVersionSelect.value = mcVersionSelect.value;
+      // Prefer prior selection when still present; otherwise default to latest.
+      if (previousMain && [...mcVersionSelect.options].some((o) => o.value === previousMain)) {
+        mcVersionSelect.value = previousMain;
+      } else if (mcVersionSelect.options.length > 0) {
+        mcVersionSelect.options[0].selected = true;
+      }
+      // Sync modal with main. On first paint (no prior main value), default
+      // modal to latest (skip "All Versions" at index 0).
+      modalLoaderSelect.value = modLoaderSelect.value;
+      if (mcVersionSelect.value) {
+        modalVersionSelect.value = mcVersionSelect.value;
+      } else if (modalVersionSelect.options.length > 1) {
+        modalVersionSelect.options[1].selected = true;
+      }
 
-        // Re-apply a .mrpack's detected loader/version if populate finished after
-        // (or during) processMrpack — otherwise the rebuild above would wipe it.
-        if (pendingPackConstraints) {
-          applyDetectedPackConstraints(
-            pendingPackConstraints.loader,
-            pendingPackConstraints.version
-          );
-        }
+      // Re-apply a .mrpack's detected loader/version if populate finished after
+      // (or during) processMrpack — otherwise the rebuild above would wipe it.
+      if (pendingPackConstraints) {
+        applyDetectedPackConstraints(
+          pendingPackConstraints.loader,
+          pendingPackConstraints.version
+        );
+      }
+    }
+
+    async function populateMcVersions() {
+      // Paint any cached list immediately, then only hit the network when TTL expired.
+      const cached = readTimedLocalCache(MC_VERSIONS_CACHE_KEY);
+      const hadCachedVersions =
+        !!(cached && Array.isArray(cached.data.versions) && cached.data.versions.length);
+
+      if (hadCachedVersions) {
+        renderMcVersionDropdowns(cached.data.versions);
+        if (cached.fresh) return;
+      }
+
+      try {
+        const response = await fetchWithRetry(
+          "https://api.modrinth.com/v2/tag/game_version"
+        );
+        if (!response.ok) throw new Error("Failed to fetch MC versions after retries");
+        const versions = await response.json();
+        renderMcVersionDropdowns(versions);
+        writeTimedLocalCache(MC_VERSIONS_CACHE_KEY, { versions });
       } catch (error) {
+        // Stale paint already populated the dropdown — keep it and stay quiet.
+        if (hadCachedVersions) {
+          console.warn("MC versions fetch failed; keeping expired cache:", error);
+          return;
+        }
         console.error("Failed to fetch MC versions after multiple attempts:", error);
-        // Fallback or show an error
         mcVersionSelect.innerHTML =
           '<option value="1.21">Error loading versions</option>';
-        // Still honor a pending .mrpack detection if versions failed to load.
         if (pendingPackConstraints) {
           applyDetectedPackConstraints(
             pendingPackConstraints.loader,
@@ -7759,29 +7785,26 @@
     }
 
     async function fetchModrinthStats() {
-      const cacheKey = MODRINTH_STATS_CACHE_KEY;
-      const ttl = MODRINTH_STATS_CACHE_TTL; // Decorative stats can refresh weekly.
       const elProjects = document.getElementById("stat-projects");
       const elVersions = document.getElementById("stat-versions");
       const elFiles = document.getElementById("stat-files");
       const elAuthors = document.getElementById("stat-authors");
 
+      const paintStats = (stats) => {
+        if (!stats) return;
+        if (stats.projects != null) elProjects.textContent = stats.projects;
+        if (stats.versions != null) elVersions.textContent = stats.versions;
+        if (stats.files != null) elFiles.textContent = stats.files;
+        if (stats.authors != null) elAuthors.textContent = stats.authors;
+      };
+
       // Show cached stats immediately (even if stale), then refresh if needed.
-      let cacheFresh = false;
-      try {
-        const cached = JSON.parse(localStorage.getItem(cacheKey));
-        if (cached) {
-          if (cached.projects != null) elProjects.textContent = cached.projects;
-          if (cached.versions != null) elVersions.textContent = cached.versions;
-          if (cached.files != null) elFiles.textContent = cached.files;
-          if (cached.authors != null) elAuthors.textContent = cached.authors;
-          cacheFresh = cached.ts != null && Date.now() - cached.ts < ttl;
-        }
-      } catch (_) { /* ignore corrupt cache */ }
+      const cached = readTimedLocalCache(MODRINTH_STATS_CACHE_KEY);
+      if (cached) {
+        paintStats(cached.data);
+        if (cached.fresh) return;
+      }
 
-      if (cacheFresh) return;
-
-      // 2. Refresh in background using the shared fetchWithRetry
       try {
         const response = await fetchWithRetry("https://api.modrinth.com/v2/statistics", {
           headers: { "Accept": "application/json" }
@@ -7793,13 +7816,9 @@
           versions: data.versions != null ? data.versions.toLocaleString() : null,
           files: data.files != null ? data.files.toLocaleString() : null,
           authors: data.authors != null ? data.authors.toLocaleString() : null,
-          ts: Date.now()
         };
-        if (stats.projects != null) elProjects.textContent = stats.projects;
-        if (stats.versions != null) elVersions.textContent = stats.versions;
-        if (stats.files != null) elFiles.textContent = stats.files;
-        if (stats.authors != null) elAuthors.textContent = stats.authors;
-        localStorage.setItem(cacheKey, JSON.stringify(stats));
+        paintStats(stats);
+        writeTimedLocalCache(MODRINTH_STATS_CACHE_KEY, stats);
       } catch (e) {
         // Silently fail - stats are non-critical
       }
@@ -13169,7 +13188,7 @@
       if (unresolved.size === 0) return;
 
       const neededIds = [...unresolved];
-      // Reuse titles learned in earlier runs this session (same TTL as mod cache)
+      // Reuse titles learned in earlier runs this session (same TTL as success cache)
       // so a fully cached Update doesn't need a /projects call just for tooltips.
       hydrateProjectTitlesFromCache(neededIds);
       for (const id of neededIds) {
@@ -14924,7 +14943,12 @@
     const MOD_CACHE_KEY = 'mcModUpdaterCache';
     // 1.3: also cache projectId → title for optional-dep name enrichment.
     const CACHE_VERSION = '1.3';
-    const CACHE_EXPIRY_HOURS = 2; // Short session-based expiry
+    // Successes stay longer (re-runs / refresh in a sitting); warnings expire
+    // sooner so a newly published compatible version isn't stuck behind a
+    // stale "no compatible version" card.
+    const CACHE_SUCCESS_TTL_MS = 60 * 60 * 1000; // 1 hour
+    const CACHE_WARNING_TTL_MS = 30 * 60 * 1000; // 30 minutes
+    const CACHE_TITLE_TTL_MS = CACHE_SUCCESS_TTL_MS;
     const MAX_CACHE_ENTRIES = 500; // Reasonable limit
     const MAX_TITLE_CACHE_ENTRIES = 1000;
 
@@ -14933,6 +14957,15 @@
       misses: 0,
       stores: 0
     };
+
+    function getResultCacheTtlMs(result) {
+      return result?.status === "warning" ? CACHE_WARNING_TTL_MS : CACHE_SUCCESS_TTL_MS;
+    }
+
+    function isCacheEntryExpired(entry, now = Date.now()) {
+      if (!entry || entry.timestamp == null) return true;
+      return now - entry.timestamp > getResultCacheTtlMs(entry.result);
+    }
 
     // Initialize cache on page load
     function initializeCache() {
@@ -14961,11 +14994,7 @@
           return null;
         }
 
-        // Check if entry is expired
-        const now = Date.now();
-        const expiry = CACHE_EXPIRY_HOURS * 60 * 60 * 1000;
-        if (now - entry.timestamp > expiry) {
-          // Remove expired entry
+        if (isCacheEntryExpired(entry)) {
           delete cache.entries[cacheKey];
           saveCache(cache);
           cacheStats.misses++;
@@ -15079,7 +15108,6 @@
         const cache = getCache();
         const titles = ensureCacheTitles(cache);
         const now = Date.now();
-        const expiry = CACHE_EXPIRY_HOURS * 60 * 60 * 1000;
         const ids = projectIds
           ? projectIds
           : Object.keys(titles);
@@ -15088,7 +15116,7 @@
           if (!id || modIdToNameMap.has(id)) continue;
           const entry = titles[id];
           if (!entry?.title) continue;
-          if (now - (entry.timestamp || 0) > expiry) {
+          if (now - (entry.timestamp || 0) > CACHE_TITLE_TTL_MS) {
             delete titles[id];
             pruned = true;
             continue;
@@ -15132,11 +15160,10 @@
     function cleanupExpiredCache() {
       const cache = getCache();
       const now = Date.now();
-      const expiry = CACHE_EXPIRY_HOURS * 60 * 60 * 1000;
       let removedCount = 0;
 
       for (const [key, entry] of Object.entries(cache.entries)) {
-        if (now - entry.timestamp > expiry) {
+        if (isCacheEntryExpired(entry, now)) {
           delete cache.entries[key];
           removedCount++;
         }
@@ -15144,7 +15171,7 @@
 
       const titles = ensureCacheTitles(cache);
       for (const [id, entry] of Object.entries(titles)) {
-        if (now - (entry?.timestamp || 0) > expiry) {
+        if (now - (entry?.timestamp || 0) > CACHE_TITLE_TTL_MS) {
           delete titles[id];
           removedCount++;
         }
