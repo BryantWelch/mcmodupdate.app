@@ -8865,9 +8865,8 @@
           delete resultToCache.fromCache;
           delete resultToCache.apiTransientFailure;
           delete resultToCache._retryJob;
-          for (const cacheKey of cacheKeys) {
-            setCachedResult(cacheKey, resultToCache);
-          }
+          // One stored payload for hash + id keys (shared resultId).
+          setCachedResults(cacheKeys, resultToCache);
         }
       }
 
@@ -14959,8 +14958,9 @@
 
     // --- Session-Based Mod Caching System ---
     const MOD_CACHE_KEY = 'mcModUpdaterCache';
-    // 1.3: also cache projectId → title for optional-dep name enrichment.
-    const CACHE_VERSION = '1.3';
+    // 1.4: entries point at shared resultIds (hash + id keys share one payload).
+    // Soft-evict on QuotaExceededError instead of wiping the whole cache.
+    const CACHE_VERSION = '1.4';
     // Successes stay longer (re-runs / refresh in a sitting); warnings expire
     // sooner so a newly published compatible version isn't stuck behind a
     // stale "no compatible version" card.
@@ -14980,9 +14980,9 @@
       return result?.status === "warning" ? CACHE_WARNING_TTL_MS : CACHE_SUCCESS_TTL_MS;
     }
 
-    function isCacheEntryExpired(entry, now = Date.now()) {
-      if (!entry || entry.timestamp == null) return true;
-      return now - entry.timestamp > getResultCacheTtlMs(entry.result);
+    function isCacheEntryExpired(entry, result, now = Date.now()) {
+      if (!entry || entry.timestamp == null || !result) return true;
+      return now - entry.timestamp > getResultCacheTtlMs(result);
     }
 
     // Initialize cache on page load
@@ -15001,6 +15001,54 @@
       return `${type}:${identifier}:${loader}:${gameVersion}`;
     }
 
+    function ensureCacheResults(cache) {
+      if (!cache.results || typeof cache.results !== "object") {
+        cache.results = {};
+      }
+      return cache.results;
+    }
+
+    function allocateResultId(cache) {
+      cache.resultSeq = (Number(cache.resultSeq) || 0) + 1;
+      return `r${cache.resultSeq}`;
+    }
+
+    // Drop result payloads no longer referenced by any entry key.
+    function pruneOrphanedResults(cache) {
+      const results = ensureCacheResults(cache);
+      const liveIds = new Set();
+      for (const entry of Object.values(cache.entries || {})) {
+        if (entry?.resultId) liveIds.add(entry.resultId);
+      }
+      for (const resultId of Object.keys(results)) {
+        if (!liveIds.has(resultId)) {
+          delete results[resultId];
+        }
+      }
+    }
+
+    // Remove oldest entry keys (by timestamp). Returns how many keys removed.
+    function evictOldestCacheEntries(cache, fraction) {
+      const entries = Object.keys(cache.entries || {});
+      if (entries.length === 0) return 0;
+
+      const sortedEntries = entries
+        .map((key) => ({ key, timestamp: cache.entries[key]?.timestamp || 0 }))
+        .sort((a, b) => a.timestamp - b.timestamp);
+
+      const toRemove = Math.max(1, Math.floor(entries.length * fraction));
+      for (let i = 0; i < toRemove && i < sortedEntries.length; i++) {
+        delete cache.entries[sortedEntries[i].key];
+      }
+      pruneOrphanedResults(cache);
+      return Math.min(toRemove, sortedEntries.length);
+    }
+
+    function resolveCacheEntryResult(cache, entry) {
+      if (!entry?.resultId) return null;
+      return ensureCacheResults(cache)[entry.resultId] || null;
+    }
+
     // Get cached result if valid
     function getCachedResult(cacheKey) {
       try {
@@ -15012,15 +15060,17 @@
           return null;
         }
 
-        if (isCacheEntryExpired(entry)) {
+        const result = resolveCacheEntryResult(cache, entry);
+        if (!result || isCacheEntryExpired(entry, result)) {
           delete cache.entries[cacheKey];
+          pruneOrphanedResults(cache);
           saveCache(cache);
           cacheStats.misses++;
           return null;
         }
 
         cacheStats.hits++;
-        return entry.result;
+        return result;
       } catch (error) {
         console.warn('Cache read error:', error);
         cacheStats.misses++;
@@ -15028,37 +15078,38 @@
       }
     }
 
-    // Store result in cache
-    function setCachedResult(cacheKey, result) {
+    // Store one result under one or more lookup keys (shared resultId).
+    function setCachedResults(cacheKeys, result) {
+      const keys = [...(cacheKeys || [])].filter(Boolean);
+      if (keys.length === 0 || !result) return;
+
       try {
         const cache = getCache();
+        ensureCacheResults(cache);
 
-        // Check cache size limit
+        // Check cache size limit (count lookup keys, not unique payloads).
         const entries = Object.keys(cache.entries);
         if (entries.length >= MAX_CACHE_ENTRIES) {
-          // Remove oldest entries (simple LRU)
-          const sortedEntries = entries
-            .map(key => ({ key, timestamp: cache.entries[key].timestamp }))
-            .sort((a, b) => a.timestamp - b.timestamp);
-
-          // Remove oldest 20% of entries
-          const toRemove = Math.floor(entries.length * 0.2);
-          for (let i = 0; i < toRemove; i++) {
-            delete cache.entries[sortedEntries[i].key];
-          }
+          evictOldestCacheEntries(cache, 0.2);
         }
 
-        // Store new entry
-        cache.entries[cacheKey] = {
-          timestamp: Date.now(),
-          result: result
-        };
+        const resultId = allocateResultId(cache);
+        cache.results[resultId] = result;
+        const timestamp = Date.now();
+        for (const cacheKey of keys) {
+          cache.entries[cacheKey] = { timestamp, resultId };
+        }
+        pruneOrphanedResults(cache);
 
         saveCache(cache);
         cacheStats.stores++;
       } catch (error) {
         console.warn('Cache write error:', error);
       }
+    }
+
+    function setCachedResult(cacheKey, result) {
+      setCachedResults([cacheKey], result);
     }
 
     // Get cache from sessionStorage (persists for this tab until closed)
@@ -15074,6 +15125,8 @@
           return createEmptyCache();
         }
 
+        ensureCacheResults(cache);
+        ensureCacheTitles(cache);
         return cache;
       } catch (error) {
         console.warn('Cache parse error:', error);
@@ -15081,16 +15134,38 @@
       }
     }
 
+    function writeCacheToSession(cache) {
+      cache.metadata.lastUpdated = Date.now();
+      cache.metadata.totalEntries = Object.keys(cache.entries).length;
+      sessionStorage.setItem(MOD_CACHE_KEY, JSON.stringify(cache));
+    }
+
     // Save cache to sessionStorage
     function saveCache(cache) {
       try {
-        cache.metadata.lastUpdated = Date.now();
-        cache.metadata.totalEntries = Object.keys(cache.entries).length;
-        sessionStorage.setItem(MOD_CACHE_KEY, JSON.stringify(cache));
+        writeCacheToSession(cache);
       } catch (error) {
         if (error.name === 'QuotaExceededError') {
-          console.warn('sessionStorage quota exceeded, clearing cache');
-          clearCache();
+          // Soft-evict oldest keys and retry; only wipe if still full.
+          console.warn('sessionStorage quota exceeded, soft-evicting oldest cache entries');
+          let saved = false;
+          for (const fraction of [0.3, 0.5, 0.75]) {
+            if (evictOldestCacheEntries(cache, fraction) === 0) break;
+            try {
+              writeCacheToSession(cache);
+              saved = true;
+              break;
+            } catch (retryError) {
+              if (retryError.name !== 'QuotaExceededError') {
+                console.warn('Cache save error:', retryError);
+                return;
+              }
+            }
+          }
+          if (!saved) {
+            console.warn('sessionStorage still full after soft-evict, clearing cache');
+            clearCache();
+          }
         } else {
           console.warn('Cache save error:', error);
         }
@@ -15102,6 +15177,9 @@
       return {
         version: CACHE_VERSION,
         entries: {},
+        // Shared payloads; entries[key].resultId → results[resultId].
+        results: {},
+        resultSeq: 0,
         // projectId → { title, timestamp } for optional-dep tooltips without
         // re-fetching /projects when the parent mod result was already cached.
         titles: {},
@@ -15181,10 +15259,14 @@
       let removedCount = 0;
 
       for (const [key, entry] of Object.entries(cache.entries)) {
-        if (isCacheEntryExpired(entry, now)) {
+        const result = resolveCacheEntryResult(cache, entry);
+        if (!result || isCacheEntryExpired(entry, result, now)) {
           delete cache.entries[key];
           removedCount++;
         }
+      }
+      if (removedCount > 0) {
+        pruneOrphanedResults(cache);
       }
 
       const titles = ensureCacheTitles(cache);
