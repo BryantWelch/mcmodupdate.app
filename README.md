@@ -82,8 +82,7 @@ Built with performance and accessibility in mind, using modern web standards wit
 *   **Progressive Enhancement** - Core workflows remain straightforward across modern browsers and device sizes
 
 ### Libraries & APIs
-*   **[JSZip](https://stuk.github.io/jszip/)** - Client-side `.jar` file reading and `.mrpack` creation
-*   **[TOML.js](https://github.com/BinaryMuse/toml-node)** - Parse `mods.toml` files for mod identification
+*   **[JSZip](https://stuk.github.io/jszip/)** - Client-side `.jar` / archive reading and `.mrpack` creation
 *   **[Marked.js](https://marked.js.org/)** - Render mod changelogs from Markdown
 *   **[Modrinth API](https://docs.modrinth.com/)** - All mod data, versions, and metadata
 *   **Web Crypto API** - Native SHA-1 file hashes for accurate Modrinth identification

@@ -23,7 +23,7 @@
   <!-- Origins touched early — warm connections before first fetch (Core Web Vitals) -->
   <link rel="preconnect" href="https://api.modrinth.com" crossorigin>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-  <link rel="dns-prefetch" href="https://unpkg.com">
+  <link rel="preconnect" href="https://cdn.modrinth.com" crossorigin>
 
   <!-- Favicon and Theme Configuration -->
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
@@ -155,7 +155,7 @@
           "name": "How does the mod updater work?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Upload your existing .jar mod files. The tool reads each mod's metadata, looks it up on Modrinth, and finds the newest version compatible with your selected Minecraft version and loader. Dependencies are resolved automatically."
+            "text": "Upload your existing .jar mod files. The tool hashes each file locally, looks it up on Modrinth, and finds the newest version compatible with your selected Minecraft version and loader. Dependencies are resolved automatically."
           }
         },
         {
@@ -211,7 +211,7 @@
           "@type": "HowToStep",
           "position": 2,
           "name": "Upload your mod files",
-          "text": "Drag and drop your .jar files into the upload area. The tool reads each mod's metadata locally in your browser."
+          "text": "Drag and drop your .jar files into the upload area. The tool hashes each file locally in your browser."
         },
         {
           "@type": "HowToStep",
@@ -230,7 +230,6 @@
   </script>
 
   <script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-  <script defer src="https://unpkg.com/toml-js@0.0.8/lib/amd/toml.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <style>
     /* -- CSS -- */
@@ -4013,8 +4012,8 @@
           <li><b>Modrinth API</b> (<code>api.modrinth.com</code>) — used to search for mods and retrieve version
             and dependency information.</li>
           <li><b>Modrinth CDN</b> — serves mod icons and gallery images.</li>
-          <li><b>jsDelivr, unpkg</b> — public JavaScript content delivery networks used to load the
-            libraries the app depends on (JSZip, toml-js, marked).</li>
+          <li><b>jsDelivr</b> — public JavaScript content delivery network used to load the
+            libraries the app depends on (JSZip, marked).</li>
           <li><b>Ko-fi</b> — only contacted when you click the "Buy Me a Coffee" button.</li>
         </ul>
 
@@ -5682,8 +5681,31 @@
     let currentFeaturedSort = "";
     let currentFeaturedProjectType = "";
     let hasRandomizedInitialFeatured = false;
+    // Sort/type/loader/version/platform used for the featured DOM currently on screen.
+    // Focus reopens reuse that DOM when this key still matches.
+    let lastFeaturedFilterKey = "";
     let activeSearchRequestId = 0;
     const searchResultsPerPage = 20;
+
+    function getFeaturedFilterKey(sortBy, projectType) {
+      const platform =
+        modalPlatformSelect && projectType === "plugin"
+          ? (modalPlatformSelect.value || "")
+          : "";
+      return [
+        sortBy || "",
+        projectType || "",
+        modalLoaderSelect.value || "",
+        modalVersionSelect.value || "",
+        platform,
+      ].join("\0");
+    }
+
+    function canReuseFeaturedContent(sortBy, projectType) {
+      if (!isShowingFeatured) return false;
+      if (lastFeaturedFilterKey !== getFeaturedFilterKey(sortBy, projectType)) return false;
+      return Boolean(searchResultsContainer.querySelector(".result-card.search"));
+    }
 
     function debounce(func, delay) {
       let timeout;
@@ -6045,6 +6067,7 @@
           appendSearchResults(enrichedHits);
         } else {
           renderSearchResults(enrichedHits);
+          lastFeaturedFilterKey = getFeaturedFilterKey(sortBy || "", projectType || "");
         }
 
         // Update offset for next load
@@ -6056,6 +6079,7 @@
       } catch (error) {
         if (requestId !== activeSearchRequestId) return;
         if (!isLoadMore) {
+          lastFeaturedFilterKey = "";
           searchResultsContainer.innerHTML = "<p>Error loading featured content.</p>";
         }
         console.error("Featured content loading failed:", error);
@@ -6266,8 +6290,14 @@
           currentFeaturedProjectType = randomProjectType;
           hasRandomizedInitialFeatured = true;
         }
-        // Always reload featured content to ensure fresh results with current filters
-        loadFeaturedContent(currentFeaturedSort || sortSelect.value, currentFeaturedProjectType || projectTypeSelect.value);
+        const sortBy = currentFeaturedSort || sortSelect.value;
+        const projectType = currentFeaturedProjectType || projectTypeSelect.value;
+        // Reuse the existing featured DOM when sort/type/loader/version/platform
+        // are unchanged — avoids "Loading..." flicker + a repeat API call on
+        // every close/reopen of the search modal.
+        if (!canReuseFeaturedContent(sortBy, projectType)) {
+          loadFeaturedContent(sortBy, projectType);
+        }
       }
     });
 
@@ -9447,7 +9477,6 @@
           const identifier = getJobIdentifier(job);
           let projectDetails = null;
           let versionDetails = null;
-          let originalModInfo = {};
 
           // Find project details based on job type
           let fileHash = null; // Track hash for caching
@@ -9479,16 +9508,6 @@
                 artifactType,
                 getEffectiveVersionLoaders(versionDetails)
               );
-            }
-
-            // Get original version from uploaded file if available
-            if (lookupType === "file" && hasAnyExtension(job?.data?.name, [".jar"])) {
-              try {
-                originalModInfo = await getModIdFromJar(job.data);
-              } catch (e) {
-                // Ignore errors getting mod info from JAR
-                originalModInfo = {};
-              }
             }
 
             // If SHA1 lookup fails for .mrpack, try filename as fallback.
@@ -9683,7 +9702,7 @@
               supportedLoaders,
               selectedLoader: isLoaderAgnostic ? null : (resolutionContext.selectedLoader || null),
               selectedGameVersion: gameVersion,
-              installedVersion: originalModInfo.version || versionDetails?.version_number || null,
+              installedVersion: versionDetails?.version_number || null,
               installedVersionId: versionDetails?.id || null,
             });
             continue;
@@ -9726,16 +9745,17 @@
               supportedLoaders,
               selectedLoader: fallbackIsLoaderAgnostic ? null : (resolutionContext.selectedLoader || null),
               selectedGameVersion: mcVersionSelect.value,
-              installedVersion: originalModInfo.version || versionDetails?.version_number || null,
+              installedVersion: versionDetails?.version_number || null,
               installedVersionId: versionDetails?.id || null,
             });
             continue;
           }
 
-          // Compare versions: prefer hash-based ID match (reliable), fall back to manifest string comparison
+          // Compare versions: prefer hash-based ID match; fall back to Modrinth
+          // version_number strings (including common "+build" / "-suffix" forms).
           const isUpToDate = latestVersion && isInstalledModVersion(
             latestVersion,
-            originalModInfo.version || versionDetails?.version_number || null,
+            versionDetails?.version_number || null,
             versionDetails?.id || null
           );
 
@@ -9786,7 +9806,7 @@
             gallery: projectDetails.gallery || [],
             body: projectDetails.body || "",
             links: collectProjectLinks(projectDetails),
-            installedVersion: originalModInfo.version || versionDetails?.version_number || null,
+            installedVersion: versionDetails?.version_number || null,
             installedVersionId: versionDetails?.id || null,
           });
 
@@ -9930,8 +9950,8 @@
     }
 
     // True when a Modrinth version matches the user's uploaded/installed file.
-    // Prefer hash-resolved version id; fall back to JAR/manifest version strings
-    // (including common "+build" / "-suffix" Modrinth numbering).
+    // Prefer hash-resolved version id; fall back to Modrinth version_number
+    // strings (including common "+build" / "-suffix" numbering).
     function isInstalledModVersion(version, installedVersion, installedVersionId) {
       if (!version) return false;
       if (installedVersionId && version.id === installedVersionId) return true;
@@ -9941,45 +9961,6 @@
         version.version_number.startsWith(installedVersion + "+") ||
         version.version_number.startsWith(installedVersion + "-")
       );
-    }
-
-    // Extract mod id, name, and version from JAR mods (only version used later).
-    async function getModIdFromJar(jarFile) {
-      try {
-        const zip = await JSZip.loadAsync(jarFile);
-
-        // --- Fabric ---
-        const fabricFile = zip.file("fabric.mod.json");
-        if (fabricFile) {
-          const manifest = JSON.parse(await fabricFile.async("string"));
-          return { id: manifest.id, name: manifest.name, version: manifest.version };
-        }
-
-        // --- Quilt ---
-        const quiltFile = zip.file("quilt.mod.json");
-        if (quiltFile) {
-          const manifest = JSON.parse(await quiltFile.async("string"));
-          const loader = manifest.quilt_loader || {};
-          return {
-            id: loader.id,
-            name: (manifest.metadata && manifest.metadata.name) || loader.id,
-            version: loader.version,
-          };
-        }
-
-        // --- Forge / NeoForge ---
-        const forgeFile = zip.file("META-INF/mods.toml") || zip.file("META-INF/neoforge.mods.toml");
-        if (forgeFile) {
-          const manifest = toml.parse(await forgeFile.async("string"));
-          const modInfo = manifest.mods && manifest.mods[0];
-          if (modInfo) {
-            return { id: modInfo.modId, name: modInfo.displayName, version: modInfo.version };
-          }
-        }
-        throw new Error("Could not find a valid manifest file.");
-      } catch (e) {
-        throw new Error("Invalid or corrupt JAR file.");
-      }
     }
 
     // --- Detect ZIP content type (mod, datapack, resourcepack, shader, or unknown) ---
@@ -12103,9 +12084,8 @@
         applyAllFiltersToSection(sectionSelector);
       }
 
-      // Expose so renderSingleResult (top-level) can re-apply visibility after
-      // appending new cards, keeping freshly added cards in sync with active
-      // dropdown filters and the text search box.
+      // Expose for user-driven UI (version change, filter toggles, search box)
+      // that needs to recompute card visibility after results already exist.
       window.applyAllFiltersToSection = applyAllFiltersToSection;
 
       function applySortToSection(sectionSelector, sortType, reversed) {
@@ -13117,11 +13097,9 @@
         if (section) {
           section.querySelector(".results-list").appendChild(card);
           section.classList.add("visible");
-          // Newly appended cards default to display:'' and would ignore any
-          // active filters/search. Re-evaluate the section so they conform.
-          if (typeof window.applyAllFiltersToSection === 'function') {
-            window.applyAllFiltersToSection('#' + sectionId);
-          }
+          // No applyAllFiltersToSection here: each Update wipes results and
+          // rebuilds sections from scratch, so filters/search can't be active
+          // mid-run. Filtering runs only on user filter/search interactions.
         }
         // And if it was a new success, we add it to our tracking set.
         if (result.status === "success") {
@@ -13784,6 +13762,26 @@
         alpha: card.querySelector(".list-view-channels .alpha"),
       };
 
+      // Lazy changelog: parse markdown only when the panel opens (or when the
+      // version changes while it is already open).
+      let changelogRenderedForVersionId = null;
+      function ensureChangelogContent() {
+        const selectedVersionId = versionSelect.value;
+        if (
+          changelogRenderedForVersionId === selectedVersionId &&
+          changelogContent.innerHTML !== ""
+        ) {
+          return;
+        }
+        const versions = Array.isArray(mod.all_versions) ? mod.all_versions : [];
+        const selectedVersion = versions.find((v) => v.id === selectedVersionId);
+        const changelogText =
+          (selectedVersion && selectedVersion.changelog) ||
+          "No changelog provided for this version.";
+        changelogContent.innerHTML = marked.parse(changelogText);
+        changelogRenderedForVersionId = selectedVersionId || null;
+      }
+
       // --- Update Dynamic Content ---
       function updateDynamicContent(fromUserChange) {
         const selectedVersionId = versionSelect.value;
@@ -13879,9 +13877,13 @@
           window.updateDownloadAllCount();
         }
         dateSpan.textContent = formatTimeAgo(selectedVersion.date_published);
-        changelogContent.innerHTML = marked.parse(
-          selectedVersion.changelog || "No changelog provided for this version."
-        );
+
+        // Changelog markdown is lazy (ensureChangelogContent). Mark stale so
+        // the next open — or an already-open panel — refreshes for this version.
+        changelogRenderedForVersionId = null;
+        if (changelogContent.classList.contains("visible")) {
+          ensureChangelogContent();
+        }
 
         // Hide all channel link containers first
         Object.values(listLinks).forEach((link) => (link.parentElement.style.display = "none"));
@@ -13984,7 +13986,10 @@
 
       changelogToggle.addEventListener("click", () => {
         const opening = !changelogContent.classList.contains("visible");
-        if (opening) closeOtherPanels(changelogContent);
+        if (opening) {
+          closeOtherPanels(changelogContent);
+          ensureChangelogContent();
+        }
         changelogContent.classList.toggle("visible", opening);
         changelogToggle.classList.toggle("active", opening);
       });
