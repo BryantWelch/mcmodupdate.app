@@ -3831,7 +3831,10 @@
         <h2>Minecraft Mod Updater &amp; Builder</h2>
       </div>
 
-      <div class="info-modal-body">
+      <div class="info-modal-body"></div>
+    </div>
+  </div>
+  <template id="info-modal-body-template">
         <p>
           This tool helps you update your existing Minecraft mods or build a brand new mod list from scratch. It uses
           the Modrinth API to find the latest compatible versions and can export your list as a standard Modrinth
@@ -3958,9 +3961,7 @@
           This tool relies on the Modrinth API for all mod data. Please be aware of their ratelimits. The ratelimit is
           currently 300 requests per minute. The application will automatically pause and resume to respect these limits.
         </p>
-      </div>
-    </div>
-  </div>
+  </template>
 
   <!-- PRIVACY POLICY MODAL BLOCK -->
   <div id="privacy-modal" class="modal-overlay">
@@ -3975,17 +3976,21 @@
         <h2>Privacy Policy</h2>
       </div>
 
-      <div class="info-modal-body">
+      <div class="info-modal-body"></div>
+    </div>
+  </div>
+  <template id="privacy-modal-body-template">
         <p>
-          <b>Minecraft Mod Updater is a static, client-side web application.</b> There is no backend server
-          collecting or storing data about you. Everything happens locally inside your browser tab.
+          <b>Minecraft Mod Updater is a static, client-side web application.</b> There is no application backend
+          collecting or storing data about you. Lookups and file processing happen locally inside your browser tab.
         </p>
 
         <h3>Your Files</h3>
         <p>
           Any <code>.jar</code>, <code>.zip</code>, <code>.mrpack</code>, or <code>.json</code> files you upload
-          are processed <b>entirely in your browser</b>. They are never uploaded to mcmodupdate.app or any third
-          party. When you close or refresh the tab, the files are gone.
+          are processed <b>entirely in your browser</b>. The file contents are never uploaded to mcmodupdate.app.
+          To identify mods, the app computes a SHA-1 hash locally and sends that hash to the Modrinth API
+          (<code>api.modrinth.com</code>). When you close or refresh the tab, the files are gone from memory.
         </p>
 
         <h3>Browser Storage</h3>
@@ -3995,8 +4000,8 @@
         <ul>
           <li><b>localStorage</b> — caches the list of Minecraft versions and Modrinth platform statistics so the
             app loads faster on subsequent visits.</li>
-          <li><b>sessionStorage</b> — caches mod lookups during your current tab session and is cleared automatically
-            when you close the tab.</li>
+          <li><b>sessionStorage</b> — caches mod lookups (and related project titles) during your current tab
+            session and is cleared automatically when you close the tab.</li>
         </ul>
         <p>
           You can clear this data at any time using your browser's site-data controls. The site does not use
@@ -4009,12 +4014,15 @@
           (your IP address, user-agent, and the resource being requested) under their own privacy policies:
         </p>
         <ul>
-          <li><b>Modrinth API</b> (<code>api.modrinth.com</code>) — used to search for mods and retrieve version
-            and dependency information.</li>
-          <li><b>Modrinth CDN</b> — serves mod icons and gallery images.</li>
+          <li><b>Netlify</b> — hosts this site. Like most hosts, it may keep standard web-server request logs.</li>
+          <li><b>Modrinth API</b> (<code>api.modrinth.com</code>) — used to search for projects, look up file hashes,
+            and retrieve version and dependency information.</li>
+          <li><b>Modrinth CDN</b> (<code>cdn.modrinth.com</code>, <code>cdn-raw.modrinth.com</code>) — serves mod
+            icons, gallery images, and the mod files you choose to download.</li>
           <li><b>jsDelivr</b> — public JavaScript content delivery network used to load the
             libraries the app depends on (JSZip, marked).</li>
-          <li><b>Ko-fi</b> — only contacted when you click the "Buy Me a Coffee" button.</li>
+          <li><b>External links</b> — following a link on this site (GitHub, Ko-fi, Discord, a project page,
+            or media embedded in a mod description) sends you to that third party under their own policy.</li>
         </ul>
 
         <h3>What We Do Not Do</h3>
@@ -4041,11 +4049,9 @@
         </p>
 
         <p style="margin-top:1.5rem;font-size:0.85rem;color:var(--secondary-text);">
-          Last updated: May 14, 2026.
+          Last updated: August 12, 2026.
         </p>
-      </div>
-    </div>
-  </div>
+  </template>
 
   <!-- ALERT MODAL BLOCK -->
   <div id="alert-modal" class="modal-overlay">
@@ -5426,6 +5432,14 @@
       unlockPageScroll();
     }
 
+    function ensureModalBodyFromTemplate(modalElement, templateId) {
+      const body = modalElement.querySelector(".info-modal-body");
+      if (!body || body.childElementCount > 0) return;
+      const template = document.getElementById(templateId);
+      if (!template?.content) return;
+      body.appendChild(template.content.cloneNode(true));
+    }
+
     function attachOverlayBackdropClose(overlayEl, closeFn) {
       overlayEl.addEventListener("click", (event) => {
         if (event.target === overlayEl) closeFn();
@@ -5442,6 +5456,7 @@
     // --- UI LOGIC ---
     document.addEventListener("click", (e) => {
       if (!e.target.closest("#help-link")) return;
+      ensureModalBodyFromTemplate(infoModal, "info-modal-body-template");
       showModalWithScrollLock(infoModal);
     });
     modalCloseButton.addEventListener("click", () => {
@@ -5451,6 +5466,7 @@
 
     document.addEventListener("click", (e) => {
       if (!e.target.closest("#privacy-link")) return;
+      ensureModalBodyFromTemplate(privacyModal, "privacy-modal-body-template");
       showModalWithScrollLock(privacyModal);
     });
     privacyModalCloseButton.addEventListener("click", () => {
@@ -8302,6 +8318,9 @@
         let dependencyQueue = Array.from(allDependencies).filter(depId => !processedProjectIds.has(depId));
         const dependencyQueued = new Set(dependencyQueue);
         let actualDependenciesAdded = 0;
+        // Nested dep edges used to refresh the parent chain icon per dep.
+        // Collect dirty parents and paint once after titles are filled.
+        const dirtyDependencyChainKeys = new Set();
 
         // Use the actual queue, not allDependencies — required deps that were
         // already in the upload set leave allDependencies non-empty but nothing to resolve.
@@ -8387,7 +8406,7 @@
                         reqList.push(makeDepEntry(dep));
                       }
                       trackDependencyParent(depKey, parentArtifactKey);
-                      updateDependencyChainOnCard(parentArtifactKey);
+                      dirtyDependencyChainKeys.add(parentArtifactKey);
                     }
                   } else if (dep.dependency_type === "optional") {
                     const depKey = dep.project_id;
@@ -8399,7 +8418,7 @@
                     if (!depListHasProject(optList, depKey)) {
                       optList.push(makeDepEntry(dep));
                       trackDependencyParent(depKey, parentArtifactKey);
-                      updateDependencyChainOnCard(parentArtifactKey);
+                      dirtyDependencyChainKeys.add(parentArtifactKey);
                     }
                   } else if (dep.dependency_type === "incompatible") {
                     if (!dep.project_id || !result.projectId) continue;
@@ -8427,6 +8446,9 @@
         // clobber the final summary). Pinned dep version numbers come from
         // versions already fetched during resolve — no extra versions call.
         await enrichOptionalDependencyNames();
+        for (const artifactKey of dirtyDependencyChainKeys) {
+          updateDependencyChainOnCard(artifactKey);
+        }
         persistKnownProjectTitles();
 
         // Conflict detection uses only Modrinth 'incompatible' metadata for the target version.
@@ -10119,46 +10141,46 @@
           standardizeModTitleIcons(modTitleDiv);
         }
 
-        // Build the detailed conflicts panel HTML from each pair's declarations.
-        const panelRows = modConflicts.map(pair => {
-          const otherModId = pair.modId === modId ? pair.conflictingModId : pair.modId;
-          const otherName = resolveModName(otherModId);
-          const decls = (pair.declarations || []).map(d => {
-            const declaredByThis = d.byProjectId === modId;
-            const verb = 'is incompatible with';
-            const sentence = declaredByThis
-              ? `This mod ${verb} <strong>${otherName}</strong>`
-              : `<strong>${otherName}</strong> ${verb} this mod`;
-            const rangeText = (d.versionRange && d.versionRange !== '*')
-              ? ` at version <code>${d.versionRange}</code>`
-              : '';
-            const installedText = d.targetInstalledVersion
-              ? ` (updating to <code>${d.targetInstalledVersion}</code>)`
-              : '';
-            const sourceTag = '';
-            return `
-              <li class="conflict-declaration severity-${d.bySeverity}">
-                <span class="conflict-severity-pill severity-${d.bySeverity}">${d.bySeverity === 'breaks' ? 'BREAKS' : 'CONFLICTS'}</span>
-                <span class="conflict-sentence">${sentence}${rangeText}${installedText}${sourceTag}</span>
-              </li>`;
-          }).join('');
-          return `
-            <div class="conflict-pair severity-${pair.severity}">
-              <div class="conflict-pair-header">
-                <span class="conflict-pair-title">${otherName}</span>
-              </div>
-              <ul class="conflict-declaration-list">${decls}</ul>
-            </div>`;
-        }).join('');
-
-        // Inject (or update) the hidden conflicts panel inside the card.
+        // Hidden conflicts panel — HTML is filled on first open (like changelog).
         let conflictsContent = card.querySelector('.conflicts-content');
         if (!conflictsContent) {
           conflictsContent = document.createElement('div');
           conflictsContent.className = 'conflicts-content';
           card.appendChild(conflictsContent);
         }
-        conflictsContent.innerHTML = panelRows;
+
+        function ensureConflictsContent() {
+          if (conflictsContent.innerHTML !== "") return;
+          conflictsContent.innerHTML = modConflicts.map(pair => {
+            const otherModId = pair.modId === modId ? pair.conflictingModId : pair.modId;
+            const otherName = resolveModName(otherModId);
+            const decls = (pair.declarations || []).map(d => {
+              const declaredByThis = d.byProjectId === modId;
+              const verb = 'is incompatible with';
+              const sentence = declaredByThis
+                ? `This mod ${verb} <strong>${otherName}</strong>`
+                : `<strong>${otherName}</strong> ${verb} this mod`;
+              const rangeText = (d.versionRange && d.versionRange !== '*')
+                ? ` at version <code>${d.versionRange}</code>`
+                : '';
+              const installedText = d.targetInstalledVersion
+                ? ` (updating to <code>${d.targetInstalledVersion}</code>)`
+                : '';
+              return `
+              <li class="conflict-declaration severity-${d.bySeverity}">
+                <span class="conflict-severity-pill severity-${d.bySeverity}">${d.bySeverity === 'breaks' ? 'BREAKS' : 'CONFLICTS'}</span>
+                <span class="conflict-sentence">${sentence}${rangeText}${installedText}</span>
+              </li>`;
+            }).join('');
+            return `
+            <div class="conflict-pair severity-${pair.severity}">
+              <div class="conflict-pair-header">
+                <span class="conflict-pair-title">${otherName}</span>
+              </div>
+              <ul class="conflict-declaration-list">${decls}</ul>
+            </div>`;
+          }).join('');
+        }
 
         // Inject a "Conflicts" toggle next to "Changelog" / "Reason".
         if (!card.querySelector('.conflicts-toggle')) {
@@ -10167,8 +10189,10 @@
           toggle.title = 'Click to view conflict details';
           toggle.textContent = 'Conflicts';
           toggle.addEventListener('click', () => {
-            conflictsContent.classList.toggle('visible');
-            toggle.classList.toggle('active');
+            const opening = !conflictsContent.classList.contains('visible');
+            if (opening) ensureConflictsContent();
+            conflictsContent.classList.toggle('visible', opening);
+            toggle.classList.toggle('active', opening);
           });
 
           const togglesHost = card.querySelector('.mod-meta-toggles');
@@ -13872,7 +13896,10 @@
           card.removeAttribute('data-file-sha1');
           card.removeAttribute('data-file-sha512');
         }
-        if (typeof window.updateDownloadAllCount === "function") {
+        // Live recount only when the user changes version. Initial card paint
+        // runs before Download All exists; finalizeResultsUI sets count/sizes
+        // once. Ignore/remove/undo already call this themselves.
+        if (fromUserChange && typeof window.updateDownloadAllCount === "function") {
           window.updateDownloadAllCount();
         }
         dateSpan.textContent = formatTimeAgo(selectedVersion.date_published);
@@ -14279,129 +14306,147 @@
   const reasonToggle = card.querySelector(".changelog-toggle");
   const reasonContent = card.querySelector(".reason-content");
 
-  // Set up the reason toggle functionality
-  reasonToggle.addEventListener("click", () => {
-    reasonContent.classList.toggle("visible");
-    reasonToggle.classList.toggle("active");
-  });
+  // Reason panel HTML is filled on first open (like changelog). Collapsed
+  // version chips render then; the full "Show all" list waits until expand.
+  function ensureReasonContent() {
+    if (reasonContent.innerHTML !== "") return;
 
-  // Set the reason content (but keep it hidden initially).
-  // Color-coding rules:
-  //   - Green (`is-supported`): the user's currently-selected loader/version is
-  //     in the project's supported list. Confirms that side of compatibility.
-  //   - Red (`is-missing`): the user's selection is NOT in the supported list,
-  //     so we splice a chip for it into the sorted position to surface exactly
-  //     what's missing.
-  //   - Loader-agnostic project types (data pack / resource pack / shader pack)
-  //     pass selectedLoader=null, so loader chips render with no highlighting —
-  //     they're informational only because the loader wasn't part of the check.
-  const escapeChip = (value) =>
-    String(value)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
+    // Color-coding rules:
+    //   - Green (`is-supported`): the user's currently-selected loader/version is
+    //     in the project's supported list. Confirms that side of compatibility.
+    //   - Red (`is-missing`): the user's selection is NOT in the supported list,
+    //     so we splice a chip for it into the sorted position to surface exactly
+    //     what's missing.
+    //   - Loader-agnostic project types (data pack / resource pack / shader pack)
+    //     pass selectedLoader=null, so loader chips render with no highlighting —
+    //     they're informational only because the loader wasn't part of the check.
+    const escapeChip = (value) =>
+      String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
 
-  const userLoader = mod.selectedLoader ? String(mod.selectedLoader).toLowerCase() : null;
-  const userGameVersion = mod.selectedGameVersion ? String(mod.selectedGameVersion).trim() : null;
+    const userLoader = mod.selectedLoader ? String(mod.selectedLoader).toLowerCase() : null;
+    const userGameVersion = mod.selectedGameVersion ? String(mod.selectedGameVersion).trim() : null;
 
-  let chipsHtml = '';
-  if (mod.supportedLoaders && mod.supportedLoaders.length) {
-    const sortedLoaders = [...mod.supportedLoaders].sort((a, b) => a.localeCompare(b));
-    const loaderInList = userLoader
-      ? sortedLoaders.some(l => String(l).toLowerCase() === userLoader)
-      : false;
-    const loaderIsMissing = !!userLoader && !loaderInList;
-    if (loaderIsMissing) {
-      sortedLoaders.push(userLoader);
-      sortedLoaders.sort((a, b) => a.localeCompare(b));
-    }
-    const loaderChips = sortedLoaders.map(l => {
-      const isUserLoader = userLoader && String(l).toLowerCase() === userLoader;
-      let cls = 'reason-chip reason-chip-loader';
-      if (isUserLoader) cls += loaderIsMissing ? ' is-missing' : ' is-supported';
-      return `<span class="${cls}">${escapeChip(l)}</span>`;
-    }).join('');
-    chipsHtml += `<div style="margin-top:0.6rem;">
+    let chipsHtml = '';
+    if (mod.supportedLoaders && mod.supportedLoaders.length) {
+      const sortedLoaders = [...mod.supportedLoaders].sort((a, b) => a.localeCompare(b));
+      const loaderInList = userLoader
+        ? sortedLoaders.some(l => String(l).toLowerCase() === userLoader)
+        : false;
+      const loaderIsMissing = !!userLoader && !loaderInList;
+      if (loaderIsMissing) {
+        sortedLoaders.push(userLoader);
+        sortedLoaders.sort((a, b) => a.localeCompare(b));
+      }
+      const loaderChips = sortedLoaders.map(l => {
+        const isUserLoader = userLoader && String(l).toLowerCase() === userLoader;
+        let cls = 'reason-chip reason-chip-loader';
+        if (isUserLoader) cls += loaderIsMissing ? ' is-missing' : ' is-supported';
+        return `<span class="${cls}">${escapeChip(l)}</span>`;
+      }).join('');
+      chipsHtml += `<div style="margin-top:0.6rem;">
       <span style="font-size:0.75em;color:var(--secondary-text);display:block;margin-bottom:0.3rem;">Supported Loaders</span>
       <div style="display:flex;flex-wrap:wrap;gap:0.3rem;">${loaderChips}</div>
     </div>`;
-  }
+    }
 
-  if (mod.supportedVersions && mod.supportedVersions.length) {
-    const sortDescending = (a, b) => {
-      const pa = a.split('.').map(n => parseInt(n, 10) || 0);
-      const pb = b.split('.').map(n => parseInt(n, 10) || 0);
-      for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-        const diff = (pb[i] || 0) - (pa[i] || 0);
-        if (diff !== 0) return diff;
+    let sortedVersions = [];
+    let renderVersionChip = null;
+    let hasHiddenVersions = false;
+    if (mod.supportedVersions && mod.supportedVersions.length) {
+      const sortDescending = (a, b) => {
+        const pa = a.split('.').map(n => parseInt(n, 10) || 0);
+        const pb = b.split('.').map(n => parseInt(n, 10) || 0);
+        for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+          const diff = (pb[i] || 0) - (pa[i] || 0);
+          if (diff !== 0) return diff;
+        }
+        return 0;
+      };
+      sortedVersions = [...mod.supportedVersions].sort(sortDescending);
+      const versionInList = userGameVersion
+        ? sortedVersions.some(v => v === userGameVersion)
+        : false;
+      const versionIsMissing = !!userGameVersion && !versionInList;
+      if (versionIsMissing) {
+        sortedVersions = [...sortedVersions, userGameVersion].sort(sortDescending);
       }
-      return 0;
-    };
-    let sortedVersions = [...mod.supportedVersions].sort(sortDescending);
-    const versionInList = userGameVersion
-      ? sortedVersions.some(v => v === userGameVersion)
-      : false;
-    const versionIsMissing = !!userGameVersion && !versionInList;
-    if (versionIsMissing) {
-      sortedVersions = [...sortedVersions, userGameVersion].sort(sortDescending);
-    }
 
-    const VISIBLE_COUNT = 25;
-    const naturalVisibleVersions = sortedVersions.slice(0, VISIBLE_COUNT);
-    const naturalHiddenVersions = sortedVersions.slice(VISIBLE_COUNT);
-    let collapsedVisibleVersions = [...naturalVisibleVersions];
+      const VISIBLE_COUNT = 25;
+      const naturalVisibleVersions = sortedVersions.slice(0, VISIBLE_COUNT);
+      const naturalHiddenVersions = sortedVersions.slice(VISIBLE_COUNT);
+      let collapsedVisibleVersions = [...naturalVisibleVersions];
+      hasHiddenVersions = naturalHiddenVersions.length > 0;
 
-    // If the user's selected version sorts past the collapsed chunk, promote it
-    // into the last visible slot while collapsed. This applies to both missing
-    // red chips and supported green chips, so the compatibility signal is
-    // visible before expanding. The expanded view renders the full sorted list
-    // separately, so the promoted marker doesn't break sort order after
-    // "Show all" is clicked.
-    if (userGameVersion && naturalHiddenVersions.includes(userGameVersion)) {
-      collapsedVisibleVersions = [...naturalVisibleVersions.slice(0, -1), userGameVersion];
-    }
+      // If the user's selected version sorts past the collapsed chunk, promote it
+      // into the last visible slot while collapsed. This applies to both missing
+      // red chips and supported green chips, so the compatibility signal is
+      // visible before expanding. The expanded view renders the full sorted list
+      // separately, so the promoted marker doesn't break sort order after
+      // "Show all" is clicked.
+      if (userGameVersion && naturalHiddenVersions.includes(userGameVersion)) {
+        collapsedVisibleVersions = [...naturalVisibleVersions.slice(0, -1), userGameVersion];
+      }
 
-    const renderVersionChip = (v) => {
-      const isUserVersion = userGameVersion && v === userGameVersion;
-      let cls = 'reason-chip';
-      if (isUserVersion) cls += versionIsMissing ? ' is-missing' : ' is-supported';
-      return `<span class="${cls}">${escapeChip(v)}</span>`;
-    };
+      renderVersionChip = (v) => {
+        const isUserVersion = userGameVersion && v === userGameVersion;
+        let cls = 'reason-chip';
+        if (isUserVersion) cls += versionIsMissing ? ' is-missing' : ' is-supported';
+        return `<span class="${cls}">${escapeChip(v)}</span>`;
+      };
 
-    let versionsHtml = `<div style="margin-top:0.6rem;">
+      let versionsHtml = `<div style="margin-top:0.6rem;">
       <span style="font-size:0.75em;color:var(--secondary-text);display:block;margin-bottom:0.3rem;">Supported Versions</span>
       <div class="version-chips-collapsed" style="display:flex;flex-wrap:wrap;gap:0.3rem;">${collapsedVisibleVersions.map(renderVersionChip).join('')}</div>`;
-    if (naturalHiddenVersions.length) {
-      // The toggle counts the project's actual supported versions only — the
-      // user's inserted "missing" chip (when present) doesn't count toward
-      // that total because it represents a version the project does NOT
-      // support.
-      const supportedCount = mod.supportedVersions.length;
-      versionsHtml += `<div class="version-chips-expanded" style="display:none;flex-wrap:wrap;gap:0.3rem;">${sortedVersions.map(renderVersionChip).join('')}</div>
-      <button type="button" class="show-more-versions" data-total-count="${supportedCount}" style="margin-top:0.4rem;background:transparent;border:none;color:var(--secondary-text);font-size:0.75em;cursor:pointer;text-decoration:underline;padding:0;">Show all ${supportedCount} versions</button>`;
+      if (hasHiddenVersions) {
+        // The toggle counts the project's actual supported versions only — the
+        // user's inserted "missing" chip (when present) doesn't count toward
+        // that total because it represents a version the project does NOT
+        // support.
+        const supportedCount = mod.supportedVersions.length;
+        versionsHtml += `<button type="button" class="show-more-versions" data-total-count="${supportedCount}" style="margin-top:0.4rem;background:transparent;border:none;color:var(--secondary-text);font-size:0.75em;cursor:pointer;text-decoration:underline;padding:0;">Show all ${supportedCount} versions</button>`;
+      }
+      versionsHtml += `</div>`;
+      chipsHtml += versionsHtml;
     }
-    versionsHtml += `</div>`;
-    chipsHtml += versionsHtml;
-  }
-  reasonContent.innerHTML = `<p style="font-weight: bold; margin: 0 0 0.8rem 0;">${mod.reason}</p>${chipsHtml}`;
+    reasonContent.innerHTML = `<p style="font-weight: bold; margin: 0 0 0.8rem 0;">${mod.reason}</p>${chipsHtml}`;
 
-  // Attach toggle listener for expandable version chips
-  const showMoreBtn = reasonContent.querySelector('.show-more-versions');
-  if (showMoreBtn) {
-    // The total reflects the project's actual supported version count, which
-    // intentionally excludes any inserted "missing" chip representing the
-    // user's unsupported selection.
-    const totalCount = showMoreBtn.dataset.totalCount || (mod.supportedVersions ? mod.supportedVersions.length : 0);
-    showMoreBtn.addEventListener('click', () => {
-      const collapsed = reasonContent.querySelector('.version-chips-collapsed');
-      const expanded = reasonContent.querySelector('.version-chips-expanded');
-      const isCollapsed = expanded.style.display === 'none';
-      collapsed.style.display = isCollapsed ? 'none' : 'flex';
-      expanded.style.display = isCollapsed ? 'flex' : 'none';
-      showMoreBtn.textContent = isCollapsed ? 'Show fewer versions' : `Show all ${totalCount} versions`;
-    });
+    const showMoreBtn = reasonContent.querySelector('.show-more-versions');
+    if (showMoreBtn && renderVersionChip) {
+      // The total reflects the project's actual supported version count, which
+      // intentionally excludes any inserted "missing" chip representing the
+      // user's unsupported selection.
+      const totalCount = showMoreBtn.dataset.totalCount || (mod.supportedVersions ? mod.supportedVersions.length : 0);
+      showMoreBtn.addEventListener('click', () => {
+        const collapsed = reasonContent.querySelector('.version-chips-collapsed');
+        let expanded = reasonContent.querySelector('.version-chips-expanded');
+        if (!expanded) {
+          expanded = document.createElement('div');
+          expanded.className = 'version-chips-expanded';
+          expanded.style.cssText = 'display:flex;flex-wrap:wrap;gap:0.3rem;';
+          expanded.innerHTML = sortedVersions.map(renderVersionChip).join('');
+          collapsed.insertAdjacentElement('afterend', expanded);
+          collapsed.style.display = 'none';
+          showMoreBtn.textContent = 'Show fewer versions';
+          return;
+        }
+        const isCollapsed = expanded.style.display === 'none';
+        collapsed.style.display = isCollapsed ? 'none' : 'flex';
+        expanded.style.display = isCollapsed ? 'flex' : 'none';
+        showMoreBtn.textContent = isCollapsed ? 'Show fewer versions' : `Show all ${totalCount} versions`;
+      });
+    }
   }
+
+  reasonToggle.addEventListener("click", () => {
+    const opening = !reasonContent.classList.contains("visible");
+    if (opening) ensureReasonContent();
+    reasonContent.classList.toggle("visible", opening);
+    reasonToggle.classList.toggle("active", opening);
+  });
 
   // --- Add project_type icon if available ---
   if (mod.project_type) {
