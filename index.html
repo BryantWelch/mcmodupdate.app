@@ -7640,9 +7640,9 @@
     document.getElementById("current-year").textContent =
       new Date().getFullYear();
 
-    // Shared timed localStorage helpers for decorative/bootstrap Modrinth data
-    // (MC versions dropdown + homepage stats). Same stale-while-revalidate
-    // policy: paint any cached payload, skip the network when fresh.
+    // Shared timed localStorage helpers for decorative/bootstrap Modrinth data.
+    // MC versions use the TTL to skip fresh network requests; homepage stats
+    // use cached data only for the initial paint and revalidate on every load.
     const LOCAL_JSON_CACHE_TTL_24H = 1000 * 60 * 60 * 24; // 24 hours
     const MODRINTH_STATS_CACHE_KEY = "modrinth_stats_cache";
     const MC_VERSIONS_CACHE_KEY = "modrinth_game_versions_cache";
@@ -7845,15 +7845,17 @@
         if (stats.authors != null) elAuthors.textContent = stats.authors;
       };
 
-      // Show cached stats immediately (even if stale), then refresh if needed.
+      // Show cached stats immediately (even if stale), then always revalidate.
+      // This keeps a value visible during outages without letting a fresh
+      // localStorage entry prevent the latest platform totals from loading.
       const cached = readTimedLocalCache(MODRINTH_STATS_CACHE_KEY);
       if (cached) {
         paintStats(cached.data);
-        if (cached.fresh) return;
       }
 
       try {
         const response = await fetchWithRetry("https://api.modrinth.com/v2/statistics", {
+          cache: "no-store",
           headers: { "Accept": "application/json" }
         });
         if (!response.ok) return;
