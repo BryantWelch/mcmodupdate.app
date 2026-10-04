@@ -5694,9 +5694,8 @@
     let currentSearchOffset = 0;
     let totalSearchResults = 0;
     let isShowingFeatured = false;
-    let currentFeaturedSort = "";
+    let currentFeaturedSort = "relevance";
     let currentFeaturedProjectType = "";
-    let hasRandomizedInitialFeatured = false;
     // Sort/type/loader/version/platform used for the featured DOM currently on screen.
     // Focus reopens reuse that DOM when this key still matches.
     let lastFeaturedFilterKey = "";
@@ -6019,8 +6018,8 @@
         // Build the API URL
         let searchUrl = `https://api.modrinth.com/v2/search?limit=${searchResultsPerPage}&offset=${currentSearchOffset}`;
         
-        // Add sorting
-        if (sortBy) {
+        // Relevance is Modrinth's default index, so omit it the same way a typed search does.
+        if (sortBy && sortBy !== "relevance") {
           searchUrl += `&index=${sortBy}`;
         }
 
@@ -6100,18 +6099,6 @@
         }
         console.error("Featured content loading failed:", error);
       }
-    }
-
-    // Function to randomly select initial featured content (exclude relevance)
-    function getRandomSortOption() {
-      const sortOptions = ['follows', 'downloads', 'updated', 'newest'];
-      return sortOptions[Math.floor(Math.random() * sortOptions.length)];
-    }
-
-    // Function to randomly select project type (weighted toward "All Projects")
-    function getRandomProjectType() {
-      const projectTypes = ['', '', '', '', 'mod', 'modpack', 'shader', 'resourcepack', 'datapack', 'plugin']; // Empty string appears 4x for higher probability
-      return projectTypes[Math.floor(Math.random() * projectTypes.length)];
     }
 
     async function loadMoreResults() {
@@ -6221,7 +6208,7 @@
         const featuredSort = currentFeaturedSort || sortSelect.value;
         sortSelect.value = featuredSort;
 
-        // Show featured content when search is empty - don't randomize, use current filters
+        // Show featured content when search is empty, using the current filters.
         if (!isShowingFeatured) {
           loadFeaturedContent(featuredSort, projectTypeSelect.value);
         }
@@ -6241,7 +6228,7 @@
       currentSearchOffset = 0;
       totalSearchResults = 0;
       isShowingFeatured = false;
-      // Show featured content when cleared - don't randomize, use current filters
+      // Show featured content when cleared, using the current filters.
       loadFeaturedContent(sortSelect.value, projectTypeSelect.value);
       // NOTE: Do NOT clear searchedMods here. Pills in the upload area are the
       // source of truth for added mods; their X-button handler removes the
@@ -6293,20 +6280,9 @@
       // Focus the modal search input for immediate typing
       modalSearchInput.focus();
 
-      // If no search query, show featured content
+      // If no search query, show featured content. Defaults are Relevance and All Projects.
       if (!currentSearchQuery) {
-        // Only randomize on first open per session
-        if (!hasRandomizedInitialFeatured) {
-          const randomSort = getRandomSortOption();
-          const randomProjectType = getRandomProjectType();
-          sortSelect.value = randomSort;
-          projectTypeSelect.value = randomProjectType;
-          updateModalLoaderOptions(projectTypeSelect.value, modLoaderSelect.value);
-          currentFeaturedSort = randomSort;
-          currentFeaturedProjectType = randomProjectType;
-          hasRandomizedInitialFeatured = true;
-        }
-        const sortBy = currentFeaturedSort || sortSelect.value;
+        const sortBy = currentFeaturedSort || sortSelect.value || "relevance";
         const projectType = currentFeaturedProjectType || projectTypeSelect.value;
         // Reuse the existing featured DOM when sort/type/loader/version/platform
         // are unchanged — avoids "Loading..." flicker + a repeat API call on
